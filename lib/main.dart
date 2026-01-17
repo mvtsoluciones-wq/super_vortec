@@ -31,7 +31,7 @@ class ClientHomeScreen extends StatefulWidget {
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
-  // DATOS
+  // DATOS ACTUALIZADOS CON GARANTÍA Y TIEMPOS
   final List<Map<String, dynamic>> myVehicles = [
     {
       "brand": "CHEVROLET",
@@ -47,12 +47,20 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "date": "17 Ene 2026",
           "status": "En Proceso",
           "isCompleted": false,
+          // Como no ha terminado, no tiene garantía activa aún
+          "warranty": "Pendiente", 
+          "daysLeft": "-",
+          "elapsed": "En curso",
         },
         {
           "title": "Cambio de Aceite y Filtro",
           "date": "10 Dic 2025",
           "status": "Finalizado",
           "isCompleted": true,
+          // NUEVOS DATOS
+          "warranty": "3 Meses",
+          "daysLeft": "54 Días",
+          "elapsed": "1 Mes y 7 días",
         },
       ]
     },
@@ -70,6 +78,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "date": "05 Nov 2025",
           "status": "Finalizado",
           "isCompleted": true,
+          // NUEVOS DATOS
+          "warranty": "6 Meses",
+          "daysLeft": "110 Días",
+          "elapsed": "2 Meses",
         },
       ]
     },
@@ -83,7 +95,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     final currentHistory = myVehicles[_currentPage]['history'] as List<Map<String, dynamic>>;
 
     return Scaffold(
-      extendBodyBehindAppBar: true, // El cuerpo empieza desde el borde superior absoluto
+      extendBodyBehindAppBar: true,
       drawer: _buildDrawer(),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -105,26 +117,25 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           ),
         ],
       ),
-      // CAMBIO IMPORTANTE: Usamos STACK para fijar el fondo
       body: Stack(
         children: [
-          // 1. EL FONDO (Capa Trasera - Fija)
+          // 1. EL FONDO
           Container(
-            height: double.infinity, // Ocupa todo el alto
-            width: double.infinity,  // Ocupa todo el ancho
+            height: double.infinity,
+            width: double.infinity,
             decoration: const BoxDecoration(
               gradient: RadialGradient(
                 center: Alignment(0, -0.3),
                 radius: 1.2,
                 colors: [
-                  Color(0xFF252525), // Luz central
-                  Colors.black,      // Sombra en bordes
+                  Color(0xFF252525),
+                  Colors.black,
                 ],
               ),
             ),
           ),
           
-          // 2. EL CONTENIDO (Capa Delantera - Scrollable)
+          // 2. EL CONTENIDO
           SingleChildScrollView(
             padding: const EdgeInsets.only(top: 100), 
             child: Column(
@@ -243,8 +254,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  // --- WIDGETS (Sin cambios) ---
-  
+  // --- WIDGET: TARJETA DE HISTORIAL COMPLETA ---
   Widget _buildHistoryCard(Map<String, dynamic> historyItem) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
@@ -257,63 +267,112 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.white10),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              isCompleted ? Icons.check_circle : Icons.timelapse,
-              color: statusColor,
-              size: 20,
-            ),
+          // PARTE SUPERIOR: TÍTULO Y ESTADO
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isCompleted ? Icons.check_circle : Icons.timelapse,
+                  color: statusColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      historyItem['title'],
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      historyItem['date'],
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  historyItem['status'],
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold
+                  ),
+                ),
+              )
+            ],
           ),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+
+          // SI ESTÁ TERMINADO, MOSTRAMOS LA INFO DE GARANTÍA
+          if (isCompleted) ...[
+            const SizedBox(height: 15),
+            const Divider(color: Colors.white10, height: 1),
+            const SizedBox(height: 15),
+            
+            // FILA DE ESTADÍSTICAS (Garantía, Días Restantes, Tiempo Pasado)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  historyItem['title'],
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  historyItem['date'],
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 11,
-                  ),
-                ),
+                _buildHistoryStat(Icons.verified_user_outlined, "Garantía", historyItem['warranty']),
+                _buildHistoryStat(Icons.hourglass_bottom, "Restan", historyItem['daysLeft'], isHighlighted: true),
+                _buildHistoryStat(Icons.history, "Pasado", historyItem['elapsed']),
               ],
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              border: Border.all(color: statusColor.withValues(alpha: 0.5)),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              historyItem['status'],
-              style: TextStyle(
-                color: statusColor,
-                fontSize: 9,
-                fontWeight: FontWeight.bold
-              ),
-            ),
-          )
+          ]
         ],
       ),
     );
   }
+
+  // Helper para las estadísticas pequeñas del historial
+  Widget _buildHistoryStat(IconData icon, String label, String value, {bool isHighlighted = false}) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: Colors.grey),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value, 
+          style: TextStyle(
+            color: isHighlighted ? Colors.greenAccent : Colors.white, 
+            fontSize: 11, 
+            fontWeight: FontWeight.bold
+          )
+        ),
+      ],
+    );
+  }
+
+  // --- WIDGETS (Sin cambios) ---
 
   Widget _buildVehicleCard(Map<String, dynamic> vehicleData) {
     bool isInWorkshop = vehicleData['isInWorkshop'];
