@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart'; // Importante para el video
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 class DiagnosticScreen extends StatefulWidget {
   const DiagnosticScreen({super.key});
@@ -26,7 +26,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       "price": 85.00,
       "isSelected": true, 
       "isFixable": true,
-      "videoUrl": "https://www.youtube.com/watch?v=wblL1YIDu-A", // Video de ejemplo
+      "videoUrl": "https://www.youtube.com/watch?v=wblL1YIDu-A", 
       "breakdown": [
         {"item": "Bobina Original AC Delco", "cost": 55.00},
         {"item": "Bujía Iridium", "cost": 10.00},
@@ -181,19 +181,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(item['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(color: item['color'].withValues(alpha: 0.2), borderRadius: BorderRadius.circular(5)),
-                            child: Text(item['code'], style: TextStyle(color: item['color'], fontWeight: FontWeight.bold, fontSize: 12)),
-                          )
-                        ],
-                      ),
+                      // TÍTULO LIMPIO (Sin códigos)
+                      Text(item['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                       
                       const SizedBox(height: 8),
                       
@@ -236,6 +225,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                               ],
                             ),
                             const Spacer(),
+                            // BOTÓN ACTUALIZADO
                             TextButton.icon(
                               onPressed: () {
                                 Navigator.push(
@@ -243,8 +233,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                                   MaterialPageRoute(builder: (context) => BudgetDetailScreen(item: item))
                                 );
                               },
-                              icon: const Icon(Icons.play_circle_fill, size: 20, color: Colors.red), // Icono Play
-                              label: const Text("Ver Evidencia", style: TextStyle(color: Colors.white, fontSize: 12)),
+                              icon: const Icon(Icons.play_circle_fill, size: 20, color: Colors.red), 
+                              label: const Text("Ver Detalle", style: TextStyle(color: Colors.white, fontSize: 12)),
                             )
                           ],
                         )
@@ -330,7 +320,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   }
 }
 
-// --- PANTALLA DETALLE ACTUALIZADA (VIDEO + PRESUPUESTO) ---
+// --- PANTALLA DETALLE ACTUALIZADA (SOPORTE FULL SCREEN) ---
 class BudgetDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
   const BudgetDetailScreen({super.key, required this.item});
@@ -348,7 +338,12 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
     String? videoId = YoutubePlayer.convertUrlToId(widget.item['videoUrl'] ?? "");
     _controller = YoutubePlayerController(
       initialVideoId: videoId ?? "", 
-      flags: const YoutubePlayerFlags(autoPlay: false, mute: false, forceHD: true),
+      flags: const YoutubePlayerFlags(
+        autoPlay: false, 
+        mute: false, 
+        forceHD: true,
+        enableCaption: false,
+      ),
     );
   }
 
@@ -363,99 +358,103 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
     final List breakdown = widget.item['breakdown'] ?? [];
     const Color bgDark = Color(0xFF121212);
 
-    return Scaffold(
-      backgroundColor: bgDark,
-      appBar: AppBar(
-        backgroundColor: bgDark,
-        elevation: 0,
-        leading: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context)),
-        title: const Text("Evidencia y Costos", style: TextStyle(color: Colors.white, fontSize: 16)),
-        centerTitle: true,
+    // USAMOS YoutubePlayerBuilder PARA SOPORTAR PANTALLA COMPLETA REAL
+    return YoutubePlayerBuilder(
+      player: YoutubePlayer(
+        controller: _controller,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: Colors.red,
+        bottomActions: [
+          CurrentPosition(),
+          ProgressBar(isExpanded: true, colors: const ProgressBarColors(playedColor: Colors.red, handleColor: Colors.redAccent)),
+          const SizedBox(width: 10),
+          RemainingDuration(),
+          const FullScreenButton(), // Botón explícito de pantalla completa
+        ],
       ),
-      body: SingleChildScrollView( // Scroll por si el video es grande
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. TÍTULO
-            Text(widget.item['title'], style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            
-            // 2. DIAGNÓSTICO (Sin código, solo texto)
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
-              child: Text(
-                widget.item['diagnosis'],
-                style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
-              ),
-            ),
-            
-            const SizedBox(height: 25),
-            
-            // 3. VIDEO DE LA FALLA (Cuadrícula)
-            if (widget.item['videoUrl'] != null && widget.item['videoUrl'].isNotEmpty) ...[
-              const Text("EVIDENCIA EN VIDEO", style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-              const SizedBox(height: 10),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 15, offset: const Offset(0, 5))],
+      builder: (context, player) {
+        return Scaffold(
+          backgroundColor: bgDark,
+          appBar: AppBar(
+            backgroundColor: bgDark,
+            elevation: 0,
+            leading: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context)),
+            title: const Text("Evidencia y Costos", style: TextStyle(color: Colors.white, fontSize: 16)),
+            centerTitle: true,
+          ),
+          body: SingleChildScrollView( 
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(widget.item['title'], style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
+                  child: Text(
+                    widget.item['diagnosis'],
+                    style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
+                  ),
                 ),
-                clipBehavior: Clip.antiAlias, // Para redondear el video
-                child: YoutubePlayer(
-                  controller: _controller,
-                  showVideoProgressIndicator: true,
-                  progressIndicatorColor: Colors.red,
-                  bottomActions: [
-                    CurrentPosition(),
-                    ProgressBar(isExpanded: true, colors: const ProgressBarColors(playedColor: Colors.red, handleColor: Colors.redAccent)),
-                    RemainingDuration(),
-                  ],
-                ),
-              ),
-            ],
-
-            const SizedBox(height: 30),
-
-            // 4. DESGLOSE DEL PRESUPUESTO
-            const Text("PRESUPUESTO DETALLADO", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 15),
-
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Column(
-                children: [
-                  ...breakdown.map((detail) => Padding(
-                    padding: const EdgeInsets.only(bottom: 15),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(detail['item'], style: const TextStyle(color: Colors.white70)),
-                        Text("\$${detail['cost'].toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  )),
-                  const Divider(color: Colors.white24),
+                
+                const SizedBox(height: 25),
+                
+                if (widget.item['videoUrl'] != null && widget.item['videoUrl'].isNotEmpty) ...[
+                  const Text("EVIDENCIA EN VIDEO", style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                   const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("TOTAL ITEM", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold)),
-                      Text("\$${widget.item['price'].toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
-                    ],
-                  )
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 15, offset: const Offset(0, 5))],
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: player, // AQUÍ VA EL REPRODUCTOR QUE NOS DA EL BUILDER
+                  ),
                 ],
-              ),
+
+                const SizedBox(height: 30),
+
+                const Text("PRESUPUESTO DETALLADO", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 15),
+
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Column(
+                    children: [
+                      ...breakdown.map((detail) => Padding(
+                        padding: const EdgeInsets.only(bottom: 15),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(detail['item'], style: const TextStyle(color: Colors.white70)),
+                            Text("\$${detail['cost'].toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      )),
+                      const Divider(color: Colors.white24),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("TOTAL ITEM", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold)),
+                          Text("\$${widget.item['price'].toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }
