@@ -34,17 +34,20 @@ class ClientHomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Definimos el ROJO DE LA MARCA para usarlo fácil
+    const Color brandRed = Color(0xFFD50000);
+
     return Scaffold(
       drawer: _buildDrawer(),
       appBar: AppBar(
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          'SUPER VORTEC', 
+          'MI GARAJE', 
           style: TextStyle(
             fontWeight: FontWeight.bold, 
             letterSpacing: 2.0,
-            color: Colors.white // Blanco
+            color: Colors.white
           )
         ),
         actions: [
@@ -67,18 +70,18 @@ class ClientHomeScreen extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 children: [
-                  _buildSliderItem(Icons.calendar_month, "Citas", Colors.redAccent),
+                  _buildSliderItem(Icons.calendar_month, "Citas", brandRed),
                   _buildSliderItem(Icons.monitor_heart, "Diagnóstico", Colors.white),
-                  _buildSliderItem(Icons.storefront, "Tienda", Colors.white),
-                  _buildSliderItem(Icons.local_offer, "Ofertas", Colors.redAccent),
-                  _buildSliderItem(Icons.sell, "Marketplace", Colors.white),
+                  _buildSliderItem(Icons.storefront, "Tienda", brandRed),
+                  _buildSliderItem(Icons.local_offer, "Ofertas", Colors.green),
+                  _buildSliderItem(Icons.sell, "Marketplace", brandRed),
                 ],
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // 2. DIAGNÓSTICO
+            // 2. TARJETA COMPACTA (SIN BARRA DE PROGRESO)
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Text("TU VEHÍCULO", style: TextStyle(color: Colors.grey, fontSize: 14, letterSpacing: 1.5)),
@@ -148,50 +151,96 @@ class ClientHomeScreen extends StatelessWidget {
     );
   }
 
+  // --- TARJETA COMPACTA ACTUALIZADA ---
   Widget _buildDiagnosticCard() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(25),
+      padding: const EdgeInsets.all(15), 
       decoration: BoxDecoration(
-        color: const Color(0xFF111111),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF3A3A3A), 
+            Color(0xFF121212), 
+          ],
+        ),
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color(0xFFD50000), width: 1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
         boxShadow: [
-          // CORRECCIÓN AQUÍ: Usamos .withValues(alpha: 0.1) en lugar de .withOpacity(0.1)
           BoxShadow(
-            color: Colors.red.withValues(alpha: 0.1), 
-            blurRadius: 15, 
-            spreadRadius: 1
+            color: Colors.black.withValues(alpha: 0.5),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
           )
         ]
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // FILA 1: Encabezado (Icono + Nombre + Estado)
+          Row(
             children: [
-              Icon(Icons.directions_car, color: Colors.white, size: 30),
-              Text("EN TALLER", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, letterSpacing: 1)),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.directions_car, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("CHEVROLET SILVERADO", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                    Text("Año 2008", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  ],
+                ),
+              ),
+              // Badge de estado pequeño
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD50000).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(color: const Color(0xFFD50000).withValues(alpha: 0.5)),
+                ),
+                child: const Text("EN TALLER", style: TextStyle(color: Color(0xFFFF5252), fontWeight: FontWeight.bold, fontSize: 9)),
+              ),
             ],
           ),
+          
           const SizedBox(height: 15),
-          const Text("Silverado 2008", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white)),
-          const Text("Diagnóstico de falla Cilindro 3", style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 20),
-          LinearProgressIndicator(
-            value: 0.5, 
-            backgroundColor: Colors.grey[900],
-            color: const Color(0xFFD50000),
-            minHeight: 4,
+          const Divider(color: Colors.white10, height: 1),
+          const SizedBox(height: 15),
+
+          // FILA 2: DATOS TÉCNICOS EN GRID (Placa, Color, Km)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildCompactInfo("PLACA", "123 ASD"),
+              _buildCompactInfo("COLOR", "AZUL"),
+              _buildCompactInfo("KM", "250.000"),
+            ],
           ),
-          const SizedBox(height: 10),
-          const Align(
-            alignment: Alignment.centerRight,
-            child: Text("50% Completado", style: TextStyle(color: Colors.white, fontSize: 12)),
-          )
+          
+          // La barra de progreso ha sido eliminada de aquí
         ],
       ),
+    );
+  }
+
+  // Widget auxiliar pequeño para los datos
+  Widget _buildCompactInfo(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9, letterSpacing: 0.5)),
+        const SizedBox(height: 2),
+        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+      ],
     );
   }
 
