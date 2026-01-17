@@ -81,7 +81,7 @@ class ClientHomeScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // 2. TARJETA COMPACTA (SIN BARRA DE PROGRESO)
+            // 2. TARJETA COMPACTA
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Text("TU VEHÍCULO", style: TextStyle(color: Colors.grey, fontSize: 14, letterSpacing: 1.5)),
@@ -90,16 +90,6 @@ class ClientHomeScreen extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _buildDiagnosticCard(),
             ),
-
-            const SizedBox(height: 30),
-
-            // 3. OFERTAS
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text("DESTACADO", style: TextStyle(color: Colors.grey, fontSize: 14, letterSpacing: 1.5)),
-            ),
-            const SizedBox(height: 10),
-            _buildOfferBanner(),
             
             const SizedBox(height: 30),
           ],
@@ -151,8 +141,12 @@ class ClientHomeScreen extends StatelessWidget {
     );
   }
 
-  // --- TARJETA COMPACTA ACTUALIZADA ---
+  // --- TARJETA COMPACTA CON LÓGICA CONDICIONAL ---
   Widget _buildDiagnosticCard() {
+    // 💡 AQUÍ ESTÁ EL INTERRUPTOR
+    // Cambia esto a 'false' para probar cómo se ve cuando NO está en el taller.
+    bool isInWorkshop = true; 
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15), 
@@ -178,7 +172,7 @@ class ClientHomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // FILA 1: Encabezado (Icono + Nombre + Estado)
+          // FILA 1: Encabezado
           Row(
             children: [
               Container(
@@ -199,16 +193,18 @@ class ClientHomeScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              // Badge de estado pequeño
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFD50000).withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(5),
-                  border: Border.all(color: const Color(0xFFD50000).withValues(alpha: 0.5)),
+              
+              // 🔽 CONDICIÓN: Solo mostramos este bloque si isInWorkshop es VERDADERO
+              if (isInWorkshop)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD50000).withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border.all(color: const Color(0xFFD50000).withValues(alpha: 0.5)),
+                  ),
+                  child: const Text("EN TALLER", style: TextStyle(color: Color(0xFFFF5252), fontWeight: FontWeight.bold, fontSize: 9)),
                 ),
-                child: const Text("EN TALLER", style: TextStyle(color: Color(0xFFFF5252), fontWeight: FontWeight.bold, fontSize: 9)),
-              ),
             ],
           ),
           
@@ -216,7 +212,7 @@ class ClientHomeScreen extends StatelessWidget {
           const Divider(color: Colors.white10, height: 1),
           const SizedBox(height: 15),
 
-          // FILA 2: DATOS TÉCNICOS EN GRID (Placa, Color, Km)
+          // FILA 2: DATOS TÉCNICOS
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -225,14 +221,11 @@ class ClientHomeScreen extends StatelessWidget {
               _buildCompactInfo("KM", "250.000"),
             ],
           ),
-          
-          // La barra de progreso ha sido eliminada de aquí
         ],
       ),
     );
   }
 
-  // Widget auxiliar pequeño para los datos
   Widget _buildCompactInfo(String label, String value) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,49 +259,6 @@ class ClientHomeScreen extends StatelessWidget {
             label,
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 11, color: Colors.white),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildOfferBanner() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      height: 140,
-      decoration: BoxDecoration(
-        color: const Color(0xFFD50000),
-        borderRadius: BorderRadius.circular(0),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    color: Colors.black,
-                    child: const Text("OFERTA FLASH", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text("KIT VORTEC", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 22)),
-                  const Text("Bobinas + Bujías", style: TextStyle(color: Colors.white70, fontSize: 12)),
-                ],
-              ),
-            ),
-          ),
-          Expanded(
-            child: Container(
-              color: Colors.black12,
-              child: const Center(
-                child: Icon(Icons.flash_on, color: Colors.white, size: 60),
-              ),
-            ),
           )
         ],
       ),
