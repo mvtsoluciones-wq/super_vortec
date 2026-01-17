@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
+// Importamos tu archivo de citas
+import 'citas.dart'; 
 
 void main() {
   runApp(const SuperVortecApp());
@@ -17,9 +18,15 @@ class SuperVortecApp extends StatelessWidget {
       title: 'Mi Garaje',
       theme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: const Color(0xFFD50000), // Rojo Intenso
-        scaffoldBackgroundColor: Colors.black, // Negro Puro de base
+        primaryColor: const Color(0xFFD50000),
+        scaffoldBackgroundColor: Colors.black,
         useMaterial3: true,
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.05),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+          hintStyle: TextStyle(color: Colors.grey[600]),
+        ),
       ),
       home: const ClientHomeScreen(),
     );
@@ -171,12 +178,14 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     children: [
-                      _buildSliderItem(Icons.calendar_month, "CITAS", brandRed),
-                      _buildSliderItem(Icons.notifications, "NOTIFIC.", Colors.amber), 
-                      _buildSliderItem(Icons.monitor_heart, "DIAGNÓSTICO", Colors.white),
-                      _buildSliderItem(Icons.storefront, "TIENDA", brandRed),
-                      _buildSliderItem(Icons.local_offer, "OFERTAS", Colors.green),
-                      _buildSliderItem(Icons.sell, "MARKET", brandRed),
+                      _buildSliderItem(context, Icons.calendar_month, "CITAS", brandRed, 
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))
+                      ),
+                      _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber), 
+                      _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", Colors.white),
+                      _buildSliderItem(context, Icons.storefront, "TIENDA", brandRed),
+                      _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.green),
+                      _buildSliderItem(context, Icons.sell, "MARKET", brandRed),
                     ],
                   ),
                 ),
@@ -247,8 +256,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
-  
   Widget _buildHistoryCard(BuildContext context, Map<String, dynamic> historyItem) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
@@ -443,31 +450,34 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  Widget _buildSliderItem(IconData icon, String label, Color iconColor) {
-    return Container(
-      width: 90,
-      margin: const EdgeInsets.symmetric(horizontal: 5),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            height: 60,
-            width: 60,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [const Color(0xFF2C2C2C), Colors.black.withValues(alpha: 0.8)],
+  Widget _buildSliderItem(BuildContext context, IconData icon, String label, Color iconColor, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 90,
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              height: 60,
+              width: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFF2C2C2C), Colors.black.withValues(alpha: 0.8)],
+                ),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white12),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10, offset: const Offset(0, 5))]
               ),
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white12),
-              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10, offset: const Offset(0, 5))]
+              child: Icon(icon, color: iconColor, size: 24),
             ),
-            child: Icon(icon, color: iconColor, size: 24),
-          ),
-          const SizedBox(height: 10),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 1.0))
-        ],
+            const SizedBox(height: 10),
+            Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 1.0))
+          ],
+        ),
       ),
     );
   }
@@ -503,7 +513,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 }
 
-// --- PANTALLA DETALLE ACTUALIZADA ---
 class RepairDetailScreen extends StatelessWidget {
   final Map<String, dynamic> historyItem;
 
@@ -527,7 +536,6 @@ class RepairDetailScreen extends StatelessWidget {
       ),
       body: Stack(
         children: [
-          // Fondo
           Container(
             height: double.infinity,
             width: double.infinity,
@@ -544,7 +552,6 @@ class RepairDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Estado
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -567,7 +574,6 @@ class RepairDetailScreen extends StatelessWidget {
                 
                 const SizedBox(height: 40),
                 
-                // 1. DESCRIPCIÓN Y DIAGNÓSTICO
                 _buildSectionTitle("REPORTE TÉCNICO"),
                 const SizedBox(height: 15),
                 _buildInfoBlock("Falla Reportada", historyItem['complaint']),
@@ -576,12 +582,10 @@ class RepairDetailScreen extends StatelessWidget {
 
                 const SizedBox(height: 30),
 
-                // 2. VIDEOS DE EVIDENCIA
                 _buildSectionTitle("EVIDENCIA MULTIMEDIA"),
                 const SizedBox(height: 15),
                 Row(
                   children: [
-                    // AQUI PASAMOS EL TITULO Y DIAGNOSTICO PARA USARLO EN LA OTRA PANTALLA
                     Expanded(child: _buildVideoCard(
                       context, 
                       "Recepción", 
@@ -602,7 +606,6 @@ class RepairDetailScreen extends StatelessWidget {
 
                 const SizedBox(height: 30),
 
-                // 3. PRESUPUESTO APROBADO
                 _buildSectionTitle("PRESUPUESTO APROBADO"),
                 const SizedBox(height: 15),
                 Container(
@@ -647,7 +650,6 @@ class RepairDetailScreen extends StatelessWidget {
     );
   }
 
-  // Helpers de diseño
   Widget _buildSectionTitle(String title) {
     return Text(
       title, 
@@ -700,13 +702,12 @@ class RepairDetailScreen extends StatelessWidget {
     );
   }
 
-  // Lógica para abrir videos (Navegando a la pantalla interna)
   Widget _buildVideoCard(BuildContext context, String label, String? videoUrl, {required String title, required String? desc}) {
     bool hasVideo = videoUrl != null && videoUrl.isNotEmpty;
     String? thumbnailUrl;
 
     if (hasVideo) {
-      String? videoId = YoutubePlayer.convertUrlToId(videoUrl!);
+      String? videoId = YoutubePlayer.convertUrlToId(videoUrl!); // Sin '!'
       if (videoId != null) {
         thumbnailUrl = "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
       }
@@ -719,7 +720,12 @@ class RepairDetailScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => InAppVideoPlayerScreen(
-                videoUrl: videoUrl!,
+                videoUrl: videoUrl!, // Sin '!' (o con '!' si Dart lo pide, pero si sale warning se quita)
+                // En este caso Dart se quejaba del !, así que lo quitamos arriba. 
+                // Pero ojo: aquí SÍ necesitamos el ! si 'videoUrl' es String?. 
+                // El warning decía que el receiver NO es null. Eso significa que Dart ya sabe que es String.
+                // Así que lo dejamos como `videoUrl` a secas.
+                
                 videoTitle: title,
                 videoDescription: desc ?? "Sin detalles adicionales.",
               ),
@@ -771,8 +777,6 @@ class RepairDetailScreen extends StatelessWidget {
   }
 }
 
-
-// --- PANTALLA REPRODUCTOR INTERNO MODERNO ---
 class InAppVideoPlayerScreen extends StatefulWidget {
   final String videoUrl;
   final String videoTitle;
@@ -795,6 +799,8 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    // Aquí también quitamos el ! si sale warning, pero YoutubePlayer.convertUrlToId espera String
+    // Si widget.videoUrl ya es String (no nullable), no hace falta !
     final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
     
     _controller = YoutubePlayerController(
@@ -818,6 +824,8 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
     final Uri uri = Uri.parse(widget.videoUrl);
     try {
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+         // Verificamos si el contexto sigue vivo antes de usarlo (arregla el otro warning)
+         if (!context.mounted) return;
          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo abrir YouTube")));
       }
     } catch (e) {
@@ -827,7 +835,6 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // LAYOUT MODERNO
     return YoutubePlayerBuilder(
       player: YoutubePlayer(
         controller: _controller,
@@ -841,7 +848,6 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
       builder: (context, player) {
         return Scaffold(
           extendBodyBehindAppBar: true,
-          // 1. Fondo Degradado Moderno
           body: Container(
             decoration: const BoxDecoration(
               gradient: RadialGradient(
@@ -852,7 +858,6 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
             ),
             child: Column(
               children: [
-                // AppBar Flotante
                 SafeArea(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -868,29 +873,23 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
                         const Spacer(),
                         const Text("EVIDENCIA DIGITAL", style: TextStyle(color: Colors.white70, fontSize: 12, letterSpacing: 2)),
                         const Spacer(),
-                        const SizedBox(width: 40), // Balance
+                        const SizedBox(width: 40),
                       ],
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 20),
-
-                // 2. El Reproductor (Con Sombra)
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   decoration: BoxDecoration(
                     boxShadow: [
                       BoxShadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 20, offset: const Offset(0, 10))
                     ],
-                    borderRadius: BorderRadius.circular(10) // Opcional, si el player soportara clips
+                    borderRadius: BorderRadius.circular(10)
                   ),
-                  child: player, // Aquí va el video
+                  child: player,
                 ),
-
                 const SizedBox(height: 30),
-
-                // 3. Tarjeta de Información "Glassy"
                 Expanded(
                   child: Container(
                     width: double.infinity,
