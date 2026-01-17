@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 // Importamos tu archivo de citas
 import 'citas.dart';
 import 'diagnostico.dart';
+import 'notificaciones.dart';
 
 void main() {
   runApp(const SuperVortecApp());
@@ -182,7 +183,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       _buildSliderItem(context, Icons.calendar_month, "CITAS", brandRed, 
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))
                       ),
-                      _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber), 
+                      _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber,
+  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const NotificationScreen()))
+),
                       _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", Colors.white, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DiagnosticScreen()))),
                       _buildSliderItem(context, Icons.storefront, "TIENDA", brandRed),
                       _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.green),
