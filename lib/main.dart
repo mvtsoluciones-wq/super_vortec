@@ -50,6 +50,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "warranty": "Pendiente", 
           "daysLeft": "-",
           "elapsed": "En curso",
+          "description": "El vehículo presenta inestabilidad en ralentí (misfire). Se procede a escanear y verificar bobinas y bujías del banco 1.",
         },
         {
           "title": "Cambio de Aceite y Filtro",
@@ -59,6 +60,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "warranty": "3 Meses",
           "daysLeft": "54 Días",
           "elapsed": "1 Mes y 7 días",
+          "description": "Mantenimiento preventivo completo. Se utilizó aceite sintético 5W-30 Dexos y filtro original AC Delco.",
         },
       ]
     },
@@ -79,6 +81,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "warranty": "6 Meses",
           "daysLeft": "110 Días",
           "elapsed": "2 Meses",
+          "description": "Se reemplazaron pastillas delanteras y traseras por desgaste excesivo. Se rectificaron discos de freno.",
         },
       ]
     },
@@ -146,7 +149,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     children: [
                       _buildSliderItem(Icons.calendar_month, "CITAS", brandRed),
-                      // NUEVO ÍTEM: NOTIFICACIONES (Color Ámbar)
                       _buildSliderItem(Icons.notifications, "NOTIFIC.", Colors.amber), 
                       _buildSliderItem(Icons.monitor_heart, "DIAGNÓSTICO", Colors.white),
                       _buildSliderItem(Icons.storefront, "TIENDA", brandRed),
@@ -240,7 +242,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   physics: const NeverScrollableScrollPhysics(), 
                   itemCount: currentHistory.length,
                   itemBuilder: (context, index) {
-                    return _buildHistoryCard(currentHistory[index]);
+                    return _buildHistoryCard(context, currentHistory[index]);
                   },
                 ),
 
@@ -255,89 +257,94 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   // --- WIDGETS AUXILIARES ---
   
-  Widget _buildHistoryCard(Map<String, dynamic> historyItem) {
+  Widget _buildHistoryCard(BuildContext context, Map<String, dynamic> historyItem) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), 
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  isCompleted ? Icons.check_circle : Icons.timelapse,
-                  color: statusColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      historyItem['title'],
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      historyItem['date'],
-                      style: const TextStyle(
-                        color: Colors.grey,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border.all(color: statusColor.withValues(alpha: 0.5)),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  historyItem['status'],
-                  style: TextStyle(
+    return GestureDetector(
+      // NAVEGACIÓN A LA NUEVA PANTALLA
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RepairDetailScreen(historyItem: historyItem),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E), 
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.white10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            )
+          ]
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isCompleted ? Icons.check_circle : Icons.timelapse,
                     color: statusColor,
-                    fontSize: 9,
-                    fontWeight: FontWeight.bold
+                    size: 20,
                   ),
                 ),
-              )
-            ],
-          ),
-          if (isCompleted) ...[
-            const SizedBox(height: 15),
-            const Divider(color: Colors.white10, height: 1),
-            const SizedBox(height: 15),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildHistoryStat(Icons.verified_user_outlined, "Garantía", historyItem['warranty']),
-                _buildHistoryStat(Icons.hourglass_bottom, "Restan", historyItem['daysLeft'], isHighlighted: true),
-                _buildHistoryStat(Icons.history, "Pasado", historyItem['elapsed']),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        historyItem['title'],
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        historyItem['date'],
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Icono de flecha para indicar que se puede hacer click
+                const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 12),
               ],
             ),
-          ]
-        ],
+            if (isCompleted) ...[
+              const SizedBox(height: 15),
+              const Divider(color: Colors.white10, height: 1),
+              const SizedBox(height: 15),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildHistoryStat(Icons.verified_user_outlined, "Garantía", historyItem['warranty']),
+                  _buildHistoryStat(Icons.hourglass_bottom, "Restan", historyItem['daysLeft'], isHighlighted: true),
+                  _buildHistoryStat(Icons.history, "Pasado", historyItem['elapsed']),
+                ],
+              ),
+            ]
+          ],
+        ),
       ),
     );
   }
@@ -535,5 +542,148 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   Widget _buildDrawerItem(IconData icon, String title) {
     return ListTile(leading: Icon(icon, color: Colors.white), title: Text(title, style: const TextStyle(color: Colors.white, letterSpacing: 1)), onTap: () {});
+  }
+}
+
+// --- NUEVA PANTALLA DE DETALLES ---
+class RepairDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> historyItem;
+
+  const RepairDetailScreen({super.key, required this.historyItem});
+
+  @override
+  Widget build(BuildContext context) {
+    bool isCompleted = historyItem['isCompleted'];
+    Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
+
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text("DETALLES DE SERVICIO", style: TextStyle(fontSize: 14, letterSpacing: 2, fontWeight: FontWeight.bold, color: Colors.white)),
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Stack(
+        children: [
+          // FONDO COMPARTIDO
+          Container(
+            height: double.infinity,
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.3),
+                radius: 1.2,
+                colors: [Color(0xFF252525), Colors.black],
+              ),
+            ),
+          ),
+          SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(25, 120, 25, 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ESTADO
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: statusColor),
+                  ),
+                  child: Text(
+                    historyItem['status'].toUpperCase(),
+                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.5),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // TÍTULO GRANDE
+                Text(
+                  historyItem['title'],
+                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, height: 1.2),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.grey, size: 14),
+                    const SizedBox(width: 8),
+                    Text(historyItem['date'], style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                  ],
+                ),
+                const SizedBox(height: 40),
+                
+                // DESCRIPCIÓN TÉCNICA
+                const Text("INFORME TÉCNICO", style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                const SizedBox(height: 15),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: Colors.white10),
+                  ),
+                  child: Text(
+                    historyItem['description'] ?? "No hay descripción disponible.",
+                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                  ),
+                ),
+
+                if (isCompleted) ...[
+                  const SizedBox(height: 40),
+                  const Text("GARANTÍA Y TIEMPOS", style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                  const SizedBox(height: 15),
+                  Row(
+                    children: [
+                      Expanded(child: _buildDetailStat("GARANTÍA", historyItem['warranty'], Icons.verified_user)),
+                      const SizedBox(width: 15),
+                      Expanded(child: _buildDetailStat("RESTANTE", historyItem['daysLeft'], Icons.hourglass_bottom, highlight: true)),
+                    ],
+                  ),
+                ],
+
+                const SizedBox(height: 50),
+                // BOTÓN DE SOPORTE
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD50000),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    ),
+                    onPressed: () {},
+                    icon: const Icon(Icons.support_agent),
+                    label: const Text("CONTACTAR SOPORTE"),
+                  ),
+                )
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailStat(String label, String value, IconData icon, {bool highlight = false}) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.grey, size: 20),
+          const SizedBox(height: 10),
+          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 1)),
+          const SizedBox(height: 5),
+          Text(value, style: TextStyle(color: highlight ? Colors.greenAccent : Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
   }
 }
