@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 
 void main() {
   runApp(const SuperVortecApp());
@@ -52,8 +54,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "elapsed": "En curso",
           "complaint": "El cliente reporta tembladera en mínimo y pérdida de potencia al acelerar a fondo.",
           "diagnosis": "Se detectó código P0303. La bobina del cilindro 3 tiene resistencia infinita (quemada) y la bujía está carbonizada.",
-          "videoReception": "assets/video_recepcion.mp4", 
-          "videoRepair": null, 
+          "videoReception": "https://www.youtube.com/watch?v=wblL1YIDu-A", 
+          "videoRepair": "https://www.youtube.com/watch?v=YuUtjWC2y0s", 
           "budget": [
             {"item": "Bobina AC Delco Original", "price": 45.00},
             {"item": "Bujía Iridium (x1)", "price": 12.00},
@@ -71,8 +73,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "elapsed": "1 Mes y 7 días",
           "complaint": "Mantenimiento programado por kilometraje.",
           "diagnosis": "Niveles de fluidos bajos, aceite degradado.",
-          "videoReception": "assets/vid_rec_02.mp4",
-          "videoRepair": "assets/vid_rep_02.mp4",
+          "videoReception": "https://www.youtube.com/watch?v=wblL1YIDu-A",
+          "videoRepair": "https://www.youtube.com/watch?v=YuUtjWC2y0s",
           "budget": [
             {"item": "Aceite 5W30 Dexos (5L)", "price": 60.00},
             {"item": "Filtro de Aceite", "price": 8.00},
@@ -100,8 +102,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "elapsed": "2 Meses",
           "complaint": "Ruido metálico al frenar.",
           "diagnosis": "Pastillas delanteras al 10% de vida. Discos requieren rectificación.",
-          "videoReception": "assets/vid_rec_03.mp4",
-          "videoRepair": "assets/vid_rep_03.mp4",
+          "videoReception": "https://www.youtube.com/watch?v=3XoBQPC-1vM",
+          "videoRepair": "https://www.youtube.com/watch?v=3XoBQPC-1vM",
           "budget": [
             {"item": "Juego Pastillas Delanteras", "price": 55.00},
             {"item": "Rectificación Discos (x2)", "price": 40.00},
@@ -117,7 +119,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   @override
   Widget build(BuildContext context) {
     const Color brandRed = Color(0xFFD50000);
-    final currentHistory = myVehicles[_currentPage]['history'] as List<Map<String, dynamic>>;
+    final currentHistory = myVehicles.isNotEmpty 
+        ? (myVehicles[_currentPage]['history'] as List<Map<String, dynamic>>)
+        : <Map<String, dynamic>>[];
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -576,9 +580,9 @@ class RepairDetailScreen extends StatelessWidget {
                 const SizedBox(height: 15),
                 Row(
                   children: [
-                    Expanded(child: _buildVideoCard("Recepción", historyItem['videoReception'])),
+                    Expanded(child: _buildVideoCard(context, "Recepción", historyItem['videoReception'])),
                     const SizedBox(width: 15),
-                    Expanded(child: _buildVideoCard("Reparación", historyItem['videoRepair'])),
+                    Expanded(child: _buildVideoCard(context, "Reparación", historyItem['videoRepair'])),
                   ],
                 ),
 
@@ -637,9 +641,7 @@ class RepairDetailScreen extends StatelessWidget {
     );
   }
 
-  // --- WIDGET MODIFICADO CON BORDE NEGRO ---
   Widget _buildInfoBlock(String label, String? content) {
-    // Definimos las propiedades comunes del estilo
     const double fontSize = 16;
     const FontWeight fontWeight = FontWeight.bold;
 
@@ -654,10 +656,8 @@ class RepairDetailScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // USAMOS STACK PARA CREAR EL BORDE NEGRO
           Stack(
             children: [
-              // 1. El Borde (Stroke) Negro
               Text(
                 label,
                 style: TextStyle(
@@ -665,17 +665,16 @@ class RepairDetailScreen extends StatelessWidget {
                   fontWeight: fontWeight,
                   foreground: Paint()
                     ..style = PaintingStyle.stroke
-                    ..strokeWidth = 2.0 // Grosor del borde negro
+                    ..strokeWidth = 2.0
                     ..color = Colors.black,
                 ),
               ),
-              // 2. El Relleno Rojo (Encima del borde)
               Text(
                 label,
                 style: const TextStyle(
                   fontSize: fontSize,
                   fontWeight: fontWeight,
-                  color: Color(0xFFD50000), // Color Rojo Original
+                  color: Color(0xFFD50000),
                 ),
               ),
             ],
@@ -687,25 +686,133 @@ class RepairDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVideoCard(String label, String? videoPath) {
-    bool hasVideo = videoPath != null;
-    return Container(
-      height: 100,
-      decoration: BoxDecoration(
-        color: hasVideo ? Colors.black : Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: hasVideo ? Colors.white24 : Colors.white10),
+  // Lógica para abrir videos (Navegando a la pantalla interna)
+  Widget _buildVideoCard(BuildContext context, String label, String? videoUrl) {
+    bool hasVideo = videoUrl != null && videoUrl.isNotEmpty;
+    String? thumbnailUrl;
+
+    if (hasVideo) {
+      String? videoId = YoutubePlayer.convertUrlToId(videoUrl!);
+      if (videoId != null) {
+        thumbnailUrl = "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
+      }
+    }
+
+    return GestureDetector(
+      onTap: () {
+        if (hasVideo) {
+          // AQUI ESTA LA CLAVE: Navegamos a la pantalla interna
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => InAppVideoPlayerScreen(videoUrl: videoUrl!),
+            ),
+          );
+        } else {
+             ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text("No hay video disponible"))
+            );
+        }
+      },
+      child: Container(
+        height: 100,
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: hasVideo ? Colors.white24 : Colors.white10),
+          image: thumbnailUrl != null 
+            ? DecorationImage(
+                image: NetworkImage(thumbnailUrl!), 
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.4), BlendMode.darken)
+              ) 
+            : null,
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(
+              Icons.play_circle_fill, 
+              color: hasVideo ? const Color(0xFFD50000) : Colors.grey.withValues(alpha: 0.3), 
+              size: 40
+            ),
+            Positioned(
+              bottom: 10,
+              child: Text(
+                label, 
+                style: const TextStyle(
+                  color: Colors.white, 
+                  fontWeight: FontWeight.bold,
+                  shadows: [Shadow(color: Colors.black, blurRadius: 4)]
+                )
+              ),
+            )
+          ],
+        ),
       ),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Icon(Icons.play_circle_fill, color: hasVideo ? Colors.white : Colors.grey.withValues(alpha: 0.3), size: 40),
-          Positioned(
-            bottom: 10,
-            child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-          )
-        ],
+    );
+  }
+}
+
+
+// --- PANTALLA REPRODUCTOR INTERNO ---
+class InAppVideoPlayerScreen extends StatefulWidget {
+  final String videoUrl;
+
+  const InAppVideoPlayerScreen({super.key, required this.videoUrl});
+
+  @override
+  State<InAppVideoPlayerScreen> createState() => _InAppVideoPlayerScreenState();
+}
+
+class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
+  late YoutubePlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
+    
+    _controller = YoutubePlayerController(
+      initialVideoId: videoId ?? "",
+      flags: const YoutubePlayerFlags(
+        autoPlay: true,
+        mute: false,
+        enableCaption: false,
       ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return YoutubePlayerBuilder(
+      player: YoutubePlayer(
+        controller: _controller,
+        showVideoProgressIndicator: true,
+        progressIndicatorColor: const Color(0xFFD50000),
+      ),
+      builder: (context, player) {
+        return Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: Center(
+            child: player,
+          ),
+        );
+      },
     );
   }
 }
