@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 // Importamos tu archivo de citas
-import 'citas.dart'; 
+import 'citas.dart';
+import 'diagnostico.dart';
 
 void main() {
   runApp(const SuperVortecApp());
@@ -182,7 +183,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))
                       ),
                       _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber), 
-                      _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", Colors.white),
+                      _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", Colors.white, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DiagnosticScreen()))),
                       _buildSliderItem(context, Icons.storefront, "TIENDA", brandRed),
                       _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.green),
                       _buildSliderItem(context, Icons.sell, "MARKET", brandRed),
