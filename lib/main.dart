@@ -31,7 +31,7 @@ class ClientHomeScreen extends StatefulWidget {
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
-  // DATOS ENRIQUECIDOS CON HISTORIAL
+  // DATOS
   final List<Map<String, dynamic>> myVehicles = [
     {
       "brand": "CHEVROLET",
@@ -41,7 +41,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       "color": "AZUL",
       "km": "250.000",
       "isInWorkshop": true,
-      // HISTORIAL DE LA SILVERADO
       "history": [
         {
           "title": "Diagnóstico de Falla Cilindro 3",
@@ -65,7 +64,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       "color": "NEGRO",
       "km": "120.500",
       "isInWorkshop": false,
-      // HISTORIAL DE LA TAHOE
       "history": [
         {
           "title": "Reemplazo de Pastillas de Freno",
@@ -82,11 +80,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   @override
   Widget build(BuildContext context) {
     const Color brandRed = Color(0xFFD50000);
-    // Obtenemos el historial del vehículo actual
     final currentHistory = myVehicles[_currentPage]['history'] as List<Map<String, dynamic>>;
 
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      extendBodyBehindAppBar: true, // El cuerpo empieza desde el borde superior absoluto
       drawer: _buildDrawer(),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -108,136 +105,146 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           ),
         ],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: RadialGradient(
-            center: Alignment(0, -0.3),
-            radius: 1.2,
-            colors: [
-              Color(0xFF252525),
-              Colors.black,
-            ],
-          ),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.only(top: 100), 
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. MENÚ SUPERIOR
-              SizedBox(
-                height: 110,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  children: [
-                    _buildSliderItem(Icons.calendar_month, "CITAS", brandRed),
-                    _buildSliderItem(Icons.monitor_heart, "DIAGNÓSTICO", Colors.white),
-                    _buildSliderItem(Icons.storefront, "TIENDA", brandRed),
-                    _buildSliderItem(Icons.local_offer, "OFERTAS", Colors.green),
-                    _buildSliderItem(Icons.sell, "MARKET", brandRed),
-                  ],
-                ),
+      // CAMBIO IMPORTANTE: Usamos STACK para fijar el fondo
+      body: Stack(
+        children: [
+          // 1. EL FONDO (Capa Trasera - Fija)
+          Container(
+            height: double.infinity, // Ocupa todo el alto
+            width: double.infinity,  // Ocupa todo el ancho
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.3),
+                radius: 1.2,
+                colors: [
+                  Color(0xFF252525), // Luz central
+                  Colors.black,      // Sombra en bordes
+                ],
               ),
+            ),
+          ),
+          
+          // 2. EL CONTENIDO (Capa Delantera - Scrollable)
+          SingleChildScrollView(
+            padding: const EdgeInsets.only(top: 100), 
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // MENÚ SUPERIOR
+                SizedBox(
+                  height: 110,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    children: [
+                      _buildSliderItem(Icons.calendar_month, "CITAS", brandRed),
+                      _buildSliderItem(Icons.monitor_heart, "DIAGNÓSTICO", Colors.white),
+                      _buildSliderItem(Icons.storefront, "TIENDA", brandRed),
+                      _buildSliderItem(Icons.local_offer, "OFERTAS", Colors.green),
+                      _buildSliderItem(Icons.sell, "MARKET", brandRed),
+                    ],
+                  ),
+                ),
 
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // 2. TÍTULO E INDICADOR
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "VEHÍCULO ACTIVO", 
-                      style: TextStyle(
-                        color: Colors.grey, 
-                        fontSize: 10, 
-                        letterSpacing: 2.5, 
-                        fontWeight: FontWeight.bold
+                // TÍTULO E INDICADOR
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "VEHÍCULO ACTIVO", 
+                        style: TextStyle(
+                          color: Colors.grey, 
+                          fontSize: 10, 
+                          letterSpacing: 2.5, 
+                          fontWeight: FontWeight.bold
+                        )
+                      ),
+                      Text(
+                        "${_currentPage + 1}/${myVehicles.length}", 
+                        style: TextStyle(color: Colors.grey[600], fontSize: 10),
                       )
-                    ),
-                    Text(
-                      "${_currentPage + 1}/${myVehicles.length}", 
-                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
-                    )
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              // 3. SLIDER DE VEHÍCULOS
-              SizedBox(
-                height: 220, 
-                child: PageView.builder(
-                  itemCount: myVehicles.length,
-                  onPageChanged: (int index) {
-                    setState(() {
-                      _currentPage = index;
-                    });
-                  },
-                  itemBuilder: (context, index) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: _buildVehicleCard(myVehicles[index]),
+                // SLIDER DE VEHÍCULOS
+                SizedBox(
+                  height: 220, 
+                  child: PageView.builder(
+                    itemCount: myVehicles.length,
+                    onPageChanged: (int index) {
+                      setState(() {
+                        _currentPage = index;
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: _buildVehicleCard(myVehicles[index]),
+                      );
+                    },
+                  ),
+                ),
+
+                // INDICADORES
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(myVehicles.length, (index) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      height: 5,
+                      width: _currentPage == index ? 20 : 5,
+                      decoration: BoxDecoration(
+                        color: _currentPage == index ? brandRed : Colors.grey[800],
+                        borderRadius: BorderRadius.circular(3),
+                      ),
                     );
+                  }),
+                ),
+                
+                const SizedBox(height: 30),
+
+                // SECCIÓN DE HISTORIAL
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+                  child: Text(
+                    "HISTORIAL DE SERVICIOS", 
+                    style: TextStyle(
+                      color: Colors.grey, 
+                      fontSize: 10, 
+                      letterSpacing: 2.5, 
+                      fontWeight: FontWeight.bold
+                    )
+                  ),
+                ),
+
+                ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  shrinkWrap: true, 
+                  physics: const NeverScrollableScrollPhysics(), 
+                  itemCount: currentHistory.length,
+                  itemBuilder: (context, index) {
+                    return _buildHistoryCard(currentHistory[index]);
                   },
                 ),
-              ),
 
-              // 4. INDICADORES
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(myVehicles.length, (index) {
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
-                    height: 5,
-                    width: _currentPage == index ? 20 : 5,
-                    decoration: BoxDecoration(
-                      color: _currentPage == index ? brandRed : Colors.grey[800],
-                      borderRadius: BorderRadius.circular(3),
-                    ),
-                  );
-                }),
-              ),
-              
-              const SizedBox(height: 30),
-
-              // 5. SECCIÓN DE HISTORIAL DINÁMICO
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-                child: Text(
-                  "HISTORIAL DE SERVICIOS", 
-                  style: TextStyle(
-                    color: Colors.grey, 
-                    fontSize: 10, 
-                    letterSpacing: 2.5, 
-                    fontWeight: FontWeight.bold
-                  )
-                ),
-              ),
-
-              // LISTA DE HISTORIAL (Se construye según el vehículo seleccionado)
-              ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                shrinkWrap: true, // Importante para que funcione dentro del SingleChildScrollView
-                physics: const NeverScrollableScrollPhysics(), // Evita conflicto de scroll
-                itemCount: currentHistory.length,
-                itemBuilder: (context, index) {
-                  return _buildHistoryCard(currentHistory[index]);
-                },
-              ),
-
-              const SizedBox(height: 50), // Espacio final
-            ],
+                const SizedBox(height: 50), 
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  // --- WIDGET: TARJETA DE HISTORIAL INDIVIDUAL ---
+  // --- WIDGETS (Sin cambios) ---
+  
   Widget _buildHistoryCard(Map<String, dynamic> historyItem) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
@@ -246,13 +253,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E), // Fondo gris oscuro sólido para diferenciar
+        color: const Color(0xFF1E1E1E), 
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.white10),
       ),
       child: Row(
         children: [
-          // Icono de estado
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -266,7 +272,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             ),
           ),
           const SizedBox(width: 15),
-          // Textos
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,7 +295,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               ],
             ),
           ),
-          // Badge de estado
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
@@ -311,7 +315,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  // --- WIDGET: TARJETA DE VEHÍCULO ---
   Widget _buildVehicleCard(Map<String, dynamic> vehicleData) {
     bool isInWorkshop = vehicleData['isInWorkshop'];
 
@@ -424,7 +427,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
   Widget _buildSliderItem(IconData icon, String label, Color iconColor) {
     return Container(
       width: 90,
