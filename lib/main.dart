@@ -6,6 +6,8 @@ import 'citas.dart';
 import 'diagnostico.dart';
 import 'notificaciones.dart';
 import 'tienda.dart';
+import 'ofertas.dart';
+import 'market.dart';
 
 void main() {
   runApp(const SuperVortecApp());
@@ -191,8 +193,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       _buildSliderItem(context, Icons.storefront, "TIENDA", const Color(0xFFD50000),
   onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))
 ),
-                      _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.green),
-                      _buildSliderItem(context, Icons.sell, "MARKET", brandRed),
+                      _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange,
+  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))
+),
+                     _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent,
+  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))
+),
                     ],
                   ),
                 ),
