@@ -50,7 +50,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "warranty": "Pendiente", 
           "daysLeft": "-",
           "elapsed": "En curso",
-          "description": "El vehículo presenta inestabilidad en ralentí (misfire). Se procede a escanear y verificar bobinas y bujías del banco 1.",
+          "complaint": "El cliente reporta tembladera en mínimo y pérdida de potencia al acelerar a fondo.",
+          "diagnosis": "Se detectó código P0303. La bobina del cilindro 3 tiene resistencia infinita (quemada) y la bujía está carbonizada.",
+          "videoReception": "assets/video_recepcion.mp4", 
+          "videoRepair": null, 
+          "budget": [
+            {"item": "Bobina AC Delco Original", "price": 45.00},
+            {"item": "Bujía Iridium (x1)", "price": 12.00},
+            {"item": "Mano de Obra Diagnóstico", "price": 30.00},
+            {"item": "Mano de Obra Reemplazo", "price": 15.00},
+          ]
         },
         {
           "title": "Cambio de Aceite y Filtro",
@@ -60,7 +69,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "warranty": "3 Meses",
           "daysLeft": "54 Días",
           "elapsed": "1 Mes y 7 días",
-          "description": "Mantenimiento preventivo completo. Se utilizó aceite sintético 5W-30 Dexos y filtro original AC Delco.",
+          "complaint": "Mantenimiento programado por kilometraje.",
+          "diagnosis": "Niveles de fluidos bajos, aceite degradado.",
+          "videoReception": "assets/vid_rec_02.mp4",
+          "videoRepair": "assets/vid_rep_02.mp4",
+          "budget": [
+            {"item": "Aceite 5W30 Dexos (5L)", "price": 60.00},
+            {"item": "Filtro de Aceite", "price": 8.00},
+            {"item": "Servicio de Cambio", "price": 15.00},
+          ]
         },
       ]
     },
@@ -81,7 +98,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "warranty": "6 Meses",
           "daysLeft": "110 Días",
           "elapsed": "2 Meses",
-          "description": "Se reemplazaron pastillas delanteras y traseras por desgaste excesivo. Se rectificaron discos de freno.",
+          "complaint": "Ruido metálico al frenar.",
+          "diagnosis": "Pastillas delanteras al 10% de vida. Discos requieren rectificación.",
+          "videoReception": "assets/vid_rec_03.mp4",
+          "videoRepair": "assets/vid_rep_03.mp4",
+          "budget": [
+            {"item": "Juego Pastillas Delanteras", "price": 55.00},
+            {"item": "Rectificación Discos (x2)", "price": 40.00},
+            {"item": "Mano de Obra", "price": 35.00},
+          ]
         },
       ]
     },
@@ -119,7 +144,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ),
       body: Stack(
         children: [
-          // 1. EL FONDO
           Container(
             height: double.infinity,
             width: double.infinity,
@@ -127,21 +151,15 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               gradient: RadialGradient(
                 center: Alignment(0, -0.3),
                 radius: 1.2,
-                colors: [
-                  Color(0xFF252525),
-                  Colors.black,
-                ],
+                colors: [Color(0xFF252525), Colors.black],
               ),
             ),
           ),
-          
-          // 2. EL CONTENIDO
           SingleChildScrollView(
             padding: const EdgeInsets.only(top: 100), 
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // MENÚ SUPERIOR (SLIDER)
                 SizedBox(
                   height: 110,
                   child: ListView(
@@ -157,33 +175,17 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // TÍTULO E INDICADOR
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        "VEHÍCULO ACTIVO", 
-                        style: TextStyle(
-                          color: Colors.grey, 
-                          fontSize: 10, 
-                          letterSpacing: 2.5, 
-                          fontWeight: FontWeight.bold
-                        )
-                      ),
-                      Text(
-                        "${_currentPage + 1}/${myVehicles.length}", 
-                        style: TextStyle(color: Colors.grey[600], fontSize: 10),
-                      )
+                      const Text("VEHÍCULO ACTIVO", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 2.5, fontWeight: FontWeight.bold)),
+                      Text("${_currentPage + 1}/${myVehicles.length}", style: TextStyle(color: Colors.grey[600], fontSize: 10))
                     ],
                   ),
                 ),
-
-                // SLIDER DE VEHÍCULOS
                 SizedBox(
                   height: 220, 
                   child: PageView.builder(
@@ -201,8 +203,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     },
                   ),
                 ),
-
-                // INDICADORES
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -219,23 +219,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     );
                   }),
                 ),
-                
                 const SizedBox(height: 30),
-
-                // SECCIÓN DE HISTORIAL
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-                  child: Text(
-                    "HISTORIAL DE SERVICIOS", 
-                    style: TextStyle(
-                      color: Colors.grey, 
-                      fontSize: 10, 
-                      letterSpacing: 2.5, 
-                      fontWeight: FontWeight.bold
-                    )
-                  ),
+                  child: Text("HISTORIAL DE SERVICIOS", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 2.5, fontWeight: FontWeight.bold)),
                 ),
-
                 ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   shrinkWrap: true, 
@@ -245,7 +233,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     return _buildHistoryCard(context, currentHistory[index]);
                   },
                 ),
-
                 const SizedBox(height: 50), 
               ],
             ),
@@ -262,7 +249,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
 
     return GestureDetector(
-      // NAVEGACIÓN A LA NUEVA PANTALLA
       onTap: () {
         Navigator.push(
           context,
@@ -326,7 +312,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     ],
                   ),
                 ),
-                // Icono de flecha para indicar que se puede hacer click
                 const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 12),
               ],
             ),
@@ -406,34 +391,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      vehicleData['brand'], 
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14, 
-                        letterSpacing: 1.5,
-                        fontWeight: FontWeight.bold
-                      )
-                    ),
+                    Text(vehicleData['brand'], style: const TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
-                    Text(
-                      vehicleData['model'], 
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800, 
-                        fontSize: 20, 
-                        color: Colors.white,
-                        letterSpacing: 0.5
-                      )
-                    ),
-                    Text(
-                      vehicleData['year'], 
-                      style: const TextStyle(
-                        color: Colors.grey, 
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5
-                      )
-                    ),
+                    Text(vehicleData['model'], style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: Colors.white, letterSpacing: 0.5)),
+                    Text(vehicleData['year'], style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                   ],
                 ),
               ),
@@ -445,15 +406,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: const Color(0xFFD50000)),
                   ),
-                  child: const Text(
-                    "EN TALLER", 
-                    style: TextStyle(
-                      color: Color(0xFFD50000), 
-                      fontWeight: FontWeight.bold, 
-                      fontSize: 8,
-                      letterSpacing: 0.5
-                    )
-                  ),
+                  child: const Text("EN TALLER", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 8, letterSpacing: 0.5)),
                 ),
             ],
           ),
@@ -545,7 +498,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 }
 
-// --- NUEVA PANTALLA DE DETALLES ---
+// --- PANTALLA DETALLE ACTUALIZADA ---
 class RepairDetailScreen extends StatelessWidget {
   final Map<String, dynamic> historyItem;
 
@@ -555,19 +508,21 @@ class RepairDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
+    List budgetList = historyItem['budget'] ?? [];
+    double totalBudget = budgetList.fold(0, (sum, item) => sum + (item['price'] as double));
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text("DETALLES DE SERVICIO", style: TextStyle(fontSize: 14, letterSpacing: 2, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: const Text("INFORME DE SERVICIO", style: TextStyle(fontSize: 14, letterSpacing: 2, fontWeight: FontWeight.bold, color: Colors.white)),
         centerTitle: true,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Stack(
         children: [
-          // FONDO COMPARTIDO
+          // Fondo
           Container(
             height: double.infinity,
             width: double.infinity,
@@ -584,7 +539,7 @@ class RepairDetailScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ESTADO
+                // Estado
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -598,23 +553,39 @@ class RepairDetailScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-                // TÍTULO GRANDE
                 Text(
                   historyItem['title'],
                   style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, height: 1.2),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_today, color: Colors.grey, size: 14),
-                    const SizedBox(width: 8),
-                    Text(historyItem['date'], style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                  ],
-                ),
+                Text(historyItem['date'], style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                
                 const SizedBox(height: 40),
                 
-                // DESCRIPCIÓN TÉCNICA
-                const Text("INFORME TÉCNICO", style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+                // 1. DESCRIPCIÓN Y DIAGNÓSTICO
+                _buildSectionTitle("REPORTE TÉCNICO"),
+                const SizedBox(height: 15),
+                _buildInfoBlock("Falla Reportada", historyItem['complaint']),
+                const SizedBox(height: 10),
+                _buildInfoBlock("Diagnóstico Técnico", historyItem['diagnosis']),
+
+                const SizedBox(height: 30),
+
+                // 2. VIDEOS DE EVIDENCIA
+                _buildSectionTitle("EVIDENCIA MULTIMEDIA"),
+                const SizedBox(height: 15),
+                Row(
+                  children: [
+                    Expanded(child: _buildVideoCard("Recepción", historyItem['videoReception'])),
+                    const SizedBox(width: 15),
+                    Expanded(child: _buildVideoCard("Reparación", historyItem['videoRepair'])),
+                  ],
+                ),
+
+                const SizedBox(height: 30),
+
+                // 3. PRESUPUESTO APROBADO
+                _buildSectionTitle("PRESUPUESTO APROBADO"),
                 const SizedBox(height: 15),
                 Container(
                   width: double.infinity,
@@ -624,41 +595,32 @@ class RepairDetailScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(15),
                     border: Border.all(color: Colors.white10),
                   ),
-                  child: Text(
-                    historyItem['description'] ?? "No hay descripción disponible.",
-                    style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
-                  ),
-                ),
-
-                if (isCompleted) ...[
-                  const SizedBox(height: 40),
-                  const Text("GARANTÍA Y TIEMPOS", style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
-                  const SizedBox(height: 15),
-                  Row(
+                  child: Column(
                     children: [
-                      Expanded(child: _buildDetailStat("GARANTÍA", historyItem['warranty'], Icons.verified_user)),
-                      const SizedBox(width: 15),
-                      Expanded(child: _buildDetailStat("RESTANTE", historyItem['daysLeft'], Icons.hourglass_bottom, highlight: true)),
+                      ...budgetList.map((item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Expanded(child: Text(item['item'], style: const TextStyle(color: Colors.white70, fontSize: 13))),
+                            Text("\$${item['price'].toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      )),
+                      const Divider(color: Colors.white24),
+                      const SizedBox(height: 5),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text("TOTAL", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 16)),
+                          Text("\$${totalBudget.toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
+                        ],
+                      )
                     ],
                   ),
-                ],
-
+                ),
+                
                 const SizedBox(height: 50),
-                // BOTÓN DE SOPORTE
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD50000),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    ),
-                    onPressed: () {},
-                    icon: const Icon(Icons.support_agent),
-                    label: const Text("CONTACTAR SOPORTE"),
-                  ),
-                )
               ],
             ),
           )
@@ -667,21 +629,81 @@ class RepairDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailStat(String label, String value, IconData icon, {bool highlight = false}) {
+  // Helpers de diseño
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title, 
+      style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)
+    );
+  }
+
+  // --- WIDGET MODIFICADO CON BORDE NEGRO ---
+  Widget _buildInfoBlock(String label, String? content) {
+    // Definimos las propiedades comunes del estilo
+    const double fontSize = 16;
+    const FontWeight fontWeight = FontWeight.bold;
+
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white10),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.grey, size: 20),
-          const SizedBox(height: 10),
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 1)),
+          // USAMOS STACK PARA CREAR EL BORDE NEGRO
+          Stack(
+            children: [
+              // 1. El Borde (Stroke) Negro
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: fontWeight,
+                  foreground: Paint()
+                    ..style = PaintingStyle.stroke
+                    ..strokeWidth = 2.0 // Grosor del borde negro
+                    ..color = Colors.black,
+                ),
+              ),
+              // 2. El Relleno Rojo (Encima del borde)
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: fontWeight,
+                  color: Color(0xFFD50000), // Color Rojo Original
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 5),
-          Text(value, style: TextStyle(color: highlight ? Colors.greenAccent : Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          Text(content ?? "Pendiente...", style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoCard(String label, String? videoPath) {
+    bool hasVideo = videoPath != null;
+    return Container(
+      height: 100,
+      decoration: BoxDecoration(
+        color: hasVideo ? Colors.black : Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: hasVideo ? Colors.white24 : Colors.white10),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Icon(Icons.play_circle_fill, color: hasVideo ? Colors.white : Colors.grey.withValues(alpha: 0.3), size: 40),
+          Positioned(
+            bottom: 10,
+            child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
+          )
         ],
       ),
     );
