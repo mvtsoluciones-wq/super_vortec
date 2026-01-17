@@ -31,7 +31,7 @@ class ClientHomeScreen extends StatefulWidget {
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
-  // DATOS ACTUALIZADOS CON GARANTÍA Y TIEMPOS
+  // DATOS
   final List<Map<String, dynamic>> myVehicles = [
     {
       "brand": "CHEVROLET",
@@ -47,7 +47,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "date": "17 Ene 2026",
           "status": "En Proceso",
           "isCompleted": false,
-          // Como no ha terminado, no tiene garantía activa aún
           "warranty": "Pendiente", 
           "daysLeft": "-",
           "elapsed": "En curso",
@@ -57,7 +56,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "date": "10 Dic 2025",
           "status": "Finalizado",
           "isCompleted": true,
-          // NUEVOS DATOS
           "warranty": "3 Meses",
           "daysLeft": "54 Días",
           "elapsed": "1 Mes y 7 días",
@@ -78,7 +76,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "date": "05 Nov 2025",
           "status": "Finalizado",
           "isCompleted": true,
-          // NUEVOS DATOS
           "warranty": "6 Meses",
           "daysLeft": "110 Días",
           "elapsed": "2 Meses",
@@ -141,7 +138,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // MENÚ SUPERIOR
+                // MENÚ SUPERIOR (SLIDER)
                 SizedBox(
                   height: 110,
                   child: ListView(
@@ -149,6 +146,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     children: [
                       _buildSliderItem(Icons.calendar_month, "CITAS", brandRed),
+                      // NUEVO ÍTEM: NOTIFICACIONES (Color Ámbar)
+                      _buildSliderItem(Icons.notifications, "NOTIFIC.", Colors.amber), 
                       _buildSliderItem(Icons.monitor_heart, "DIAGNÓSTICO", Colors.white),
                       _buildSliderItem(Icons.storefront, "TIENDA", brandRed),
                       _buildSliderItem(Icons.local_offer, "OFERTAS", Colors.green),
@@ -254,7 +253,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  // --- WIDGET: TARJETA DE HISTORIAL COMPLETA ---
+  // --- WIDGETS AUXILIARES ---
+  
   Widget _buildHistoryCard(Map<String, dynamic> historyItem) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
@@ -269,7 +269,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ),
       child: Column(
         children: [
-          // PARTE SUPERIOR: TÍTULO Y ESTADO
           Row(
             children: [
               Container(
@@ -325,14 +324,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               )
             ],
           ),
-
-          // SI ESTÁ TERMINADO, MOSTRAMOS LA INFO DE GARANTÍA
           if (isCompleted) ...[
             const SizedBox(height: 15),
             const Divider(color: Colors.white10, height: 1),
             const SizedBox(height: 15),
-            
-            // FILA DE ESTADÍSTICAS (Garantía, Días Restantes, Tiempo Pasado)
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -347,7 +342,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  // Helper para las estadísticas pequeñas del historial
   Widget _buildHistoryStat(IconData icon, String label, String value, {bool isHighlighted = false}) {
     return Column(
       children: [
@@ -371,8 +365,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       ],
     );
   }
-
-  // --- WIDGETS (Sin cambios) ---
 
   Widget _buildVehicleCard(Map<String, dynamic> vehicleData) {
     bool isInWorkshop = vehicleData['isInWorkshop'];
