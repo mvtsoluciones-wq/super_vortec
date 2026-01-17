@@ -31,7 +31,7 @@ class ClientHomeScreen extends StatefulWidget {
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
-  // DATOS
+  // DATOS ENRIQUECIDOS CON HISTORIAL
   final List<Map<String, dynamic>> myVehicles = [
     {
       "brand": "CHEVROLET",
@@ -40,7 +40,22 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       "plate": "123 ASD",
       "color": "AZUL",
       "km": "250.000",
-      "isInWorkshop": true, 
+      "isInWorkshop": true,
+      // HISTORIAL DE LA SILVERADO
+      "history": [
+        {
+          "title": "Diagnóstico de Falla Cilindro 3",
+          "date": "17 Ene 2026",
+          "status": "En Proceso",
+          "isCompleted": false,
+        },
+        {
+          "title": "Cambio de Aceite y Filtro",
+          "date": "10 Dic 2025",
+          "status": "Finalizado",
+          "isCompleted": true,
+        },
+      ]
     },
     {
       "brand": "CHEVROLET",
@@ -49,7 +64,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
       "plate": "999 VRT",
       "color": "NEGRO",
       "km": "120.500",
-      "isInWorkshop": false, 
+      "isInWorkshop": false,
+      // HISTORIAL DE LA TAHOE
+      "history": [
+        {
+          "title": "Reemplazo de Pastillas de Freno",
+          "date": "05 Nov 2025",
+          "status": "Finalizado",
+          "isCompleted": true,
+        },
+      ]
     },
   ];
 
@@ -58,6 +82,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   @override
   Widget build(BuildContext context) {
     const Color brandRed = Color(0xFFD50000);
+    // Obtenemos el historial del vehículo actual
+    final currentHistory = myVehicles[_currentPage]['history'] as List<Map<String, dynamic>>;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -98,7 +124,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. MENÚ SUPERIOR (SLIDER)
+              // 1. MENÚ SUPERIOR
               SizedBox(
                 height: 110,
                 child: ListView(
@@ -177,9 +203,110 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               ),
               
               const SizedBox(height: 30),
+
+              // 5. SECCIÓN DE HISTORIAL DINÁMICO
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+                child: Text(
+                  "HISTORIAL DE SERVICIOS", 
+                  style: TextStyle(
+                    color: Colors.grey, 
+                    fontSize: 10, 
+                    letterSpacing: 2.5, 
+                    fontWeight: FontWeight.bold
+                  )
+                ),
+              ),
+
+              // LISTA DE HISTORIAL (Se construye según el vehículo seleccionado)
+              ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                shrinkWrap: true, // Importante para que funcione dentro del SingleChildScrollView
+                physics: const NeverScrollableScrollPhysics(), // Evita conflicto de scroll
+                itemCount: currentHistory.length,
+                itemBuilder: (context, index) {
+                  return _buildHistoryCard(currentHistory[index]);
+                },
+              ),
+
+              const SizedBox(height: 50), // Espacio final
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // --- WIDGET: TARJETA DE HISTORIAL INDIVIDUAL ---
+  Widget _buildHistoryCard(Map<String, dynamic> historyItem) {
+    bool isCompleted = historyItem['isCompleted'];
+    Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E), // Fondo gris oscuro sólido para diferenciar
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white10),
+      ),
+      child: Row(
+        children: [
+          // Icono de estado
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              isCompleted ? Icons.check_circle : Icons.timelapse,
+              color: statusColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 15),
+          // Textos
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  historyItem['title'],
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  historyItem['date'],
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Badge de estado
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: statusColor.withValues(alpha: 0.5)),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              historyItem['status'],
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 9,
+                fontWeight: FontWeight.bold
+              ),
+            ),
+          )
+        ],
       ),
     );
   }
@@ -205,7 +332,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icono
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -215,24 +341,20 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 child: const Icon(Icons.directions_car, color: Color(0xFFD50000), size: 22),
               ),
               const SizedBox(width: 12),
-              
-              // COLUMNA DE DATOS PRINCIPALES
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. MARCA (AHORA ES BLANCA IGUAL QUE EL MODELO)
                     Text(
                       vehicleData['brand'], 
                       style: const TextStyle(
-                        color: Colors.white, // CAMBIO AQUI: Antes era white70
+                        color: Colors.white,
                         fontSize: 14, 
                         letterSpacing: 1.5,
                         fontWeight: FontWeight.bold
                       )
                     ),
                     const SizedBox(height: 2),
-                    // 2. MODELO
                     Text(
                       vehicleData['model'], 
                       style: const TextStyle(
@@ -242,7 +364,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         letterSpacing: 0.5
                       )
                     ),
-                    // 3. AÑO
                     Text(
                       vehicleData['year'], 
                       style: const TextStyle(
@@ -255,8 +376,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   ],
                 ),
               ),
-              
-              // Estado En Taller
               if (isInWorkshop)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -277,12 +396,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 ),
             ],
           ),
-          
           const Spacer(),
           const Divider(color: Colors.white10, height: 1),
           const Spacer(), 
-
-          // FILA DE DATOS TÉCNICOS
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -301,30 +417,14 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   Widget _buildTechInfo(String label, String value) {
     return Column(
       children: [
-        Text(
-          label, 
-          style: const TextStyle(
-            color: Colors.grey, 
-            fontSize: 8, 
-            letterSpacing: 1.0
-          )
-        ),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 8, letterSpacing: 1.0)),
         const SizedBox(height: 3),
-        Text(
-          value, 
-          style: const TextStyle(
-            color: Colors.white, 
-            fontWeight: FontWeight.bold, 
-            fontSize: 12, 
-            letterSpacing: 0.5
-          )
-        ),
+        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
       ],
     );
   }
 
   // --- WIDGETS AUXILIARES ---
-
   Widget _buildSliderItem(IconData icon, String label, Color iconColor) {
     return Container(
       width: 90,
@@ -339,34 +439,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF2C2C2C),
-                  Colors.black.withValues(alpha: 0.8),
-                ],
+                colors: [const Color(0xFF2C2C2C), Colors.black.withValues(alpha: 0.8)],
               ),
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                )
-              ]
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10, offset: const Offset(0, 5))]
             ),
             child: Icon(icon, color: iconColor, size: 24),
           ),
           const SizedBox(height: 10),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 10, 
-              color: Colors.white70,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.0
-            ),
-          )
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 1.0))
         ],
       ),
     );
@@ -384,11 +466,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  backgroundColor: Color(0xFFD50000),
-                  radius: 30,
-                  child: Icon(Icons.person, color: Colors.white, size: 30),
-                ),
+                CircleAvatar(backgroundColor: Color(0xFFD50000), radius: 30, child: Icon(Icons.person, color: Colors.white, size: 30)),
                 SizedBox(height: 15),
                 Text("MVTSOLUCIONES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
                 Text("Usuario Premium", style: TextStyle(color: Colors.grey, fontSize: 12)),
@@ -403,10 +481,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   Widget _buildDrawerItem(IconData icon, String title) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white),
-      title: Text(title, style: const TextStyle(color: Colors.white, letterSpacing: 1)),
-      onTap: () {},
-    );
+    return ListTile(leading: Icon(icon, color: Colors.white), title: Text(title, style: const TextStyle(color: Colors.white, letterSpacing: 1)), onTap: () {});
   }
 }
