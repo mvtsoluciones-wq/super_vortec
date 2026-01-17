@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 void main() {
   runApp(const SuperVortecApp());
@@ -580,9 +581,22 @@ class RepairDetailScreen extends StatelessWidget {
                 const SizedBox(height: 15),
                 Row(
                   children: [
-                    Expanded(child: _buildVideoCard(context, "Recepción", historyItem['videoReception'])),
+                    // AQUI PASAMOS EL TITULO Y DIAGNOSTICO PARA USARLO EN LA OTRA PANTALLA
+                    Expanded(child: _buildVideoCard(
+                      context, 
+                      "Recepción", 
+                      historyItem['videoReception'], 
+                      title: "Recepción: ${historyItem['title']}",
+                      desc: historyItem['complaint']
+                    )),
                     const SizedBox(width: 15),
-                    Expanded(child: _buildVideoCard(context, "Reparación", historyItem['videoRepair'])),
+                    Expanded(child: _buildVideoCard(
+                      context, 
+                      "Reparación", 
+                      historyItem['videoRepair'],
+                      title: "Reparación: ${historyItem['title']}",
+                      desc: historyItem['diagnosis']
+                    )),
                   ],
                 ),
 
@@ -687,7 +701,7 @@ class RepairDetailScreen extends StatelessWidget {
   }
 
   // Lógica para abrir videos (Navegando a la pantalla interna)
-  Widget _buildVideoCard(BuildContext context, String label, String? videoUrl) {
+  Widget _buildVideoCard(BuildContext context, String label, String? videoUrl, {required String title, required String? desc}) {
     bool hasVideo = videoUrl != null && videoUrl.isNotEmpty;
     String? thumbnailUrl;
 
@@ -701,11 +715,14 @@ class RepairDetailScreen extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         if (hasVideo) {
-          // AQUI ESTA LA CLAVE: Navegamos a la pantalla interna
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => InAppVideoPlayerScreen(videoUrl: videoUrl!),
+              builder: (context) => InAppVideoPlayerScreen(
+                videoUrl: videoUrl!,
+                videoTitle: title,
+                videoDescription: desc ?? "Sin detalles adicionales.",
+              ),
             ),
           );
         } else {
@@ -755,11 +772,18 @@ class RepairDetailScreen extends StatelessWidget {
 }
 
 
-// --- PANTALLA REPRODUCTOR INTERNO ---
+// --- PANTALLA REPRODUCTOR INTERNO MODERNO ---
 class InAppVideoPlayerScreen extends StatefulWidget {
   final String videoUrl;
+  final String videoTitle;
+  final String videoDescription;
 
-  const InAppVideoPlayerScreen({super.key, required this.videoUrl});
+  const InAppVideoPlayerScreen({
+    super.key, 
+    required this.videoUrl,
+    required this.videoTitle,
+    required this.videoDescription,
+  });
 
   @override
   State<InAppVideoPlayerScreen> createState() => _InAppVideoPlayerScreenState();
@@ -779,6 +803,7 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
         autoPlay: true,
         mute: false,
         enableCaption: false,
+        forceHD: true,
       ),
     );
   }
@@ -789,27 +814,152 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
     super.dispose();
   }
 
+  void _openInYoutubeApp() async {
+    final Uri uri = Uri.parse(widget.videoUrl);
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo abrir YouTube")));
+      }
+    } catch (e) {
+      debugPrint("Error: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // LAYOUT MODERNO
     return YoutubePlayerBuilder(
       player: YoutubePlayer(
         controller: _controller,
         showVideoProgressIndicator: true,
         progressIndicatorColor: const Color(0xFFD50000),
+        progressColors: const ProgressBarColors(
+          playedColor: Color(0xFFD50000),
+          handleColor: Color(0xFFD50000),
+        ),
       ),
       builder: (context, player) {
         return Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+          extendBodyBehindAppBar: true,
+          // 1. Fondo Degradado Moderno
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.3),
+                radius: 1.3,
+                colors: [Color(0xFF252525), Colors.black],
+              ),
             ),
-          ),
-          body: Center(
-            child: player,
+            child: Column(
+              children: [
+                // AppBar Flotante
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: Colors.black.withValues(alpha: 0.5),
+                          child: IconButton(
+                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                        const Spacer(),
+                        const Text("EVIDENCIA DIGITAL", style: TextStyle(color: Colors.white70, fontSize: 12, letterSpacing: 2)),
+                        const Spacer(),
+                        const SizedBox(width: 40), // Balance
+                      ],
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+
+                // 2. El Reproductor (Con Sombra)
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 20, offset: const Offset(0, 10))
+                    ],
+                    borderRadius: BorderRadius.circular(10) // Opcional, si el player soportara clips
+                  ),
+                  child: player, // Aquí va el video
+                ),
+
+                const SizedBox(height: 30),
+
+                // 3. Tarjeta de Información "Glassy"
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(25),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(30),
+                        topRight: Radius.circular(30),
+                      ),
+                      border: const Border(top: BorderSide(color: Colors.white10))
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFD50000),
+                                  borderRadius: BorderRadius.circular(5)
+                                ),
+                                child: const Text("VIDEO TÉCNICO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.open_in_new, color: Colors.white70),
+                                onPressed: _openInYoutubeApp,
+                                tooltip: "Abrir en YouTube",
+                              )
+                            ],
+                          ),
+                          const SizedBox(height: 15),
+                          Text(
+                            widget.videoTitle,
+                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 15),
+                          const Divider(color: Colors.white10),
+                          const SizedBox(height: 15),
+                          const Text("DETALLES DEL REGISTRO:", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          Text(
+                            widget.videoDescription,
+                            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                          ),
+                          const SizedBox(height: 40),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFD50000),
+                                padding: const EdgeInsets.symmetric(vertical: 15),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                              ),
+                              onPressed: _openInYoutubeApp, 
+                              icon: const Icon(Icons.ondemand_video, color: Colors.white),
+                              label: const Text("ABRIR EN APP DE YOUTUBE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              ],
+            ),
           ),
         );
       },
