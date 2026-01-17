@@ -23,27 +23,54 @@ class SuperVortecApp extends StatelessWidget {
   }
 }
 
-class ClientHomeScreen extends StatelessWidget {
+class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
 
   @override
+  State<ClientHomeScreen> createState() => _ClientHomeScreenState();
+}
+
+class _ClientHomeScreenState extends State<ClientHomeScreen> {
+  // DATOS
+  final List<Map<String, dynamic>> myVehicles = [
+    {
+      "brand": "CHEVROLET",
+      "model": "SILVERADO",
+      "year": "2008",
+      "plate": "123 ASD",
+      "color": "AZUL",
+      "km": "250.000",
+      "isInWorkshop": true, 
+    },
+    {
+      "brand": "CHEVROLET",
+      "model": "TAHOE",
+      "year": "2015",
+      "plate": "999 VRT",
+      "color": "NEGRO",
+      "km": "120.500",
+      "isInWorkshop": false, 
+    },
+  ];
+
+  int _currentPage = 0; 
+
+  @override
   Widget build(BuildContext context) {
-    // Definimos el ROJO DE LA MARCA
     const Color brandRed = Color(0xFFD50000);
 
     return Scaffold(
-      // Extendemos el cuerpo detrás del AppBar para que el degradado cubra TODO
       extendBodyBehindAppBar: true,
       drawer: _buildDrawer(),
       appBar: AppBar(
-        backgroundColor: Colors.transparent, // Transparente para ver el fondo
+        backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         title: const Text(
           'MI GARAJE', 
           style: TextStyle(
             fontWeight: FontWeight.bold, 
-            letterSpacing: 3.0, // Espaciado amplio estilo Premium
+            letterSpacing: 3.0,
             fontSize: 18,
             color: Colors.white
           )
@@ -55,15 +82,14 @@ class ClientHomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      // FONDO "SPOTLIGHT"
       body: Container(
         decoration: const BoxDecoration(
           gradient: RadialGradient(
-            center: Alignment(0, -0.3), // El centro de luz está un poco arriba
+            center: Alignment(0, -0.3),
             radius: 1.2,
             colors: [
-              Color(0xFF252525), // Centro: Gris Carbón (Luz)
-              Colors.black,      // Bordes: Negro Profundo (Sombra)
+              Color(0xFF252525),
+              Colors.black,
             ],
           ),
         ),
@@ -88,24 +114,66 @@ class ClientHomeScreen extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 20),
 
-              // 2. TARJETA DE CRISTAL
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-                child: Text(
-                  "VEHÍCULO ACTIVO", 
-                  style: TextStyle(
-                    color: Colors.grey, 
-                    fontSize: 10, 
-                    letterSpacing: 2.5, 
-                    fontWeight: FontWeight.bold
-                  )
+              // 2. TÍTULO E INDICADOR
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "VEHÍCULO ACTIVO", 
+                      style: TextStyle(
+                        color: Colors.grey, 
+                        fontSize: 10, 
+                        letterSpacing: 2.5, 
+                        fontWeight: FontWeight.bold
+                      )
+                    ),
+                    Text(
+                      "${_currentPage + 1}/${myVehicles.length}", 
+                      style: TextStyle(color: Colors.grey[600], fontSize: 10),
+                    )
+                  ],
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _buildGlassCard(),
+
+              // 3. SLIDER DE VEHÍCULOS
+              SizedBox(
+                height: 220, 
+                child: PageView.builder(
+                  itemCount: myVehicles.length,
+                  onPageChanged: (int index) {
+                    setState(() {
+                      _currentPage = index;
+                    });
+                  },
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: _buildVehicleCard(myVehicles[index]),
+                    );
+                  },
+                ),
+              ),
+
+              // 4. INDICADORES
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(myVehicles.length, (index) {
+                  return AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    height: 5,
+                    width: _currentPage == index ? 20 : 5,
+                    decoration: BoxDecoration(
+                      color: _currentPage == index ? brandRed : Colors.grey[800],
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  );
+                }),
               ),
               
               const SizedBox(height: 30),
@@ -116,15 +184,14 @@ class ClientHomeScreen extends StatelessWidget {
     );
   }
 
-  // --- WIDGET: TARJETA CRISTAL AHUMADO ---
-  Widget _buildGlassCard() {
-    bool isInWorkshop = true; // Interruptor de estado
+  // --- WIDGET: TARJETA DE VEHÍCULO ---
+  Widget _buildVehicleCard(Map<String, dynamic> vehicleData) {
+    bool isInWorkshop = vehicleData['isInWorkshop'];
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20), 
+      padding: const EdgeInsets.all(15), 
       decoration: BoxDecoration(
-        // Fondo semitransparente (Efecto Cristal)
         color: Colors.white.withValues(alpha: 0.05), 
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
@@ -135,49 +202,64 @@ class ClientHomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // FILA 1: Encabezado
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icono flotante
+              // Icono
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: const Color(0xFFD50000).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.directions_car, color: Color(0xFFD50000), size: 24),
+                child: const Icon(Icons.directions_car, color: Color(0xFFD50000), size: 22),
               ),
-              const SizedBox(width: 15),
-              const Expanded(
+              const SizedBox(width: 12),
+              
+              // COLUMNA DE DATOS PRINCIPALES
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 1. MARCA (AHORA ES BLANCA IGUAL QUE EL MODELO)
                     Text(
-                      "CHEVROLET SILVERADO", 
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900, 
-                        fontSize: 16, 
-                        color: Colors.white,
-                        letterSpacing: 1.0
+                      vehicleData['brand'], 
+                      style: const TextStyle(
+                        color: Colors.white, // CAMBIO AQUI: Antes era white70
+                        fontSize: 14, 
+                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.bold
                       )
                     ),
-                    // AQUÍ ESTÁ EL CAMBIO: Solo muestra "2008"
+                    const SizedBox(height: 2),
+                    // 2. MODELO
                     Text(
-                      "2008", 
-                      style: TextStyle(
+                      vehicleData['model'], 
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800, 
+                        fontSize: 20, 
+                        color: Colors.white,
+                        letterSpacing: 0.5
+                      )
+                    ),
+                    // 3. AÑO
+                    Text(
+                      vehicleData['year'], 
+                      style: const TextStyle(
                         color: Colors.grey, 
-                        fontSize: 12, // Un poco más grande para que destaque solo
-                        letterSpacing: 1.0,
-                        fontWeight: FontWeight.bold
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5
                       )
                     ),
                   ],
                 ),
               ),
               
+              // Estado En Taller
               if (isInWorkshop)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(30),
@@ -188,27 +270,27 @@ class ClientHomeScreen extends StatelessWidget {
                     style: TextStyle(
                       color: Color(0xFFD50000), 
                       fontWeight: FontWeight.bold, 
-                      fontSize: 9,
-                      letterSpacing: 1.0
+                      fontSize: 8,
+                      letterSpacing: 0.5
                     )
                   ),
                 ),
             ],
           ),
           
-          const SizedBox(height: 20),
+          const Spacer(),
           const Divider(color: Colors.white10, height: 1),
-          const SizedBox(height: 20),
+          const Spacer(), 
 
-          // FILA 2: DATOS TÉCNICOS
+          // FILA DE DATOS TÉCNICOS
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildTechInfo("PLACA", "123 ASD"),
-              Container(width: 1, height: 30, color: Colors.white10),
-              _buildTechInfo("COLOR", "AZUL"),
-              Container(width: 1, height: 30, color: Colors.white10),
-              _buildTechInfo("ODÓMETRO", "250.000"),
+              _buildTechInfo("PLACA", vehicleData['plate']),
+              Container(width: 1, height: 25, color: Colors.white10),
+              _buildTechInfo("COLOR", vehicleData['color']),
+              Container(width: 1, height: 25, color: Colors.white10),
+              _buildTechInfo("KM", vehicleData['km']),
             ],
           ),
         ],
@@ -223,23 +305,25 @@ class ClientHomeScreen extends StatelessWidget {
           label, 
           style: const TextStyle(
             color: Colors.grey, 
-            fontSize: 9, 
-            letterSpacing: 1.5
+            fontSize: 8, 
+            letterSpacing: 1.0
           )
         ),
-        const SizedBox(height: 5),
+        const SizedBox(height: 3),
         Text(
           value, 
           style: const TextStyle(
             color: Colors.white, 
             fontWeight: FontWeight.bold, 
-            fontSize: 14,
-            letterSpacing: 1.0
+            fontSize: 12, 
+            letterSpacing: 0.5
           )
         ),
       ],
     );
   }
+
+  // --- WIDGETS AUXILIARES ---
 
   Widget _buildSliderItem(IconData icon, String label, Color iconColor) {
     return Container(
