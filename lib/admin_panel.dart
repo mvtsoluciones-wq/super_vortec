@@ -6,6 +6,11 @@ import 'presupuesto_web.dart';
 import 'seguimiento_web.dart';
 import 'clientes_web.dart';
 import 'notificaciones_web.dart';
+import 'tienda_web.dart';
+import 'ofertas_web.dart';
+import 'market_web.dart';
+import 'facturacion_web.dart';
+import 'inventario_web.dart';
 
 class AdminControlPanel extends StatefulWidget {
   const AdminControlPanel({super.key});
@@ -186,7 +191,12 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     case 2: return const SeguimientoWebModule();
     case 3: return const ClientesWebModule();
     case 4: return const NotificacionesWebModule();
-    case 9: return const PresupuestoWebModule(); // <--- Nueva pestaña
+    case 5: return const TiendaWebModule();
+    case 6: return const OfertasWebModule();
+    case 7: return const MarketWebModule();
+    case 8: return const FacturacionWebModule();
+    case 9: return const PresupuestoWebModule();
+   case 10: return const InventarioWebModule(); // <--- Nueva pestaña
     default:
       return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
   }
