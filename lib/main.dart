@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 // --- IMPORTACIONES DE TUS PANTALLAS ---
 import 'citas.dart';
@@ -9,7 +8,7 @@ import 'diagnostico.dart';
 import 'notificaciones.dart';
 import 'tienda.dart';
 import 'ofertas.dart';
-import 'market.dart';
+import 'market.dart'; 
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +32,7 @@ class SuperVortecApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: themeNotifier,
-      builder: (_, mode, __) {
+      builder: (context, mode, child) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Mi Garaje',
@@ -688,7 +687,6 @@ class RepairDetailScreen extends StatelessWidget {
                       context, 
                       "Recepción", 
                       historyItem['videoReception'], 
-                      // AQUÍ SE ACTUALIZAN LOS TÍTULOS Y DESCRIPCIÓN ESPECÍFICOS PARA EL VIDEO DE RECEPCIÓN
                       title: "Recepción del vehículo.",
                       desc: "Este video muestra el estado del vehículo al llegar al taller.",
                       isDark: isDark
@@ -783,7 +781,7 @@ class RepairDetailScreen extends StatelessWidget {
                   foreground: Paint()
                     ..style = PaintingStyle.stroke
                     ..strokeWidth = 2.0
-                    ..color = Colors.black, // BORDE NEGRO
+                    ..color = Colors.black, 
                 ),
               ),
               Text(
@@ -797,7 +795,7 @@ class RepairDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 5),
-          Text(content ?? "Pendiente...", style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 13, height: 1.4)),
+          Text(content ?? "Pendiente...", style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 13, height: 1.4)),
         ],
       ),
     );
@@ -821,7 +819,7 @@ class RepairDetailScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => InAppVideoPlayerScreen(
-                videoUrl: videoUrl!,
+                videoUrl: videoUrl, // CORREGIDO: Sin el signo "!"
                 videoTitle: title,
                 videoDescription: desc ?? "Sin detalles adicionales.",
               ),
