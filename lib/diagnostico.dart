@@ -26,6 +26,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       "price": 85.00,
       "isSelected": true, 
       "isFixable": true,
+      "warranty": "3 Meses", // CAMBIO: Solo tiempo
       "videoUrl": "https://www.youtube.com/watch?v=wblL1YIDu-A", 
       "breakdown": [
         {"item": "Bobina Original AC Delco", "cost": 55.00},
@@ -44,6 +45,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       "price": 35.00,
       "isSelected": false, 
       "isFixable": true,
+      "warranty": "15 Días", // CAMBIO: Solo tiempo
       "videoUrl": "https://www.youtube.com/watch?v=YuUtjWC2y0s",
       "breakdown": [
         {"item": "Limpiador Electrónico", "cost": 10.00},
@@ -58,8 +60,9 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       "priority": "ALERTA",
       "color": Colors.orange, 
       "price": 60.00,
-      "isSelected": false,
+      "isSelected": false, 
       "isFixable": true,
+      "warranty": "3 Meses", // CAMBIO: Solo tiempo
       "videoUrl": "https://www.youtube.com/watch?v=3XoBQPC-1vM",
       "breakdown": [
         {"item": "Par de Bieletas (Genéricas)", "cost": 30.00},
@@ -77,6 +80,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       "price": 0.00,
       "isSelected": false,
       "isFixable": false, 
+      "warranty": "N/A",
       "videoUrl": "",
       "breakdown": [] 
     },
@@ -181,7 +185,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // TÍTULO LIMPIO (Sin códigos)
+                      // TÍTULO
                       Text(item['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                       
                       const SizedBox(height: 8),
@@ -225,7 +229,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                               ],
                             ),
                             const Spacer(),
-                            // BOTÓN ACTUALIZADO
                             TextButton.icon(
                               onPressed: () {
                                 Navigator.push(
@@ -253,6 +256,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             ),
           ),
 
+          // BARRA TOTALIZADORA
           Container(
             padding: const EdgeInsets.all(25),
             decoration: const BoxDecoration(
@@ -320,7 +324,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   }
 }
 
-// --- PANTALLA DETALLE ACTUALIZADA (SOPORTE FULL SCREEN) ---
+// --- PANTALLA DETALLE (GARANTÍA EN VERDE) ---
 class BudgetDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
   const BudgetDetailScreen({super.key, required this.item});
@@ -358,7 +362,6 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
     final List breakdown = widget.item['breakdown'] ?? [];
     const Color bgDark = Color(0xFF121212);
 
-    // USAMOS YoutubePlayerBuilder PARA SOPORTAR PANTALLA COMPLETA REAL
     return YoutubePlayerBuilder(
       player: YoutubePlayer(
         controller: _controller,
@@ -369,7 +372,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
           ProgressBar(isExpanded: true, colors: const ProgressBarColors(playedColor: Colors.red, handleColor: Colors.redAccent)),
           const SizedBox(width: 10),
           RemainingDuration(),
-          const FullScreenButton(), // Botón explícito de pantalla completa
+          const FullScreenButton(),
         ],
       ),
       builder: (context, player) {
@@ -410,7 +413,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 15, offset: const Offset(0, 5))],
                     ),
                     clipBehavior: Clip.antiAlias,
-                    child: player, // AQUÍ VA EL REPRODUCTOR QUE NOS DA EL BUILDER
+                    child: player,
                   ),
                 ],
 
@@ -446,6 +449,32 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                           const Text("TOTAL ITEM", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold)),
                           Text("\$${widget.item['price'].toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
                         ],
+                      ),
+                      
+                      const SizedBox(height: 20),
+                      
+                      // --- SECCIÓN GARANTÍA EN VERDE (NUEVO DISEÑO) ---
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1), // Fondo verde suave
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.5)), // Borde verde
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.verified, color: Colors.green, size: 24),
+                            const SizedBox(width: 10),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text("GARANTÍA INCLUIDA", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                                Text(widget.item['warranty'] ?? "N/A", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                              ],
+                            ),
+                          ],
+                        ),
                       )
                     ],
                   ),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; 
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-// Importamos tu archivo de citas
+
+// --- IMPORTACIONES DE TUS PANTALLAS ---
 import 'citas.dart';
 import 'diagnostico.dart';
 import 'notificaciones.dart';
@@ -10,30 +12,72 @@ import 'ofertas.dart';
 import 'market.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // BLOQUEO DE PANTALLA VERTICAL
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
   runApp(const SuperVortecApp());
 }
+
+// CONTROLADOR GLOBAL DEL TEMA
+final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
 class SuperVortecApp extends StatelessWidget {
   const SuperVortecApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Mi Garaje',
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xFFD50000),
-        scaffoldBackgroundColor: Colors.black,
-        useMaterial3: true,
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.05),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-          hintStyle: TextStyle(color: Colors.grey[600]),
-        ),
-      ),
-      home: const ClientHomeScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeNotifier,
+      builder: (_, mode, __) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'Mi Garaje',
+          themeMode: mode, 
+          
+          // --- TEMA CLARO (DÍA) ---
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primaryColor: const Color(0xFFD50000), 
+            scaffoldBackgroundColor: const Color(0xFFF5F5F5), 
+            useMaterial3: true,
+            appBarTheme: const AppBarTheme(
+              iconTheme: IconThemeData(color: Colors.black),
+              titleTextStyle: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)
+            ),
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: Colors.grey[200],
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              hintStyle: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+
+          // --- TEMA OSCURO (NOCHE) ---
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primaryColor: const Color(0xFFD50000),
+            scaffoldBackgroundColor: Colors.black,
+            useMaterial3: true,
+             appBarTheme: const AppBarTheme(
+              iconTheme: IconThemeData(color: Colors.white),
+              titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+            ),
+            inputDecorationTheme: InputDecorationTheme(
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.05),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+              hintStyle: TextStyle(color: Colors.grey[600]),
+            ),
+          ),
+          
+          home: const ClientHomeScreen(),
+        );
+      },
     );
   }
 }
@@ -136,26 +180,36 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         ? (myVehicles[_currentPage]['history'] as List<Map<String, dynamic>>)
         : <Map<String, dynamic>>[];
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final subTextColor = isDark ? Colors.grey : Colors.grey[700];
+
     return Scaffold(
       extendBodyBehindAppBar: true,
-      drawer: _buildDrawer(),
+      drawer: _buildDrawer(isDark),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        title: const Text(
+        iconTheme: IconThemeData(color: textColor), 
+        title: Text(
           'MI GARAJE', 
           style: TextStyle(
             fontWeight: FontWeight.bold, 
             letterSpacing: 3.0,
             fontSize: 18,
-            color: Colors.white
+            color: textColor
           )
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none, color: Colors.white), 
-            onPressed: () {}
+            icon: Icon(
+              isDark ? Icons.light_mode : Icons.dark_mode, 
+              color: isDark ? Colors.amber : Colors.indigo
+            ), 
+            onPressed: () {
+              themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
+            },
           ),
         ],
       ),
@@ -164,12 +218,18 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           Container(
             height: double.infinity,
             width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(0, -0.3),
-                radius: 1.2,
-                colors: [Color(0xFF252525), Colors.black],
-              ),
+            decoration: BoxDecoration(
+              gradient: isDark 
+                ? const RadialGradient(
+                    center: Alignment(0, -0.3),
+                    radius: 1.2,
+                    colors: [Color(0xFF252525), Colors.black],
+                  )
+                : const LinearGradient( 
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.white, Color(0xFFEEEEEE)],
+                  ),
             ),
           ),
           SingleChildScrollView(
@@ -183,22 +243,22 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     children: [
-                      _buildSliderItem(context, Icons.calendar_month, "CITAS", brandRed, 
+                      _buildSliderItem(context, Icons.calendar_month, "CITAS", brandRed, isDark,
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))
                       ),
-                      _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber,
-  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const NotificationScreen()))
-),
-                      _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", Colors.white, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DiagnosticScreen()))),
-                      _buildSliderItem(context, Icons.storefront, "TIENDA", const Color(0xFFD50000),
-  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))
-),
-                      _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange,
-  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))
-),
-                     _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent,
-  onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))
-),
+                      _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber, isDark,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const NotificationScreen()))
+                      ),
+                      _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DiagnosticScreen()))),
+                      _buildSliderItem(context, Icons.storefront, "TIENDA", const Color(0xFFD50000), isDark,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))
+                      ),
+                      _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange, isDark,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))
+                      ),
+                       _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent, isDark,
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))
+                      ),
                     ],
                   ),
                 ),
@@ -209,7 +269,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text("VEHÍCULO ACTIVO", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 2.5, fontWeight: FontWeight.bold)),
-                      Text("${_currentPage + 1}/${myVehicles.length}", style: TextStyle(color: Colors.grey[600], fontSize: 10))
+                      Text("${_currentPage + 1}/${myVehicles.length}", style: TextStyle(color: subTextColor, fontSize: 10))
                     ],
                   ),
                 ),
@@ -225,7 +285,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     itemBuilder: (context, index) {
                       return Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: _buildVehicleCard(myVehicles[index]),
+                        child: _buildVehicleCard(myVehicles[index], isDark),
                       );
                     },
                   ),
@@ -257,7 +317,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   physics: const NeverScrollableScrollPhysics(), 
                   itemCount: currentHistory.length,
                   itemBuilder: (context, index) {
-                    return _buildHistoryCard(context, currentHistory[index]);
+                    return _buildHistoryCard(context, currentHistory[index], isDark);
                   },
                 ),
                 const SizedBox(height: 50), 
@@ -269,16 +329,19 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  Widget _buildHistoryCard(BuildContext context, Map<String, dynamic> historyItem) {
+  Widget _buildHistoryCard(BuildContext context, Map<String, dynamic> historyItem, bool isDark) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
+    Color cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    Color titleColor = isDark ? Colors.white : Colors.black;
+    Color borderColor = isDark ? Colors.white10 : Colors.grey[300]!;
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => RepairDetailScreen(historyItem: historyItem),
+            builder: (context) => RepairDetailScreen(historyItem: historyItem, isDark: isDark),
           ),
         );
       },
@@ -286,12 +349,12 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E), 
+          color: cardBg, 
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.white10),
+          border: Border.all(color: borderColor),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
+              color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, 5),
             )
@@ -320,8 +383,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     children: [
                       Text(
                         historyItem['title'],
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: titleColor,
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -342,14 +405,14 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             ),
             if (isCompleted) ...[
               const SizedBox(height: 15),
-              const Divider(color: Colors.white10, height: 1),
+              Divider(color: borderColor, height: 1),
               const SizedBox(height: 15),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildHistoryStat(Icons.verified_user_outlined, "Garantía", historyItem['warranty']),
-                  _buildHistoryStat(Icons.hourglass_bottom, "Restan", historyItem['daysLeft'], isHighlighted: true),
-                  _buildHistoryStat(Icons.history, "Pasado", historyItem['elapsed']),
+                  _buildHistoryStat(Icons.verified_user_outlined, "Garantía", historyItem['warranty'], isDark),
+                  _buildHistoryStat(Icons.hourglass_bottom, "Restan", historyItem['daysLeft'], isDark, isHighlighted: true),
+                  _buildHistoryStat(Icons.history, "Tiempo Transcurrido", historyItem['elapsed'], isDark),
                 ],
               ),
             ]
@@ -359,7 +422,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  Widget _buildHistoryStat(IconData icon, String label, String value, {bool isHighlighted = false}) {
+  Widget _buildHistoryStat(IconData icon, String label, String value, bool isDark, {bool isHighlighted = false}) {
+    Color valColor = isHighlighted 
+        ? (isDark ? Colors.greenAccent : Colors.green[700]!)
+        : (isDark ? Colors.white : Colors.black87);
+
     return Column(
       children: [
         Row(
@@ -374,7 +441,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         Text(
           value, 
           style: TextStyle(
-            color: isHighlighted ? Colors.greenAccent : Colors.white, 
+            color: valColor, 
             fontSize: 11, 
             fontWeight: FontWeight.bold
           )
@@ -383,17 +450,21 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  Widget _buildVehicleCard(Map<String, dynamic> vehicleData) {
+  Widget _buildVehicleCard(Map<String, dynamic> vehicleData, bool isDark) {
     bool isInWorkshop = vehicleData['isInWorkshop'];
+    Color cardBg = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white;
+    Color textColor = isDark ? Colors.white : Colors.black;
+    Color borderColor = isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey[300]!;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15), 
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05), 
+        color: cardBg, 
         borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0 : 0.05), blurRadius: 10)],
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1), 
+          color: borderColor, 
           width: 1
         ),
       ),
@@ -416,9 +487,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(vehicleData['brand'], style: const TextStyle(color: Colors.white, fontSize: 14, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
+                    Text(vehicleData['brand'], style: TextStyle(color: textColor, fontSize: 14, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 2),
-                    Text(vehicleData['model'], style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: Colors.white, letterSpacing: 0.5)),
+                    Text(vehicleData['model'], style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: textColor, letterSpacing: 0.5)),
                     Text(vehicleData['year'], style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                   ],
                 ),
@@ -436,16 +507,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             ],
           ),
           const Spacer(),
-          const Divider(color: Colors.white10, height: 1),
+          Divider(color: borderColor, height: 1),
           const Spacer(), 
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildTechInfo("PLACA", vehicleData['plate']),
-              Container(width: 1, height: 25, color: Colors.white10),
-              _buildTechInfo("COLOR", vehicleData['color']),
-              Container(width: 1, height: 25, color: Colors.white10),
-              _buildTechInfo("KM", vehicleData['km']),
+              _buildTechInfo("PLACA", vehicleData['plate'], isDark),
+              Container(width: 1, height: 25, color: borderColor),
+              _buildTechInfo("COLOR", vehicleData['color'], isDark),
+              Container(width: 1, height: 25, color: borderColor),
+              _buildTechInfo("KM", vehicleData['km'], isDark),
             ],
           ),
         ],
@@ -453,17 +524,17 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  Widget _buildTechInfo(String label, String value) {
+  Widget _buildTechInfo(String label, String value, bool isDark) {
     return Column(
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 8, letterSpacing: 1.0)),
         const SizedBox(height: 3),
-        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
+        Text(value, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
       ],
     );
   }
 
-  Widget _buildSliderItem(BuildContext context, IconData icon, String label, Color iconColor, {VoidCallback? onTap}) {
+  Widget _buildSliderItem(BuildContext context, IconData icon, String label, Color iconColor, bool isDark, {VoidCallback? onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -479,57 +550,61 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [const Color(0xFF2C2C2C), Colors.black.withValues(alpha: 0.8)],
+                  colors: isDark 
+                    ? [const Color(0xFF2C2C2C), Colors.black.withValues(alpha: 0.8)]
+                    : [Colors.white, Colors.grey[200]!],
                 ),
                 shape: BoxShape.circle,
-                border: Border.all(color: Colors.white12),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 10, offset: const Offset(0, 5))]
+                border: Border.all(color: isDark ? Colors.white12 : Colors.grey[300]!),
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.1), blurRadius: 10, offset: const Offset(0, 5))]
               ),
               child: Icon(icon, color: iconColor, size: 24),
             ),
             const SizedBox(height: 10),
-            Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.white70, fontWeight: FontWeight.bold, letterSpacing: 1.0))
+            Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: isDark ? Colors.white70 : Colors.black54, fontWeight: FontWeight.bold, letterSpacing: 1.0))
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDrawer() {
+  Widget _buildDrawer(bool isDark) {
     return Drawer(
-      backgroundColor: Colors.black,
+      backgroundColor: isDark ? Colors.black : Colors.white,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
           Container(
             padding: const EdgeInsets.only(top: 60, bottom: 30, left: 20),
-            decoration: const BoxDecoration(color: Color(0xFF111111)),
-            child: const Column(
+            decoration: BoxDecoration(color: isDark ? const Color(0xFF111111) : Colors.grey[200]),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(backgroundColor: Color(0xFFD50000), radius: 30, child: Icon(Icons.person, color: Colors.white, size: 30)),
-                SizedBox(height: 15),
-                Text("MVTSOLUCIONES", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
-                Text("Usuario Premium", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                const CircleAvatar(backgroundColor: Color(0xFFD50000), radius: 30, child: Icon(Icons.person, color: Colors.white, size: 30)),
+                const SizedBox(height: 15),
+                Text("MVTSOLUCIONES", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
+                const Text("Usuario Premium", style: TextStyle(color: Colors.grey, fontSize: 12)),
               ],
             ),
           ),
-          _buildDrawerItem(Icons.settings, "CONFIGURACIÓN"),
-          _buildDrawerItem(Icons.logout, "CERRAR SESIÓN"),
+          _buildDrawerItem(Icons.settings, "CONFIGURACIÓN", isDark),
+          _buildDrawerItem(Icons.logout, "CERRAR SESIÓN", isDark),
         ],
       ),
     );
   }
 
-  Widget _buildDrawerItem(IconData icon, String title) {
-    return ListTile(leading: Icon(icon, color: Colors.white), title: Text(title, style: const TextStyle(color: Colors.white, letterSpacing: 1)), onTap: () {});
+  Widget _buildDrawerItem(IconData icon, String title, bool isDark) {
+    Color color = isDark ? Colors.white : Colors.black87;
+    return ListTile(leading: Icon(icon, color: color), title: Text(title, style: TextStyle(color: color, letterSpacing: 1)), onTap: () {});
   }
 }
 
 class RepairDetailScreen extends StatelessWidget {
   final Map<String, dynamic> historyItem;
+  final bool isDark;
 
-  const RepairDetailScreen({super.key, required this.historyItem});
+  const RepairDetailScreen({super.key, required this.historyItem, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
@@ -538,26 +613,36 @@ class RepairDetailScreen extends StatelessWidget {
     List budgetList = historyItem['budget'] ?? [];
     double totalBudget = budgetList.fold(0, (sum, item) => sum + (item['price'] as double));
 
+    Color textColor = isDark ? Colors.white : Colors.black;
+    Color cardColor = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white;
+    Color borderColor = isDark ? Colors.white10 : Colors.grey[300]!;
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: const Text("INFORME DE SERVICIO", style: TextStyle(fontSize: 14, letterSpacing: 2, fontWeight: FontWeight.bold, color: Colors.white)),
+        title: Text("INFORME DE SERVICIO", style: TextStyle(fontSize: 14, letterSpacing: 2, fontWeight: FontWeight.bold, color: textColor)),
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: IconThemeData(color: textColor),
       ),
       body: Stack(
         children: [
           Container(
             height: double.infinity,
             width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(0, -0.3),
-                radius: 1.2,
-                colors: [Color(0xFF252525), Colors.black],
-              ),
+            decoration: BoxDecoration(
+              gradient: isDark 
+                ? const RadialGradient(
+                    center: Alignment(0, -0.3),
+                    radius: 1.2,
+                    colors: [Color(0xFF252525), Colors.black],
+                  )
+                : const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.white, Color(0xFFEEEEEE)],
+                  ),
             ),
           ),
           SingleChildScrollView(
@@ -580,7 +665,7 @@ class RepairDetailScreen extends StatelessWidget {
                 const SizedBox(height: 20),
                 Text(
                   historyItem['title'],
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white, height: 1.2),
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textColor, height: 1.2),
                 ),
                 const SizedBox(height: 10),
                 Text(historyItem['date'], style: const TextStyle(color: Colors.grey, fontSize: 14)),
@@ -589,9 +674,9 @@ class RepairDetailScreen extends StatelessWidget {
                 
                 _buildSectionTitle("REPORTE TÉCNICO"),
                 const SizedBox(height: 15),
-                _buildInfoBlock("Falla Reportada", historyItem['complaint']),
+                _buildInfoBlock("Falla Reportada", historyItem['complaint'], textColor, cardColor, borderColor),
                 const SizedBox(height: 10),
-                _buildInfoBlock("Diagnóstico Técnico", historyItem['diagnosis']),
+                _buildInfoBlock("Diagnóstico Técnico", historyItem['diagnosis'], textColor, cardColor, borderColor),
 
                 const SizedBox(height: 30),
 
@@ -603,8 +688,10 @@ class RepairDetailScreen extends StatelessWidget {
                       context, 
                       "Recepción", 
                       historyItem['videoReception'], 
-                      title: "Recepción: ${historyItem['title']}",
-                      desc: historyItem['complaint']
+                      // AQUÍ SE ACTUALIZAN LOS TÍTULOS Y DESCRIPCIÓN ESPECÍFICOS PARA EL VIDEO DE RECEPCIÓN
+                      title: "Recepción del vehículo.",
+                      desc: "Este video muestra el estado del vehículo al llegar al taller.",
+                      isDark: isDark
                     )),
                     const SizedBox(width: 15),
                     Expanded(child: _buildVideoCard(
@@ -612,7 +699,8 @@ class RepairDetailScreen extends StatelessWidget {
                       "Reparación", 
                       historyItem['videoRepair'],
                       title: "Reparación: ${historyItem['title']}",
-                      desc: historyItem['diagnosis']
+                      desc: historyItem['diagnosis'],
+                      isDark: isDark
                     )),
                   ],
                 ),
@@ -625,9 +713,9 @@ class RepairDetailScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
+                    color: cardColor,
                     borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.white10),
+                    border: Border.all(color: borderColor),
                   ),
                   child: Column(
                     children: [
@@ -636,12 +724,12 @@ class RepairDetailScreen extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(child: Text(item['item'], style: const TextStyle(color: Colors.white70, fontSize: 13))),
-                            Text("\$${item['price'].toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            Expanded(child: Text(item['item'], style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 13))),
+                            Text("\$${item['price'].toStringAsFixed(2)}", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       )),
-                      const Divider(color: Colors.white24),
+                      Divider(color: borderColor),
                       const SizedBox(height: 5),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -666,11 +754,11 @@ class RepairDetailScreen extends StatelessWidget {
   Widget _buildSectionTitle(String title) {
     return Text(
       title, 
-      style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)
+      style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)
     );
   }
 
-  Widget _buildInfoBlock(String label, String? content) {
+  Widget _buildInfoBlock(String label, String? content, Color textColor, Color bgColor, Color borderColor) {
     const double fontSize = 16;
     const FontWeight fontWeight = FontWeight.bold;
 
@@ -678,9 +766,9 @@ class RepairDetailScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
+        color: bgColor,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,7 +783,7 @@ class RepairDetailScreen extends StatelessWidget {
                   foreground: Paint()
                     ..style = PaintingStyle.stroke
                     ..strokeWidth = 2.0
-                    ..color = Colors.black,
+                    ..color = Colors.black, // BORDE NEGRO
                 ),
               ),
               Text(
@@ -709,18 +797,18 @@ class RepairDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 5),
-          Text(content ?? "Pendiente...", style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4)),
+          Text(content ?? "Pendiente...", style: TextStyle(color: textColor.withOpacity(0.7), fontSize: 13, height: 1.4)),
         ],
       ),
     );
   }
 
-  Widget _buildVideoCard(BuildContext context, String label, String? videoUrl, {required String title, required String? desc}) {
+  Widget _buildVideoCard(BuildContext context, String label, String? videoUrl, {required String title, required String? desc, required bool isDark}) {
     bool hasVideo = videoUrl != null && videoUrl.isNotEmpty;
     String? thumbnailUrl;
 
     if (hasVideo) {
-      String? videoId = YoutubePlayer.convertUrlToId(videoUrl!); // Sin '!'
+      String? videoId = YoutubePlayer.convertUrlToId(videoUrl); 
       if (videoId != null) {
         thumbnailUrl = "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
       }
@@ -733,12 +821,7 @@ class RepairDetailScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => InAppVideoPlayerScreen(
-                videoUrl: videoUrl!, // Sin '!' (o con '!' si Dart lo pide, pero si sale warning se quita)
-                // En este caso Dart se quejaba del !, así que lo quitamos arriba. 
-                // Pero ojo: aquí SÍ necesitamos el ! si 'videoUrl' es String?. 
-                // El warning decía que el receiver NO es null. Eso significa que Dart ya sabe que es String.
-                // Así que lo dejamos como `videoUrl` a secas.
-                
+                videoUrl: videoUrl!,
                 videoTitle: title,
                 videoDescription: desc ?? "Sin detalles adicionales.",
               ),
@@ -755,7 +838,7 @@ class RepairDetailScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.black,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: hasVideo ? Colors.white24 : Colors.white10),
+          border: Border.all(color: isDark ? Colors.white24 : Colors.grey[400]!),
           image: thumbnailUrl != null 
             ? DecorationImage(
                 image: NetworkImage(thumbnailUrl!), 
@@ -812,8 +895,6 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    // Aquí también quitamos el ! si sale warning, pero YoutubePlayer.convertUrlToId espera String
-    // Si widget.videoUrl ya es String (no nullable), no hace falta !
     final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
     
     _controller = YoutubePlayerController(
@@ -833,19 +914,6 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
     super.dispose();
   }
 
-  void _openInYoutubeApp() async {
-    final Uri uri = Uri.parse(widget.videoUrl);
-    try {
-      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-         // Verificamos si el contexto sigue vivo antes de usarlo (arregla el otro warning)
-         if (!context.mounted) return;
-         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo abrir YouTube")));
-      }
-    } catch (e) {
-      debugPrint("Error: $e");
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return YoutubePlayerBuilder(
@@ -863,11 +931,7 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
           extendBodyBehindAppBar: true,
           body: Container(
             decoration: const BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(0, -0.3),
-                radius: 1.3,
-                colors: [Color(0xFF252525), Colors.black],
-              ),
+              color: Colors.black
             ),
             child: Column(
               children: [
@@ -919,23 +983,13 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFD50000),
-                                  borderRadius: BorderRadius.circular(5)
-                                ),
-                                child: const Text("VIDEO TÉCNICO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.open_in_new, color: Colors.white70),
-                                onPressed: _openInYoutubeApp,
-                                tooltip: "Abrir en YouTube",
-                              )
-                            ],
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD50000),
+                              borderRadius: BorderRadius.circular(5)
+                            ),
+                            child: const Text("VIDEO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
                           ),
                           const SizedBox(height: 15),
                           Text(
@@ -945,26 +999,13 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
                           const SizedBox(height: 15),
                           const Divider(color: Colors.white10),
                           const SizedBox(height: 15),
-                          const Text("DETALLES DEL REGISTRO:", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
+                          const Text("DETALLES", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 10),
                           Text(
                             widget.videoDescription,
                             style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
                           ),
                           const SizedBox(height: 40),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFD50000),
-                                padding: const EdgeInsets.symmetric(vertical: 15),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                              ),
-                              onPressed: _openInYoutubeApp, 
-                              icon: const Icon(Icons.ondemand_video, color: Colors.white),
-                              label: const Text("ABRIR EN APP DE YOUTUBE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
-                            ),
-                          )
                         ],
                       ),
                     ),
