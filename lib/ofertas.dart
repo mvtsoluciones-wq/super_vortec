@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class OfferScreen extends StatelessWidget {
   const OfferScreen({super.key});
@@ -7,34 +8,33 @@ class OfferScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     const Color bgDark = Color(0xFF121212);
 
-    // DATOS DE OFERTAS
     final List<Map<String, dynamic>> offers = [
       {
-        "title": "Cambio de Aceite Full Sintético",
+        "title": "Cambio de Aceite",
+        "category": "MANTENIMIENTO",
         "discount": "20%",
-        "description": "Incluye filtro de aceite y revisión de 15 puntos de seguridad.",
+        "description": "Incluye filtro y revisión de fluidos.",
         "validUntil": "18 Ene",
-        "color1": const Color(0xFF8E2DE2), // Degradado Morado
-        "color2": const Color(0xFF4A00E0),
+        "color": const Color(0xFFD50000), // Rojo Vortec
         "code": "OIL20",
       },
       {
-        "title": "Diagnóstico Computarizado",
-        "discount": "GRATIS",
-        "description": "Al realizar cualquier reparación mayor a \$100 en el taller.",
+        "title": "Escáner General",
+        "category": "DIAGNÓSTICO",
+        "discount": "FREE",
+        "description": "Gratis al realizar la reparación.",
         "validUntil": "30 Ene",
-        "color1": const Color(0xFFF12711), // Degradado Rojo Naranja
-        "color2": const Color(0xFFF5AF19),
+        "color": const Color(0xFF2962FF), // Azul Intenso
         "code": "SCANFREE",
       },
       {
-        "title": "Alineación y Balanceo",
-        "discount": "2x1",
-        "description": "Paga el eje delantero y te regalamos el trasero. Solo camionetas.",
+        "title": "Tren Delantero",
+        "category": "MECÁNICA",
+        "discount": "15%",
+        "description": "Descuento en mano de obra.",
         "validUntil": "Hoy",
-        "color1": const Color(0xFF11998e), // Degradado Verde
-        "color2": const Color(0xFF38ef7d),
-        "code": "ALIEN2X1",
+        "color": const Color(0xFFFF6D00), // Naranja
+        "code": "TREN15",
       },
     ];
 
@@ -48,119 +48,187 @@ class OfferScreen extends StatelessWidget {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Ofertas y Promociones", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text("Mis Cupones", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         itemCount: offers.length,
         itemBuilder: (context, index) {
-          final promo = offers[index];
-          return _buildCouponCard(context, promo);
+          return _buildTicketCard(context, offers[index]);
         },
       ),
     );
   }
 
-  Widget _buildCouponCard(BuildContext context, Map<String, dynamic> promo) {
+  Widget _buildTicketCard(BuildContext context, Map<String, dynamic> promo) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      height: 180,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [promo['color1'], promo['color2']],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: promo['color1'].withOpacity(0.4),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          )
-        ],
-      ),
+      margin: const EdgeInsets.only(bottom: 25),
+      height: 160,
       child: Stack(
         children: [
-          // CÍRCULOS DECORATIVOS DE FONDO (Marca de agua)
-          Positioned(
-            right: -20,
-            top: -20,
-            child: Icon(Icons.local_offer, size: 150, color: Colors.white.withOpacity(0.1)),
-          ),
-          
-          // CONTENIDO
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          // CAPA BASE BLANCA (EL TICKET)
+          Row(
+            children: [
+              // LADO IZQUIERDO (DESCUENTO - COLOR SÓLIDO)
+              Container(
+                width: 110,
+                decoration: BoxDecoration(
+                  color: promo['color'],
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(15),
+                    bottomLeft: Radius.circular(15),
+                  ),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(color: Colors.black26, borderRadius: BorderRadius.circular(8)),
-                      child: Text(
-                        "Válido hasta: ${promo['validUntil']}", 
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)
+                    Text(
+                      promo['discount'],
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          promo['discount'], 
-                          style: const TextStyle(color: Colors.white, fontSize: 35, fontWeight: FontWeight.w900, height: 1)
-                        ),
-                        const SizedBox(width: 5),
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 5),
-                          child: Text("OFF", style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      promo['title'], 
-                      style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)
+                    const Text(
+                      "OFF",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2
+                      ),
                     ),
                   ],
                 ),
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        promo['description'], 
-                        style: const TextStyle(color: Colors.white70, fontSize: 11),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+              ),
+              
+              // LADO DERECHO (INFORMACIÓN - BLANCO)
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(25, 15, 15, 15),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(
+                      topRight: Radius.circular(15),
+                      bottomRight: Radius.circular(15),
                     ),
-                    const SizedBox(width: 15),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(4)
+                            ),
+                            child: Text(
+                              promo['category'],
+                              style: TextStyle(color: Colors.grey[600], fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            promo['title'],
+                            style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            promo['description'],
+                            style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text("¡Cupón ${promo['code']} canjeado!"),
-                            backgroundColor: Colors.green,
+                      
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Vence: ${promo['validUntil']}",
+                            style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              Clipboard.setData(ClipboardData(text: promo['code']));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Código ${promo['code']} copiado"),
+                                  backgroundColor: Colors.green,
+                                )
+                              );
+                            },
+                            child: const Text(
+                              "USAR CUPÓN",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                                decoration: TextDecoration.underline
+                              ),
+                            ),
                           )
-                        );
-                      }, 
-                      child: const Text("CANJEAR", style: TextStyle(fontWeight: FontWeight.bold))
-                    )
-                  ],
-                )
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // DECORACIÓN: MUESCAS Y LÍNEA PUNTEADA (EFECTO TICKET)
+          Positioned(
+            left: 100, // Justo entre los dos colores
+            top: -10,
+            bottom: -10,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // CÍRCULO NEGRO ARRIBA (Muesca)
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF121212), // Mismo color que el fondo de la pantalla
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                // LÍNEA PUNTEADA
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return Flex(
+                        direction: Axis.vertical,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(10, (_) {
+                          return Container(
+                            width: 2,
+                            height: 5,
+                            color: Colors.grey[300],
+                          );
+                        }),
+                      );
+                    },
+                  ),
+                ),
+                // CÍRCULO NEGRO ABAJO (Muesca)
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF121212), // Mismo color que el fondo de la pantalla
+                    shape: BoxShape.circle,
+                  ),
+                ),
               ],
             ),
           ),
