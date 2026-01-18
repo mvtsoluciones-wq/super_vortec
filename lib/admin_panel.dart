@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:url_launcher/url_launcher.dart';
 import 'diagnostico_web.dart';
+import 'presupuesto_web.dart';
 
 class AdminControlPanel extends StatefulWidget {
   const AdminControlPanel({super.key});
@@ -176,17 +177,12 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   }
 
   Widget _buildCurrentModule() {
-    // Este switch decide qué archivo mostrar según la pestaña activa
   switch (_activeTab) {
-    case 0:
-      return _moduleRecepcionVehiculo(); // Pestaña de Recepción
-    case 1:
-      return const DiagnosticoWebModule(); // <--- Aquí usamos el nuevo archivo
+    case 0: return _moduleRecepcionVehiculo();
+    case 1: return const DiagnosticoWebModule();
+    case 9: return const PresupuestoWebModule(); // <--- Nueva pestaña
     default:
-      // Para todas las demás pestañas que aún no creamos
-      return const Center(
-        child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150),
-      );
+      return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
   }
 }
 
