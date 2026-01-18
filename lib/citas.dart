@@ -18,7 +18,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   // DATOS
   final List<DateTime> _days = List.generate(7, (index) => DateTime.now().add(Duration(days: index)));
   
-  // CAMBIO: Ahora solo dos opciones de turno
   final List<String> _timeSlots = [
     "En la Mañana", 
     "En la Tarde"
@@ -125,7 +124,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     
-                    // A. TIPO DE SERVICIO
                     const Text("Tipo de Servicio", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     Container(
@@ -159,7 +157,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
                     const SizedBox(height: 25),
 
-                    // B. PREFERENCIA DE TURNO (Solo 2 opciones ahora)
                     const Text("Preferencia de Turno", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     Row(
@@ -199,7 +196,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
                     const SizedBox(height: 25),
 
-                    // C. DESCRIPCIÓN DE FALLA
                     const Text("Descripción de la Falla", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     TextField(
@@ -218,7 +214,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
                     const SizedBox(height: 25),
 
-                    // D. SUBIR FOTOS/VIDEOS
                     const Text("Evidencia (Fotos/Videos)", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 10),
                     GestureDetector(
@@ -265,7 +260,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
                     const SizedBox(height: 40),
 
-                    // E. BOTÓN ENVIAR
                     SizedBox(
                       width: double.infinity,
                       height: 55,
@@ -291,7 +285,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     );
   }
 
-  // DIÁLOGO DE ÉXITO
   void _showSuccessDialog() {
     if (_selectedService == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("⚠️ Selecciona un tipo de servicio"), backgroundColor: Colors.orange));
@@ -325,11 +318,14 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                 const SizedBox(height: 20),
                 const Text("¡Solicitud Enviada!", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
+                
+                // CORRECCIÓN REALIZADA AQUÍ: Se eliminaron las llaves {} en la interpolación
                 Text(
-                  "Hemos recibido tu solicitud de ${_selectedService} para el turno de la ${_timeSlots[_selectedTimeIndex].toLowerCase()}.",
+                  "Hemos recibido tu solicitud de $_selectedService para el turno de la ${_timeSlots[_selectedTimeIndex].toLowerCase()}.",
                   textAlign: TextAlign.center,
                   style: const TextStyle(color: Colors.white70, fontSize: 14),
                 ),
+                
                 const SizedBox(height: 25),
                 SizedBox(
                   width: double.infinity,

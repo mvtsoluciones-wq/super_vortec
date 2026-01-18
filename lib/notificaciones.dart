@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-// IMPORTANTE: Esta es la nueva librería para el icono de WhatsApp
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 class NotificationScreen extends StatefulWidget {
@@ -63,9 +62,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final Uri url = Uri.parse("https://wa.me/$phoneNumber?text=${Uri.encodeComponent(message)}");
 
     try {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw 'No se pudo abrir WhatsApp';
+      }
     } catch (e) {
-      if(!context.mounted) return;
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("No se pudo abrir WhatsApp")),
       );
@@ -75,16 +76,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
   @override
   Widget build(BuildContext context) {
     const Color bgDark = Color(0xFF121212);
+    // CORRECCIÓN: Se eliminó la variable 'brandRed' que no se usaba aquí.
 
     return Scaffold(
       backgroundColor: bgDark,
-      // BOTÓN FLOTANTE DE WHATSAPP (ACTUALIZADO)
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _launchWhatsApp,
         backgroundColor: Colors.green,
-        // AQUÍ ESTÁ EL CAMBIO DE ICONO
         icon: const FaIcon(FontAwesomeIcons.whatsapp, color: Colors.white, size: 25),
-        // AQUÍ ESTÁ EL CAMBIO DE TEXTO
         label: const Text("Contáctanos", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
       ),
       appBar: AppBar(
@@ -106,7 +105,9 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   n['isRead'] = true;
                 }
               });
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Todo marcado como leído")));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Todo marcado como leído"), duration: Duration(seconds: 1))
+              );
             },
           )
         ],
@@ -124,7 +125,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  // Tarjeta Deslizable
   Widget _buildNotificationCard(Map<String, dynamic> item, int index) {
     return Dismissible(
       key: Key(item['id']),
@@ -143,57 +143,65 @@ class _NotificationScreenState extends State<NotificationScreen> {
         setState(() {
           _notifications.removeAt(index);
         });
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("${item['title']} eliminado"), duration: const Duration(seconds: 1)),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 15),
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: item['isRead'] ? const Color(0xFF1E1E1E) : const Color(0xFF2C2C2C), 
-          borderRadius: BorderRadius.circular(15),
-          border: item['isRead'] ? null : Border.all(color: Colors.white12),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildIcon(item['type']),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        item['title'], 
-                        style: TextStyle(
-                          color: Colors.white, 
-                          fontWeight: item['isRead'] ? FontWeight.normal : FontWeight.bold,
-                          fontSize: 15
-                        )
-                      ),
-                      Text(item['time'], style: TextStyle(color: Colors.grey[600], fontSize: 10)),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    item['body'], 
-                    style: TextStyle(color: Colors.grey[400], fontSize: 12, height: 1.4)
-                  ),
-                ],
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            item['isRead'] = true;
+          });
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 15),
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: item['isRead'] ? const Color(0xFF1E1E1E) : const Color(0xFF2C2C2C), 
+            borderRadius: BorderRadius.circular(15),
+            border: item['isRead'] ? null : Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildIcon(item['type']),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          item['title'], 
+                          style: TextStyle(
+                            color: Colors.white, 
+                            fontWeight: item['isRead'] ? FontWeight.normal : FontWeight.bold,
+                            fontSize: 15
+                          )
+                        ),
+                        Text(item['time'], style: TextStyle(color: Colors.grey[600], fontSize: 10)),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      item['body'], 
+                      style: TextStyle(color: Colors.grey[400], fontSize: 12, height: 1.4)
+                    ),
+                  ],
+                ),
               ),
-            ),
-            if (!item['isRead'])
-              Container(
-                margin: const EdgeInsets.only(left: 10, top: 5),
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(color: Color(0xFFD50000), shape: BoxShape.circle),
-              )
-          ],
+              if (!item['isRead'])
+                Container(
+                  margin: const EdgeInsets.only(left: 10, top: 5),
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(color: Color(0xFFD50000), shape: BoxShape.circle),
+                )
+            ],
+          ),
         ),
       ),
     );
@@ -238,7 +246,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
         children: [
           Icon(Icons.notifications_off_outlined, size: 80, color: Colors.grey[800]),
           const SizedBox(height: 20),
-          const Text("Sin notificaciones", style: TextStyle(color: Colors.grey)),
+          const Text("Sin notificaciones", style: TextStyle(color: Colors.grey, fontSize: 16)),
         ],
       ),
     );

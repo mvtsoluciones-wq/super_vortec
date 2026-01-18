@@ -15,7 +15,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
 
   // DATOS DE DIAGNÓSTICO
   final List<Map<String, dynamic>> _diagnosticItems = [
-    // 1. PRIORIDAD ROJA
     {
       "system": "Motor (ECM)",
       "code": "P0303",
@@ -26,7 +25,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       "price": 85.00,
       "isSelected": true, 
       "isFixable": true,
-      "warranty": "3 Meses", // CAMBIO: Solo tiempo
+      "warranty": "3 Meses",
       "videoUrl": "https://www.youtube.com/watch?v=wblL1YIDu-A", 
       "breakdown": [
         {"item": "Bobina Original AC Delco", "cost": 55.00},
@@ -34,7 +33,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
         {"item": "Mano de Obra", "cost": 20.00},
       ]
     },
-    // 2. PRIORIDAD NARANJA
     {
       "system": "Admisión",
       "code": "P0171",
@@ -45,7 +43,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       "price": 35.00,
       "isSelected": false, 
       "isFixable": true,
-      "warranty": "15 Días", // CAMBIO: Solo tiempo
+      "warranty": "15 Días",
       "videoUrl": "https://www.youtube.com/watch?v=YuUtjWC2y0s",
       "breakdown": [
         {"item": "Limpiador Electrónico", "cost": 10.00},
@@ -62,14 +60,13 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
       "price": 60.00,
       "isSelected": false, 
       "isFixable": true,
-      "warranty": "3 Meses", // CAMBIO: Solo tiempo
+      "warranty": "3 Meses",
       "videoUrl": "https://www.youtube.com/watch?v=3XoBQPC-1vM",
       "breakdown": [
         {"item": "Par de Bieletas (Genéricas)", "cost": 30.00},
         {"item": "Instalación", "cost": 30.00},
       ]
     },
-    // 3. PRIORIDAD VERDE
     {
       "system": "Frenos (ABS)",
       "code": "OK",
@@ -114,8 +111,11 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
         webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
       );
     } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo cargar el reporte")));
+      // CORRECCIÓN DE SEGURIDAD PARA ASYNC GAPS
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No se pudo cargar el reporte"))
+      );
     }
   }
 
@@ -185,11 +185,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // TÍTULO
                       Text(item['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      
                       const SizedBox(height: 8),
-                      
                       Text.rich(
                         TextSpan(
                           children: [
@@ -199,11 +196,9 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                           style: const TextStyle(fontSize: 13, height: 1.4),
                         ),
                       ),
-                      
                       const SizedBox(height: 15),
                       const Divider(color: Colors.white10),
                       const SizedBox(height: 10),
-
                       if (isFixable)
                         Row(
                           children: [
@@ -256,7 +251,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             ),
           ),
 
-          // BARRA TOTALIZADORA
           Container(
             padding: const EdgeInsets.all(25),
             decoration: const BoxDecoration(
@@ -324,7 +318,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   }
 }
 
-// --- PANTALLA DETALLE (GARANTÍA EN VERDE) ---
 class BudgetDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
   const BudgetDetailScreen({super.key, required this.item});
@@ -392,7 +385,6 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
               children: [
                 Text(widget.item['title'], style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
-                
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
@@ -401,9 +393,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                     style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
                   ),
                 ),
-                
                 const SizedBox(height: 25),
-                
                 if (widget.item['videoUrl'] != null && widget.item['videoUrl'].isNotEmpty) ...[
                   const Text("EVIDENCIA EN VIDEO", style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                   const SizedBox(height: 10),
@@ -416,12 +406,9 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                     child: player,
                   ),
                 ],
-
                 const SizedBox(height: 30),
-
                 const Text("PRESUPUESTO DETALLADO", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 15),
-
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
@@ -450,17 +437,15 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                           Text("\$${widget.item['price'].toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
                         ],
                       ),
-                      
                       const SizedBox(height: 20),
-                      
-                      // --- SECCIÓN GARANTÍA EN VERDE (NUEVO DISEÑO) ---
+                      // SECCIÓN DE GARANTÍA (DISEÑO VERDE)
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
                         decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1), // Fondo verde suave
+                          color: Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.green.withValues(alpha: 0.5)), // Borde verde
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
                         ),
                         child: Row(
                           children: [
