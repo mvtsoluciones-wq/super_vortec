@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'dart:math'; // Necesario para el número de control aleatorio
 
 // --- MODELOS DE DATOS ---
 
@@ -42,13 +43,50 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
   final List<ItemPresupuesto> _itemsAgregados = [];
   int _cantidadActual = 1;
   ClientePrueba? _clienteSeleccionado;
+  String _numeroControl = ""; // Variable para el ID único
 
   // --- CONFIGURACIÓN VISUAL ---
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // --- DATOS DE PRUEBA (IMPORTACIÓN) ---
+  @override
+  void initState() {
+    super.initState();
+    _generarNumeroControl();
+  }
+
+  // --- LÓGICA DE CONTROL Y GUARDADO ---
+
+  void _generarNumeroControl() {
+    final now = DateTime.now();
+    final random = Random().nextInt(999).toString().padLeft(3, '0');
+    setState(() {
+      _numeroControl = "SV-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-$random";
+    });
+  }
+
+  void _guardarPresupuesto() {
+    if (_clienteSeleccionado == null) {
+      _notificar("Error: Debe seleccionar un cliente", Colors.red);
+      return;
+    }
+    if (_itemsAgregados.isEmpty) {
+      _notificar("Error: Agregue al menos un repuesto o servicio", Colors.red);
+      return;
+    }
+
+    // Aquí iría la lógica para enviar a Firebase en el futuro
+    _notificar("Éxito: Presupuesto $_numeroControl guardado", Colors.green);
+  }
+
+  void _notificar(String msj, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msj), backgroundColor: color, behavior: SnackBarBehavior.floating),
+    );
+  }
+
+  // --- DATOS DE PRUEBA ---
   final List<ClientePrueba> _listaClientes = [
     ClientePrueba(nombre: "Juan Pérez", id: "V-12.345.678", telefono: "0414-1234567"),
     ClientePrueba(nombre: "Talleres Mecánicos C.A.", id: "J-30987654-2", telefono: "0212-5554433"),
@@ -77,21 +115,17 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
   // --- LÓGICA DE PDF ---
   Future<void> _generatePdf() async {
     if (_clienteSeleccionado == null || _itemsAgregados.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Seleccione cliente e ingrese ítems")),
-      );
+      _notificar("Seleccione cliente e ingrese ítems", brandRed);
       return;
     }
 
     final pdf = pw.Document();
-    
-    // Carga de Imagen con Manejo de Errores
     pw.MemoryImage? logo;
     try {
       final ByteData bytes = await rootBundle.load('assets/logo_vortec.png');
       logo = pw.MemoryImage(bytes.buffer.asUint8List());
     } catch (e) {
-      debugPrint("Logo no encontrado en assets");
+      debugPrint("Logo no encontrado");
     }
 
     pdf.addPage(
@@ -102,15 +136,14 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // ENCABEZADO
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text("SUPER VORTEC 5.3", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(brandRed.value))),
-                      pw.Text("Taller Mecánico & Repuestos Especializados", style: const pw.TextStyle(fontSize: 10)),
+                      pw.Text("SUPER VORTEC 5.3", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(brandRed.toARGB32()))),
+                      pw.Text("N° Control: $_numeroControl", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
                       pw.Text("Fecha: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}"),
                     ],
                   ),
@@ -120,47 +153,27 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
               pw.SizedBox(height: 20),
               pw.Divider(thickness: 1, color: PdfColors.grey300),
               pw.SizedBox(height: 10),
-
-              // DATOS CLIENTE
-              pw.Text("DATOS DEL CLIENTE:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-              pw.Text("Nombre: ${_clienteSeleccionado!.nombre}"),
+              pw.Text("CLIENTE: ${_clienteSeleccionado!.nombre}"),
               pw.Text("ID/RIF: ${_clienteSeleccionado!.id}"),
-              pw.Text("Teléfono: ${_clienteSeleccionado!.telefono}"),
               pw.SizedBox(height: 20),
-
-              // TABLA
               pw.TableHelper.fromTextArray(
                 context: context,
                 headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
-                headerDecoration: pw.BoxDecoration(color: PdfColor.fromInt(brandRed.value)),
-                cellHeight: 25,
+                headerDecoration: pw.BoxDecoration(color: PdfColor.fromInt(brandRed.toARGB32())),
                 data: <List<String>>[
                   ['Concepto', 'Cant.', 'P. Unitario', 'Total'],
-                  ..._itemsAgregados.map((i) => [
-                    i.nombre,
-                    i.cantidad.toString(),
-                    "\$${i.precioUnitario.toStringAsFixed(2)}",
-                    "\$${i.totalLinea.toStringAsFixed(2)}"
-                  ])
+                  ..._itemsAgregados.map((i) => [i.nombre, i.cantidad.toString(), "\$${i.precioUnitario}", "\$${i.totalLinea}"])
                 ],
               ),
-              
               pw.Spacer(),
-
-              // TOTALES
               pw.Align(
                 alignment: pw.Alignment.centerRight,
-                child: pw.Container(
-                  width: 180,
-                  child: pw.Column(
-                    children: [
-                      _pdfRow("Subtotal:", "\$${_subtotal.toStringAsFixed(2)}"),
-                      _pdfRow("IVA (16%):", "\$${_iva.toStringAsFixed(2)}"),
-                      pw.Divider(),
-                      _pdfRow("TOTAL NETO:", "\$${_total.toStringAsFixed(2)}", isBold: true),
-                    ],
-                  ),
-                ),
+                child: pw.Column(children: [
+                  pw.Text("Subtotal: \$${_subtotal.toStringAsFixed(2)}"),
+                  pw.Text("IVA (16%): \$${_iva.toStringAsFixed(2)}"),
+                  pw.Divider(),
+                  pw.Text("TOTAL: \$${_total.toStringAsFixed(2)}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColor.fromInt(brandRed.toARGB32()))),
+                ]),
               ),
             ],
           );
@@ -170,20 +183,7 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 
-  pw.Widget _pdfRow(String l, String v, {bool isBold = false}) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(vertical: 2),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text(l, style: pw.TextStyle(fontSize: 10, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-          pw.Text(v, style: pw.TextStyle(fontSize: 10, fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-        ],
-      ),
-    );
-  }
-
-  // --- INTERFAZ DE USUARIO ---
+  // --- INTERFAZ ---
 
   @override
   Widget build(BuildContext context) {
@@ -193,14 +193,16 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildTopHeader(),
-          const SizedBox(height: 30),
+          const SizedBox(height: 20),
+          _buildControlBadge(),
+          const SizedBox(height: 20),
           _buildClientImporter(),
           const SizedBox(height: 30),
           _buildSelectionArea(),
           const SizedBox(height: 30),
           _buildItemsTable(),
           const SizedBox(height: 30),
-          _buildBottomSummary(),
+          _buildBottomSummaryAndSave(),
         ],
       ),
     );
@@ -224,6 +226,14 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
           style: ElevatedButton.styleFrom(backgroundColor: brandRed, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15)),
         ),
       ],
+    );
+  }
+
+  Widget _buildControlBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(color: brandRed.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: brandRed.withValues(alpha: 0.3))),
+      child: Text("CONTROL ID: $_numeroControl", style: TextStyle(color: brandRed, fontWeight: FontWeight.bold, fontSize: 12)),
     );
   }
 
@@ -344,23 +354,32 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     );
   }
 
-  Widget _buildBottomSummary() {
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        width: 300,
-        padding: const EdgeInsets.all(25),
-        decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(12), border: Border.all(color: brandRed.withValues(alpha: 0.2))),
-        child: Column(
-          children: [
-            _summaryRow("SUBTOTAL", "\$${_subtotal.toStringAsFixed(2)}"),
-            const SizedBox(height: 10),
-            _summaryRow("IVA (16%)", "\$${_iva.toStringAsFixed(2)}"),
-            const Divider(color: Colors.white10, height: 30),
-            _summaryRow("TOTAL ESTIMADO", "\$${_total.toStringAsFixed(2)}", isBold: true),
-          ],
+  Widget _buildBottomSummaryAndSave() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        ElevatedButton.icon(
+          onPressed: _guardarPresupuesto,
+          icon: const Icon(Icons.save),
+          label: const Text("GUARDAR EN SISTEMA", style: TextStyle(fontWeight: FontWeight.bold)),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
         ),
-      ),
+        Container(
+          width: 300,
+          padding: const EdgeInsets.all(25),
+          decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(12), border: Border.all(color: brandRed.withValues(alpha: 0.2))),
+          child: Column(
+            children: [
+              _summaryRow("SUBTOTAL", "\$${_subtotal.toStringAsFixed(2)}"),
+              const SizedBox(height: 10),
+              _summaryRow("IVA (16%)", "\$${_iva.toStringAsFixed(2)}"),
+              const Divider(color: Colors.white10, height: 30),
+              _summaryRow("TOTAL ESTIMADO", "\$${_total.toStringAsFixed(2)}", isBold: true),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
