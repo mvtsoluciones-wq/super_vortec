@@ -18,13 +18,12 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _videoController = TextEditingController();
 
-  // Paleta de Colores Industrial
+  // Colores Super Vortec
   final Color bgBlack = const Color(0xFF000000);
   final Color cardGrey = const Color(0xFF111111);
   final Color vorteRed = const Color(0xFFD50000);
   final Color successGreen = const Color(0xFF00C853);
 
-  // Función segura para abrir YouTube Studio
   Future<void> _launchYouTubeStudio() async {
     final Uri url = Uri.parse('https://studio.youtube.com/');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
@@ -37,8 +36,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
-    
-    // Bloqueo de escritorio
     if (screenWidth < 800) {
       return const Scaffold(
         backgroundColor: Colors.black, 
@@ -50,10 +47,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       backgroundColor: bgBlack,
       body: Row(
         children: [
-          // BARRA LATERAL
           _buildSidebar(),
-
-          // ÁREA DE CONTENIDO
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(35),
@@ -79,7 +73,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     );
   }
 
-  // --- COMPONENTE: SIDEBAR ---
+  // --- SIDEBAR ORGANIZADO POR SECCIONES ---
   Widget _buildSidebar() {
     return Container(
       width: 280,
@@ -87,47 +81,69 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         color: cardGrey,
         border: Border(right: BorderSide(color: Colors.white.withValues(alpha: 0.05))),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, 
-        children: [
-          // LOGO IMPONENTE AGRANDADO
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 50, 20, 10),
-            child: Container(
-              height: 180, // Tamaño aumentado según tu solicitud
-              width: double.infinity,
-              alignment: Alignment.centerLeft,
-              child: Image.asset(
-                'assets/weblogo.jpg',
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => 
-                  Icon(Icons.broken_image, color: vorteRed.withValues(alpha: 0.2), size: 60),
+      child: SingleChildScrollView( // Permite scroll si el menú es muy largo
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start, 
+          children: [
+            // LOGO
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 50, 20, 10),
+              child: Container(
+                height: 180,
+                width: double.infinity,
+                alignment: Alignment.centerLeft,
+                child: Image.asset(
+                  'assets/weblogo.jpg',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => 
+                    Icon(Icons.broken_image, color: vorteRed.withValues(alpha: 0.2), size: 60),
+                ),
               ),
             ),
-          ),
 
-          const Divider(color: Colors.white10, indent: 20, endIndent: 20),
+            const Divider(color: Colors.white10, indent: 20, endIndent: 20),
 
-          // TÍTULO DE SECCIÓN SOLICITADO
-          const Padding(
-            padding: EdgeInsets.fromLTRB(25, 20, 20, 10),
-            child: Text(
-              "OPCIONES DEL TALLER",
-              style: TextStyle(
-                color: Colors.white38, 
-                fontSize: 11, 
-                fontWeight: FontWeight.bold, 
-                letterSpacing: 1.5
-              ),
-            ),
-          ),
-          
-          _sidebarItem(0, Icons.car_repair, "RECEPCIÓN DE VEHÍCULO"),
-          _sidebarItem(1, Icons.dashboard_customize, "VARIABLES APP"),
-          _sidebarItem(2, Icons.people_alt, "CLIENTES & LOGIN"),
-          _sidebarItem(3, Icons.video_library, "MULTIMEDIA YOUTUBE"),
-          _sidebarItem(4, Icons.settings, "CONFIG. SERVIDOR"),
-        ],
+            // SECCIÓN 1: OPCIONES DEL TALLER
+            _buildSectionTitle("OPCIONES DEL TALLER"),
+            _sidebarItem(0, Icons.car_repair, "RECEPCIÓN DE VEHÍCULO"),
+            _sidebarItem(1, Icons.biotech, "DIAGNÓSTICO"), // Nueva
+            _sidebarItem(2, Icons.track_changes, "SEGUIMIENTO"), // Nueva
+            _sidebarItem(3, Icons.people_alt, "CLIENTES & LOGIN"),
+
+            const SizedBox(height: 20),
+            const Divider(color: Colors.white10, indent: 20, endIndent: 20),
+
+            // SECCIÓN 2: HERRAMIENTAS
+            _buildSectionTitle("HERRAMIENTAS"),
+            _sidebarItem(4, Icons.notifications, "NOTIFICACIÓN"),
+            _sidebarItem(5, Icons.storefront, "TIENDA"),
+            _sidebarItem(6, Icons.local_offer, "OFERTAS"),
+            _sidebarItem(7, Icons.shopping_bag, "MARKET"),
+
+            const SizedBox(height: 20),
+            const Divider(color: Colors.white10, indent: 20, endIndent: 20),
+
+            // SECCIÓN 3: ADMINISTRACIÓN
+            _buildSectionTitle("ADMINISTRACIÓN"),
+            _sidebarItem(8, Icons.receipt_long, "FACTURACIÓN"),
+            _sidebarItem(9, Icons.description, "PRESUPUESTOS"),
+            _sidebarItem(10, Icons.inventory_2, "INVENTARIO"),
+            _sidebarItem(11, Icons.shopping_cart, "COMPRAS"),
+            
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper para títulos de sección
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(25, 15, 20, 10),
+      child: Text(
+        title,
+        style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5),
       ),
     );
   }
@@ -137,14 +153,14 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 25),
       onTap: () => setState(() => _activeTab = index),
-      leading: Icon(icon, color: isSelected ? vorteRed : Colors.grey),
+      leading: Icon(icon, color: isSelected ? vorteRed : Colors.grey, size: 20),
       title: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontSize: 13, fontWeight: FontWeight.bold)),
       selected: isSelected,
       selectedTileColor: vorteRed.withValues(alpha: 0.1),
+      dense: true, // Hace el menú más compacto para que quepan todas las opciones
     );
   }
 
-  // --- COMPONENTE: HEADER ---
   Widget _buildHeader() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -157,7 +173,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
 
   Widget _buildCurrentModule() {
     if (_activeTab == 0) return _moduleRecepcionVehiculo();
-    return const Center(child: Text("MÓDULO EN CONSTRUCCIÓN", style: TextStyle(color: Colors.white24)));
+    return Center(child: Text("MÓDULO ${_activeTab.toString()} EN CONSTRUCCIÓN", style: const TextStyle(color: Colors.white24)));
   }
 
   // --- MÓDULO: RECEPCIÓN DE VEHÍCULO ---
@@ -188,16 +204,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 children: [
                   Expanded(child: _buildFormField("Nombre y Apellido", Icons.person)),
                   const SizedBox(width: 20),
-                  Expanded(child: _buildFormField(
-                    "Correo Electrónico", 
-                    Icons.email,
-                    controller: _emailController,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return 'Requerido';
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) return 'Email inválido';
-                      return null;
-                    },
-                  )),
+                  Expanded(child: _buildFormField("Correo Electrónico", Icons.email, controller: _emailController)),
                 ],
               ),
               const SizedBox(height: 20),
@@ -205,17 +212,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 children: [
                   Expanded(child: _buildFormField("Cédula", Icons.badge, isNumber: true)),
                   const SizedBox(width: 20),
-                  Expanded(child: _buildFormField(
-                    "Número de Teléfono", 
-                    Icons.phone, 
-                    isNumber: true,
-                    controller: _phoneController,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return 'Requerido';
-                      if (value.length < 10) return 'Mínimo 10 dígitos';
-                      return null;
-                    },
-                  )),
+                  Expanded(child: _buildFormField("Teléfono", Icons.phone, isNumber: true, controller: _phoneController)),
                 ],
               ),
               
@@ -238,7 +235,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               ),
               const SizedBox(height: 20),
               _buildFormField("Descripción de la Falla", Icons.build_circle_outlined, maxLines: 3),
-              
               const SizedBox(height: 35),
               
               // SECCIÓN DE VIDEO
@@ -276,11 +272,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                         fillColor: Colors.black,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
                       ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Link necesario';
-                        if (!value.contains("youtube.com") && !value.contains("youtu.be")) return 'URL de YouTube no válida';
-                        return null;
-                      },
                     ),
                   ],
                 ),
@@ -298,12 +289,10 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   ),
                   onPressed: () {
                     if (_formKey.currentState!.validate()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("PROCESANDO INGRESO..."), backgroundColor: Colors.blue),
-                      );
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("GUARDANDO...")));
                     }
                   }, 
-                  child: const Text("GUARDAR REGISTRO TÉCNICO", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, letterSpacing: 1.2)),
+                  child: const Text("GUARDAR REGISTRO TÉCNICO", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                 ),
               )
             ],
@@ -313,8 +302,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     );
   }
 
-  // --- COMPONENTE: CAMPO DE FORMULARIO ---
-  Widget _buildFormField(String label, IconData icon, {bool isNumber = false, int maxLines = 1, TextEditingController? controller, String? Function(String?)? validator}) {
+  Widget _buildFormField(String label, IconData icon, {bool isNumber = false, int maxLines = 1, TextEditingController? controller}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -323,7 +311,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         TextFormField(
           controller: controller,
           maxLines: maxLines,
-          validator: validator ?? (value) => value == null || value.isEmpty ? 'Requerido' : null,
           keyboardType: isNumber ? TextInputType.number : TextInputType.text,
           inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : null,
           style: const TextStyle(color: Colors.white, fontSize: 15),
@@ -333,7 +320,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
             fillColor: Colors.black,
             enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white10), borderRadius: BorderRadius.circular(8)),
             focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: vorteRed, width: 2), borderRadius: BorderRadius.circular(8)),
-            errorBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.redAccent), borderRadius: BorderRadius.circular(8)),
           ),
         ),
       ],
@@ -343,7 +329,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   Widget _buildStatTile(String label, String val, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      decoration: BoxDecoration(color: cardGrey, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+      decoration: BoxDecoration(color: cardGrey, borderRadius: BorderRadius.circular(10)),
       child: Column(children: [Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9)), Text(val, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.bold))]),
     );
   }
