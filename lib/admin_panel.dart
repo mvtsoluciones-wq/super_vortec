@@ -5,6 +5,7 @@ import 'diagnostico_web.dart';
 import 'presupuesto_web.dart';
 import 'seguimiento_web.dart';
 import 'clientes_web.dart';
+import 'notificaciones_web.dart';
 
 class AdminControlPanel extends StatefulWidget {
   const AdminControlPanel({super.key});
@@ -184,6 +185,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     case 1: return const DiagnosticoWebModule();
     case 2: return const SeguimientoWebModule();
     case 3: return const ClientesWebModule();
+    case 4: return const NotificacionesWebModule();
     case 9: return const PresupuestoWebModule(); // <--- Nueva pestaña
     default:
       return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
