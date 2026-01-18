@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; // Necesario para detectar la web
 
 // --- IMPORTACIONES DE TUS PANTALLAS ---
+import 'admin_panel.dart'; // IMPORTANTE: Asegúrate de tener este archivo
 import 'citas.dart';
 import 'diagnostico.dart';
 import 'notificaciones.dart';
@@ -38,49 +40,94 @@ class SuperVortecApp extends StatelessWidget {
           title: 'Mi Garaje',
           themeMode: mode, 
           
-          // --- TEMA CLARO (DÍA) ---
+          // TEMA CLARO
           theme: ThemeData(
             brightness: Brightness.light,
             primaryColor: const Color(0xFFD50000), 
             scaffoldBackgroundColor: const Color(0xFFF5F5F5), 
             useMaterial3: true,
-            appBarTheme: const AppBarTheme(
-              iconTheme: IconThemeData(color: Colors.black),
-              titleTextStyle: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: Colors.grey[200],
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              hintStyle: TextStyle(color: Colors.grey[600]),
-            ),
           ),
 
-          // --- TEMA OSCURO (NOCHE) ---
+          // TEMA OSCURO
           darkTheme: ThemeData(
             brightness: Brightness.dark,
             primaryColor: const Color(0xFFD50000),
             scaffoldBackgroundColor: Colors.black,
             useMaterial3: true,
-             appBarTheme: const AppBarTheme(
-              iconTheme: IconThemeData(color: Colors.white),
-              titleTextStyle: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
-            ),
-            inputDecorationTheme: InputDecorationTheme(
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-              hintStyle: TextStyle(color: Colors.grey[600]),
-            ),
           ),
           
-          home: const ClientHomeScreen(),
+          // MODIFICACIÓN: Enrutador inteligente
+          home: const PlatformGuard(),
         );
       },
     );
   }
 }
 
+// --- ESCUDO DE PLATAFORMA MODIFICADO ---
+class PlatformGuard extends StatelessWidget {
+  const PlatformGuard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Obtenemos el ancho de la pantalla
+    double screenWidth = MediaQuery.of(context).size.width;
+
+    if (kIsWeb) {
+      // MODIFICACIÓN: Si es Web y la pantalla es de PC (ej: mayor a 1000px)
+      if (screenWidth > 1000) {
+        return const AdminControlPanel(); // Abre el panel de control
+      }
+      // Si es Web pero pantalla pequeña, bloquea (tlf intentando entrar a la web)
+      return const WebBlockedScreen();
+    }
+
+    // Si es la App instalada (Android/iOS), carga la pantalla normal del cliente
+    return const ClientHomeScreen();
+  }
+}
+
+// --- PANTALLA DE ACCESO DENEGADO EN WEB (Sin cambios) ---
+class WebBlockedScreen extends StatelessWidget {
+  const WebBlockedScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.phonelink_lock, color: Color(0xFFD50000), size: 100),
+              const SizedBox(height: 30),
+              const Text(
+                "APP NO DISPONIBLE EN WEB",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 1),
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                "Por seguridad y precisión técnica, el acceso a 'Mi Garaje' está restringido exclusivamente a la aplicación móvil oficial.",
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+              const SizedBox(height: 40),
+              const Text(
+                "PROYECTO SUPER VORTEC 5.3",
+                style: TextStyle(color: Colors.white24, fontSize: 10, letterSpacing: 2),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// --- RESTO DEL CÓDIGO (ClientHomeScreen y RepairDetailScreen se mantienen exactamente igual) ---
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
 
@@ -89,7 +136,7 @@ class ClientHomeScreen extends StatefulWidget {
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
-  // DATOS
+  // DATOS (Mantenidos intactos)
   final List<Map<String, dynamic>> myVehicles = [
     {
       "brand": "CHEVROLET",
@@ -328,6 +375,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
+  // --- MÉTODOS DE APOYO (Mantenidos sin cambios) ---
   Widget _buildHistoryCard(BuildContext context, Map<String, dynamic> historyItem, bool isDark) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
@@ -749,6 +797,7 @@ class RepairDetailScreen extends StatelessWidget {
     );
   }
 
+  // --- MÉTODOS DE APOYO (Mantenidos sin cambios) ---
   Widget _buildSectionTitle(String title) {
     return Text(
       title, 
@@ -819,7 +868,7 @@ class RepairDetailScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => InAppVideoPlayerScreen(
-                videoUrl: videoUrl, // CORREGIDO: Sin el signo "!"
+                videoUrl: videoUrl, 
                 videoTitle: title,
                 videoDescription: desc ?? "Sin detalles adicionales.",
               ),
@@ -839,7 +888,7 @@ class RepairDetailScreen extends StatelessWidget {
           border: Border.all(color: isDark ? Colors.white24 : Colors.grey[400]!),
           image: thumbnailUrl != null 
             ? DecorationImage(
-                image: NetworkImage(thumbnailUrl!), 
+                image: NetworkImage(thumbnailUrl), 
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.4), BlendMode.darken)
               ) 
