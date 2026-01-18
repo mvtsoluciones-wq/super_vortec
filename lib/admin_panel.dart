@@ -217,7 +217,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("REGISTRO DE INGRESO TÉCNICO", style: TextStyle(color: brandRed, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+              Text("REGISTRO DE INGRESO TÉCNICO", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
               const SizedBox(height: 35),
               Row(
                 children: [
