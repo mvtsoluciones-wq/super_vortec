@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'main.dart'; // Para acceder al PlatformGuard
+import 'main.dart'; // Importante para conectar con el PlatformGuard
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,26 +18,26 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
 
-    // 1. Inicializar el controlador (2 segundos de duración)
+    // Duración total de la animación de los elementos
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 1500),
     );
 
-    // 2. Definir efecto de desvanecimiento (de invisible a opaco)
+    // Configuración del desvanecimiento
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
 
-    // 3. Definir efecto de tamaño con rebote (de 0.5 a 1.0 de tamaño)
+    // Configuración del tamaño con el rebote corregido (easeOutBack)
     _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack), // Nombre correcto
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
 
-    // 4. INICIAR LA ANIMACIÓN
+    // Arranca la animación apenas carga el widget
     _controller.forward();
 
-    // 5. Temporizador para cambiar de pantalla
+    // Espera 4 segundos en total antes de cambiar de pantalla
     Timer(const Duration(seconds: 4), () {
       if (mounted) {
         Navigator.of(context).pushReplacement(
@@ -49,14 +49,14 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
-    _controller.dispose(); // Importante para liberar memoria
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Fondo negro sólido
+      backgroundColor: Colors.black,
       body: Center(
         child: FadeTransition(
           opacity: _fadeAnimation,
@@ -65,7 +65,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // LOGO
+                // Asegúrate de que la ruta del logo sea correcta en tu pubspec.yaml
                 Image.asset(
                   'assets/weblogo.jpg',
                   width: 250,
@@ -73,7 +73,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                     const Icon(Icons.directions_car, color: Color(0xFFD50000), size: 100),
                 ),
                 const SizedBox(height: 50),
-                // BARRA DE CARGA
                 const SizedBox(
                   width: 200,
                   child: LinearProgressIndicator(

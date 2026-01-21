@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart'; // Solo necesitamos este import ahora
+import 'package:flutter/material.dart';
 
 class DiagnosticoWebModule extends StatefulWidget {
   const DiagnosticoWebModule({super.key});
@@ -15,7 +15,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   String? _clienteSeleccionado;
   String? _presupuestoSeleccionado;
   
-  // Listas simuladas (Mañana vendrán de tu base de datos)
+  // Listas simuladas
   final List<String> _clientes = ['Juan Pérez', 'Talleres ABC', 'María García'];
   final List<String> _presupuestos = ['Presupuesto #001 - Motor', 'Presupuesto #002 - Frenos'];
 
@@ -39,8 +39,8 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("PANEL DE DIAGNÓSTICO AVANZADO", 
-                style: TextStyle(color: brandRed, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+              const Text("PANEL DE DIAGNÓSTICO AVANZADO", 
+                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
               const SizedBox(height: 35),
               
               Row(
@@ -87,10 +87,8 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                         padding: const EdgeInsets.symmetric(vertical: 20),
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: () {
-                        // Aquí podrías abrir un diálogo para agregar fallas específicas
-                      },
-                      icon: const Icon(Icons.add_circle_outline),
+                      onPressed: () {},
+                      icon: const Icon(Icons.add_circle_outline, color: Colors.white), // Icono Blanco
                       label: const Text("AGREGAR FALLA AL LISTADO"),
                     ),
                   ),
@@ -155,7 +153,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
           shape: BoxShape.circle,
           border: Border.all(color: isSelected ? color : Colors.white10, width: 2),
         ),
-        child: Icon(Icons.traffic, color: isSelected ? color : Colors.white24, size: 30),
+        child: Icon(Icons.traffic, color: isSelected ? color : Colors.white, size: 30), // Icono Blanco cuando no está seleccionado
       ),
     );
   }
@@ -178,7 +176,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: const TextStyle(color: Colors.white12),
-            prefixIcon: Icon(icon, color: brandRed, size: 20),
+            prefixIcon: Icon(icon, color: Colors.white, size: 20), // Icono Blanco
             filled: true,
             fillColor: inputFill,
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -203,6 +201,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
               value: currentVal,
               isExpanded: true,
               dropdownColor: cardBlack,
+              icon: const Icon(Icons.arrow_drop_down, color: Colors.white), // Icono de flecha en Blanco
               style: const TextStyle(color: Colors.white),
               hint: const Text("Seleccionar...", style: TextStyle(color: Colors.white24, fontSize: 14)),
               items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
