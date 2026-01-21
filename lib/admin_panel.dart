@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:url_launcher/url_launcher.dart';
+
+// --- IMPORTACIONES DE MÓDULOS ---
 import 'diagnostico_web.dart';
 import 'presupuesto_web.dart';
 import 'seguimiento_web.dart';
@@ -11,6 +13,7 @@ import 'ofertas_web.dart';
 import 'market_web.dart';
 import 'facturacion_web.dart';
 import 'inventario_web.dart';
+import 'config_factura_web.dart'; 
 
 class AdminControlPanel extends StatefulWidget {
   const AdminControlPanel({super.key});
@@ -70,7 +73,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(), // Encabezado con sombra y borde
+                  _buildHeader(), 
                   const SizedBox(height: 30),
                   Expanded(
                     child: Align(
@@ -124,6 +127,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
             _buildDivider(),
             _buildSectionTitle("ADMINISTRACIÓN"),
             _sidebarItem(8, Icons.account_balance_wallet_outlined, "FACTURACIÓN"),
+            _sidebarItem(12, Icons.settings_suggest_rounded, "CONFIG. FISCAL"),
             _sidebarItem(9, Icons.request_quote_outlined, "PRESUPUESTOS"),
             _sidebarItem(10, Icons.inventory_2_outlined, "INVENTARIO"),
             _sidebarItem(11, Icons.shopping_cart_checkout_rounded, "COMPRAS"),
@@ -138,19 +142,17 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     bool isSelected = _activeTab == index;
     return ListTile(
       onTap: () => setState(() => _activeTab = index),
-      leading: Icon(icon, color: isSelected ? brandRed : Colors.white38, size: 20),
+      leading: Icon(icon, color: isSelected ? Colors.white : Colors.white38, size: 20),
       title: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white38, fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
       selected: isSelected,
-      selectedTileColor: brandRed.withValues(alpha: 0.15),
+      selectedTileColor: brandRed.withValues(alpha: 0.15), // CORRECCIÓN 1
       contentPadding: const EdgeInsets.symmetric(horizontal: 25),
     );
   }
 
-  // --- HEADER: SISTEMA DE CONTROL CON BORDE Y SOMBRA ---
   Widget _buildHeader() {
     return Stack(
       children: [
-        // Sombra y Borde del Texto
         Text(
           "SISTEMA DE CONTROL",
           style: TextStyle(
@@ -160,10 +162,9 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
             foreground: Paint()
               ..style = PaintingStyle.stroke
               ..strokeWidth = 2
-              ..color = Colors.black, // Borde Negro
+              ..color = Colors.black,
           ),
         ),
-        // Texto Principal Blanco con Sombra Proyectada
         const Text(
           "SISTEMA DE CONTROL",
           style: TextStyle(
@@ -185,22 +186,23 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   }
 
   Widget _buildCurrentModule() {
-  switch (_activeTab) {
-    case 0: return _moduleRecepcionVehiculo();
-    case 1: return const DiagnosticoWebModule();
-    case 2: return const SeguimientoWebModule();
-    case 3: return const ClientesWebModule();
-    case 4: return const NotificacionesWebModule();
-    case 5: return const TiendaWebModule();
-    case 6: return const OfertasWebModule();
-    case 7: return const MarketWebModule();
-    case 8: return const FacturacionWebModule();
-    case 9: return const PresupuestoWebModule();
-   case 10: return const InventarioWebModule(); // <--- Nueva pestaña
-    default:
-      return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
+    switch (_activeTab) {
+      case 0: return _moduleRecepcionVehiculo();
+      case 1: return const DiagnosticoWebModule();
+      case 2: return const SeguimientoWebModule();
+      case 3: return const ClientesWebModule();
+      case 4: return const NotificacionesWebModule();
+      case 5: return const TiendaWebModule();
+      case 6: return const OfertasWebModule();
+      case 7: return const MarketWebModule();
+      case 8: return const FacturacionWebModule();
+      case 12: return const ConfigFacturaWeb(); 
+      case 9: return const PresupuestoWebModule();
+      case 10: return const InventarioWebModule();
+      default:
+        return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
+    }
   }
-}
 
   Widget _moduleRecepcionVehiculo() {
     return SingleChildScrollView(
@@ -212,12 +214,12 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
             color: cardBlack, 
             borderRadius: BorderRadius.circular(16),
             boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 15))],
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)), // CORRECCIÓN 2
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("REGISTRO DE INGRESO TÉCNICO", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+              const Text("REGISTRO DE INGRESO TÉCNICO", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
               const SizedBox(height: 35),
               Row(
                 children: [
@@ -276,7 +278,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : null,
           style: const TextStyle(color: Colors.white, fontSize: 15),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: brandRed, size: 20),
+            prefixIcon: Icon(icon, color: Colors.white, size: 20), 
             filled: true,
             fillColor: inputFill,
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -293,13 +295,13 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       decoration: BoxDecoration(
         color: inputFill,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)), // CORRECCIÓN 3
       ),
       child: Column(
         children: [
           Row(
             children: [
-              Icon(Icons.video_library_rounded, color: brandRed, size: 20),
+              const Icon(Icons.video_library_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 12),
               const Text("EVIDENCIA MULTIMEDIA", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
               const Spacer(),
