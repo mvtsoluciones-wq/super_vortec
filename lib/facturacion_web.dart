@@ -3,11 +3,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-// --- IMPORTACIONES ---
+// --- IMPORTACIONES DE CONFIGURACIÓN ---
 import 'config_factura_web.dart'; 
-// Asumimos que estos archivos exportan una lista llamada listaClientes y listaInventario
-// import 'clientes_web.dart'; 
-// import 'inventario_web.dart';
 
 class FacturacionWebModule extends StatefulWidget {
   const FacturacionWebModule({super.key});
@@ -17,38 +14,40 @@ class FacturacionWebModule extends StatefulWidget {
 }
 
 class _FacturacionWebModuleState extends State<FacturacionWebModule> {
+  // Paleta Super Vortec
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // Estilos de texto grandes
+  // Estilos de texto optimizados para visibilidad en oficina
+  final TextStyle headerStyle = const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: 1.5);
   final TextStyle labelStyle = const TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.bold);
   final TextStyle inputTextStyle = const TextStyle(color: Colors.white, fontSize: 20);
-  final TextStyle titleStyle = const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900);
+  final TextStyle totalStyle = const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold);
 
-  // --- DATOS DEL CLIENTE ---
+  // --- CONTROLADORES CLIENTE ---
   final TextEditingController _ctrlNombre = TextEditingController();
   final TextEditingController _ctrlRif = TextEditingController();
   final TextEditingController _ctrlTelf = TextEditingController();
   final TextEditingController _ctrlDir = TextEditingController();
 
-  // --- CONTROL DE FACTURA (Editable y Secuencial) ---
+  // --- CONTROL DE FACTURA (Secuencia editable) ---
   final TextEditingController _ctrlFacturaN = TextEditingController(text: "0919");
   final TextEditingController _ctrlControlN = TextEditingController(text: "00-0919");
   final TextEditingController _ctrlGarantia = TextEditingController(text: "30 DÍAS");
 
-  // --- CONCEPTOS ---
+  // --- CONTROLADORES ITEMS ---
   final TextEditingController _itemConcepto = TextEditingController();
   final TextEditingController _itemPrecio = TextEditingController();
   final TextEditingController _itemCant = TextEditingController(text: "1");
 
   // --- ESTADO ---
   bool _ivaActivo = true;
-  List<Map<String, dynamic>> _itemsFactura = [];
-  List<Map<String, dynamic>> _facturasGuardadas = [];
-  DateTime _fechaFiltro = DateTime.now();
+  final List<Map<String, dynamic>> _itemsFactura = []; // Marcado como final
+  final List<Map<String, dynamic>> _facturasGuardadas = []; // Marcado como final
+  DateTime _fechaFiltro = DateTime.now(); // No es final porque se reasigna con el calendario
 
-  // Bases de datos simuladas (Sustituir por los imports de clientes_web e inventario_web)
+  // Bases de datos para buscadores (Simuladas)
   final List<Map<String, String>> _dbClientes = [
     {"nombre": "PRODUCTOS RONAVA C.A.", "id": "J-00030157-3", "tel": "(0212)239.64.13", "dir": "Los Ruices, Caracas"},
   ];
@@ -60,13 +59,15 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
   List<Map<String, String>> _sugerenciasClientes = [];
   List<Map<String, dynamic>> _sugerenciasProductos = [];
 
+  // --- CÁLCULOS ---
   double get _subtotal => _itemsFactura.fold(0, (sum, item) => sum + item['total']);
   double get _montoIva => _ivaActivo ? (_subtotal * 0.16) : 0;
   double get _total => _subtotal + _montoIva;
 
+  // --- FUNCIONES ---
   void _agregarItem() {
     if (_itemConcepto.text.isEmpty) return;
-    double p = double.tryParse(_itemPrecio.text) ?? 0;
+    double p = double.tryParse(_itemPrecio.text.replaceAll(',', '.')) ?? 0;
     int c = int.tryParse(_itemCant.text) ?? 1;
     setState(() {
       _itemsFactura.add({
@@ -81,22 +82,22 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
   }
 
   void _guardarFactura() {
-    if (_itemsFactura.isEmpty) return;
+    if (_itemsFactura.isEmpty || _ctrlNombre.text.isEmpty) return;
     setState(() {
       _facturasGuardadas.add({
         "nro": _ctrlFacturaN.text,
-        "control": _ctrlControlN.text,
         "cliente": _ctrlNombre.text,
-        "monto": _total,
         "fecha": DateTime.now(),
+        "monto": _total,
       });
-      // Secuencia automática
-      int nro = (int.tryParse(_ctrlFacturaN.text) ?? 0) + 1;
-      _ctrlFacturaN.text = nro.toString().padLeft(4, '0');
+      // Aumentar secuencia automáticamente
+      int sig = (int.tryParse(_ctrlFacturaN.text) ?? 0) + 1;
+      _ctrlFacturaN.text = sig.toString().padLeft(4, '0');
+      _ctrlControlN.text = "00-${sig.toString().padLeft(4, '0')}";
       _itemsFactura.clear();
       _ctrlNombre.clear(); _ctrlRif.clear(); _ctrlTelf.clear(); _ctrlDir.clear();
     });
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Factura guardada exitosamente")));
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("FACTURA GUARDADA E INCREMENTADA")));
   }
 
   @override
@@ -105,40 +106,44 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
       padding: const EdgeInsets.all(40),
       child: Column(
         children: [
-          _buildHeader(),
+          _buildHeaderSecuencia(),
           const SizedBox(height: 30),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(flex: 2, child: _seccionIzquierda()),
+              Expanded(flex: 2, child: _buildSeccionIzquierda()),
               const SizedBox(width: 30),
-              Expanded(flex: 1, child: _seccionDerechaTotales()),
+              Expanded(flex: 1, child: _buildSeccionDerechaTotales()),
             ],
           ),
-          const SizedBox(height: 60),
-          _seccionHistorial(),
+          const SizedBox(height: 50),
+          _buildHistorialFacturas(),
         ],
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Image.asset(ConfigFactura.logoPath, height: 120, errorBuilder: (c, e, s) => Icon(Icons.bolt, color: brandRed, size: 80)),
-        Column(
-          children: [
-            _inputSecuencia("FACTURA N:", _ctrlFacturaN),
-            const SizedBox(height: 10),
-            _inputSecuencia("N DE CONTROL", _ctrlControlN),
-          ],
-        )
-      ],
+  Widget _buildHeaderSecuencia() {
+    return Container(
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(
+        color: cardBlack, 
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 20)]
+      ),
+      child: Row(
+        children: [
+          Image.asset(ConfigFactura.logoPath, height: 100, errorBuilder: (c, e, s) => Icon(Icons.bolt, color: brandRed, size: 80)),
+          const Spacer(),
+          _inputSecuencia("FACTURA N:", _ctrlFacturaN),
+          const SizedBox(width: 20),
+          _inputSecuencia("N DE CONTROL", _ctrlControlN),
+        ],
+      ),
     );
   }
 
-  Widget _seccionIzquierda() {
+  Widget _buildSeccionIzquierda() {
     return Column(
       children: [
         _buildCard("DATOS FISCALES DEL CLIENTE", [
@@ -171,30 +176,37 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
             const SizedBox(width: 10),
             Expanded(flex: 1, child: _fieldSimple("Cant", _itemCant)),
             const SizedBox(width: 10),
-            IconButton(icon: Icon(Icons.add_circle, color: brandRed, size: 50), onPressed: _agregarItem)
+            IconButton(icon: Icon(Icons.add_circle, color: brandRed, size: 55), onPressed: _agregarItem)
           ]),
           const SizedBox(height: 20),
           _buildTablaItems(),
-          const SizedBox(height: 25),
+          const SizedBox(height: 20),
           _field("Detalle de Garantía", _ctrlGarantia, Icons.verified),
         ]),
       ],
     );
   }
 
-  Widget _seccionDerechaTotales() {
+  Widget _buildSeccionDerechaTotales() {
     return _buildCard("RESUMEN DE PAGO", [
       _filaResumen("SUB-TOTAL", _subtotal),
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text("I.V.A. (16%)", style: labelStyle),
-          Transform.scale(scale: 1.4, child: Switch(value: _ivaActivo, activeColor: brandRed, onChanged: (v) => setState(() => _ivaActivo = v))),
+          Transform.scale(
+            scale: 1.4, 
+            child: Switch(
+              value: _ivaActivo, 
+              activeThumbColor: brandRed, // Uso de activeThumbColor corregido
+              onChanged: (v) => setState(() => _ivaActivo = v)
+            )
+          ),
         ],
       ),
       if (_ivaActivo) _filaResumen("MONTO IVA", _montoIva),
       const Divider(color: Colors.white24, height: 40),
-      _filaResumen("TOTAL A PAGAR", _total, destacar: true),
+      _filaResumen("TOTAL", _total, destacar: true),
       const SizedBox(height: 40),
       _btn("GUARDAR FACTURA", Colors.green[800]!, _guardarFactura),
       const SizedBox(height: 15),
@@ -202,15 +214,21 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
     ]);
   }
 
-  Widget _seccionHistorial() {
-    return _buildCard("HISTORIAL DE FACTURAS GUARDADAS", [
+  Widget _buildHistorialFacturas() {
+    return _buildCard("HISTORIAL DE FACTURAS", [
       Row(children: [
         Text("FILTRAR FECHA: ", style: labelStyle),
         const SizedBox(width: 20),
         ActionChip(
+          backgroundColor: inputFill,
           label: Text("${_fechaFiltro.day}/${_fechaFiltro.month}/${_fechaFiltro.year}", style: inputTextStyle),
           onPressed: () async {
-            DateTime? pick = await showDatePicker(context: context, initialDate: _fechaFiltro, firstDate: DateTime(2025), lastDate: DateTime(2030));
+            DateTime? pick = await showDatePicker(
+              context: context, 
+              initialDate: _fechaFiltro, 
+              firstDate: DateTime(2025), 
+              lastDate: DateTime(2030)
+            );
             if (pick != null) setState(() => _fechaFiltro = pick);
           },
         )
@@ -219,7 +237,6 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
       SizedBox(
         width: double.infinity,
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(inputFill),
           columns: const [
             DataColumn(label: Text("NRO")), DataColumn(label: Text("CLIENTE")),
             DataColumn(label: Text("TOTAL")), DataColumn(label: Text("ACCIÓN"))
@@ -228,7 +245,7 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
             DataCell(Text(f['nro'], style: inputTextStyle)),
             DataCell(Text(f['cliente'], style: const TextStyle(color: Colors.white70, fontSize: 18))),
             DataCell(Text("\$${f['monto'].toStringAsFixed(2)}", style: inputTextStyle)),
-            DataCell(IconButton(icon: const Icon(Icons.delete_outline, color: Colors.white38), onPressed: () => setState(() => _facturasGuardadas.remove(f)))),
+            DataCell(IconButton(icon: const Icon(Icons.delete_forever, color: Colors.white38), onPressed: () => setState(() => _facturasGuardadas.remove(f)))),
           ])).toList(),
         ),
       )
@@ -261,12 +278,17 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
 
   Widget _inputSecuencia(String label, TextEditingController ctrl) {
     return SizedBox(
-      width: 250,
+      width: 220,
       child: TextField(
         controller: ctrl,
         textAlign: TextAlign.center,
         style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-        decoration: InputDecoration(labelText: label, labelStyle: const TextStyle(color: Colors.white38, fontSize: 12), enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white10))),
+        decoration: InputDecoration(
+          labelText: label, 
+          labelStyle: const TextStyle(color: Colors.white38, fontSize: 12),
+          enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white10)),
+          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: brandRed, width: 2)),
+        ),
       ),
     );
   }
@@ -280,18 +302,19 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
   }
 
   Widget _listadoProductos() {
-    return Container(color: inputFill, child: Column(children: _sugerenciasProductos.map((p) => ListTile(title: Text(p['nombre'], style: inputTextStyle), trailing: Text("\$${p['precio']}", style: TextStyle(color: brandRed, fontSize: 20)), onTap: () => setState(() { _itemConcepto.text = p['nombre']; _itemPrecio.text = p['precio'].toString(); _sugerenciasProductos = []; }))).toList()));
+    return Container(color: inputFill, child: Column(children: _sugerenciasProductos.map((p) => ListTile(title: Text(p['nombre'], style: inputTextStyle), trailing: Text("\$${p['precio']}", style: TextStyle(color: brandRed, fontSize: 22)), onTap: () => setState(() { _itemConcepto.text = p['nombre']; _itemPrecio.text = p['precio'].toString(); _sugerenciasProductos = []; }))).toList()));
   }
 
   Widget _buildTablaItems() {
-    return SizedBox(
+    return Container(
       width: double.infinity,
+      decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(10)),
       child: DataTable(
         columns: const [DataColumn(label: Text("CANT")), DataColumn(label: Text("CONCEPTO")), DataColumn(label: Text("TOTAL"))],
         rows: _itemsFactura.map((i) => DataRow(cells: [
           DataCell(Text(i['cant'].toString(), style: inputTextStyle)),
           DataCell(Text(i['concepto'], style: const TextStyle(color: Colors.white70, fontSize: 18))),
-          DataCell(Text("\$${i['total']}", style: inputTextStyle)),
+          DataCell(Text("\$${i['total'].toStringAsFixed(2)}", style: inputTextStyle)),
         ])).toList(),
       ),
     );
@@ -301,7 +324,7 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text(label, style: destacar ? titleStyle : labelStyle),
+        Text(label, style: destacar ? headerStyle : labelStyle),
         Text("\$${val.toStringAsFixed(2)}", style: TextStyle(color: destacar ? brandRed : Colors.white, fontSize: destacar ? 35 : 22, fontWeight: FontWeight.bold)),
       ]),
     );
