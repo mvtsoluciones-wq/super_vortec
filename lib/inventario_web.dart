@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class InventarioWebModule extends StatefulWidget {
   const InventarioWebModule({super.key});
@@ -8,208 +7,174 @@ class InventarioWebModule extends StatefulWidget {
   State<InventarioWebModule> createState() => _InventarioWebModuleState();
 }
 
-class _InventarioWebModuleState extends State<InventarioWebModule> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  
+class _InventarioWebModuleState extends State<InventarioWebModule> {
+  // Estilo Super Vortec
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // --- DATOS DE PRUEBA ---
-  final List<Map<String, dynamic>> _repuestos = [
-    {"sku": "V-001", "nombre": "Kit Tiempos 5.3", "stock": 8, "precio": 120.0},
-    {"sku": "V-003", "nombre": "Bomba de Aceite Melling", "stock": 3, "precio": 180.0},
+  // --- CONTROLADORES PARA NUEVOS PRODUCTOS ---
+  final TextEditingController _ctrlNombreProd = TextEditingController();
+  final TextEditingController _ctrlPrecioProd = TextEditingController();
+  final TextEditingController _ctrlStockProd = TextEditingController();
+
+  // --- BASE DE DATOS DE INVENTARIO (Estado Local) ---
+  final List<Map<String, dynamic>> _inventario = [
+    {"nombre": "CÁMARA DOMO 1080P", "precio": 45.00, "stock": 25, "minimo": 5},
+    {"nombre": "DVR 4 CANALES", "precio": 85.50, "stock": 4, "minimo": 5}, // Alerta
+    {"nombre": "DISCO DURO 1TB", "precio": 60.00, "stock": 15, "minimo": 3},
+    {"nombre": "MANTENIMIENTO CCTV", "precio": 240671.85, "stock": 999, "minimo": 0},
   ];
 
-  final List<Map<String, dynamic>> _servicios = [
-    {"id": "S-001", "nombre": "Cambio de Aceite", "precio": 25.0},
-    {"id": "S-002", "nombre": "Ajuste de Tren Delantero", "precio": 60.0},
-  ];
-
-  final List<Map<String, String>> _proveedores = [
-    {"empresa": "Distribuidora GM", "contacto": "Carlos", "tel": "0412-1112233", "rubro": "Motores"},
-    {"empresa": "Frenos Altamira", "contacto": "Ventas", "tel": "0424-9998877", "rubro": "Frenos"},
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this); // Ahora son 3 pestañas
+  void _agregarProducto() {
+    if (_ctrlNombreProd.text.isEmpty) return;
+    setState(() {
+      _inventario.add({
+        "nombre": _ctrlNombreProd.text.toUpperCase(),
+        "precio": double.tryParse(_ctrlPrecioProd.text) ?? 0.0,
+        "stock": int.tryParse(_ctrlStockProd.text) ?? 0,
+        "minimo": 5,
+      });
+      _ctrlNombreProd.clear();
+      _ctrlPrecioProd.clear();
+      _ctrlStockProd.clear();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(30),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(),
+          _buildResumenCards(),
           const SizedBox(height: 30),
-          
-          // SELECTOR DE PESTAÑAS
-          Container(
-            width: 600,
-            decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(10)),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: brandRed,
-              labelColor: brandRed,
-              unselectedLabelColor: Colors.white24,
-              tabs: const [
-                Tab(text: "REPUESTOS", icon: Icon(Icons.settings_input_component, size: 18)),
-                Tab(text: "SERVICIOS", icon: Icon(Icons.handyman_outlined, size: 18)),
-                Tab(text: "AGENDA PROV.", icon: Icon(Icons.contact_phone_outlined, size: 18)),
-              ],
-            ),
-          ),
-          
+          _buildFormularioNuevo(),
           const SizedBox(height: 30),
-          
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildTablaRepuestos(),
-                _buildTablaServicios(),
-                _buildAgendaContactos(),
-              ],
-            ),
-          ),
+          _buildTablaInventario(),
         ],
       ),
     );
   }
 
-  Widget _buildHeader() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  // --- WIDGETS DE LA INTERFAZ ---
+
+  Widget _buildResumenCards() {
+    int totalProds = _inventario.length;
+    int bajoStock = _inventario.where((p) => p['stock'] <= p['minimo']).length;
+
+    return Row(
       children: [
-        Text("GESTIÓN INTEGRAL DE ALMACÉN", 
-          style: TextStyle(color: brandRed, fontWeight: FontWeight.w900, fontSize: 18)),
-        const Text("Control de stock y directorio de proveedores", 
-          style: TextStyle(color: Colors.white24, fontSize: 10)),
+        _infoCard("PRODUCTOS TOTALES", totalProds.toString(), Icons.inventory_2),
+        const SizedBox(width: 20),
+        _infoCard("ALERTA STOCK BAJO", bajoStock.toString(), Icons.warning_amber_rounded, color: Colors.orange),
       ],
     );
   }
 
-  // --- MÓDULO DE AGENDA (Nuevo) ---
-  Widget _buildAgendaContactos() {
-    return _containerBase(
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Text("DIRECTORIO DE PROVEEDORES", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              ElevatedButton.icon(
-                onPressed: () {},
-                icon: const Icon(Icons.add, size: 16),
-                label: const Text("NUEVO CONTACTO"),
-                style: ElevatedButton.styleFrom(backgroundColor: brandRed, foregroundColor: Colors.white),
-              )
-            ],
-          ),
-          const SizedBox(height: 20),
-          GridView.builder(
-            shrinkWrap: true,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 15,
-              mainAxisSpacing: 15,
-              childAspectRatio: 2.5,
-            ),
-            itemCount: _proveedores.length,
-            itemBuilder: (context, index) => _contactCard(_proveedores[index]),
-          ),
-        ],
+  Widget _infoCard(String title, String value, IconData icon, {Color? color}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
+        child: Row(
+          children: [
+            Icon(icon, color: color ?? brandRed, size: 30),
+            const SizedBox(width: 15),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text(value, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              ],
+            )
+          ],
+        ),
       ),
     );
   }
 
-  Widget _contactCard(Map<String, String> prov) {
+  Widget _buildFormularioNuevo() {
     return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: inputFill,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: Row(
+      padding: const EdgeInsets.all(25),
+      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(backgroundColor: brandRed.withValues(alpha: 0.1), child: Icon(Icons.business, color: brandRed)),
-          const SizedBox(width: 15),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(prov['empresa']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                Text(prov['rubro']!, style: const TextStyle(color: Colors.white38, fontSize: 10)),
-                const SizedBox(height: 5),
-                Text(prov['tel']!, style: const TextStyle(color: Colors.green, fontSize: 12, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.phone_in_talk, color: Colors.white24),
-            onPressed: () async {
-              final Uri tel = Uri.parse('tel:${prov['tel']}');
-              if (await canLaunchUrl(tel)) await launchUrl(tel);
-            },
+          const Text("REGISTRAR NUEVO PRODUCTO / ENTRADA", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(flex: 3, child: _inputField("Nombre del Producto", _ctrlNombreProd)),
+              const SizedBox(width: 10),
+              Expanded(flex: 1, child: _inputField("Precio \$", _ctrlPrecioProd)),
+              const SizedBox(width: 10),
+              Expanded(flex: 1, child: _inputField("Stock Inicial", _ctrlStockProd)),
+              const SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: _agregarProducto,
+                style: ElevatedButton.styleFrom(backgroundColor: brandRed, minimumSize: const Size(60, 55)),
+                child: const Icon(Icons.add, color: Colors.white),
+              )
+            ],
           )
         ],
       ),
     );
   }
 
-  // --- WIDGETS DE TABLAS (Se mantienen de la versión anterior) ---
-  Widget _buildTablaRepuestos() {
-    return _containerBase(
-      DataTable(
-        columns: const [
-          DataColumn(label: Text("SKU", style: TextStyle(color: Colors.white38))),
-          DataColumn(label: Text("REPUESTO", style: TextStyle(color: Colors.white38))),
-          DataColumn(label: Text("STOCK", style: TextStyle(color: Colors.white38))),
-          DataColumn(label: Text("PRECIO", style: TextStyle(color: Colors.white38))),
-        ],
-        rows: _repuestos.map((item) => DataRow(cells: [
-          DataCell(Text(item['sku'], style: const TextStyle(color: Colors.white54))),
-          DataCell(Text(item['nombre'], style: const TextStyle(color: Colors.white))),
-          DataCell(Text("${item['stock']}", style: TextStyle(color: item['stock'] < 5 ? Colors.orange : Colors.green))),
-          DataCell(Text("\$${item['precio']}", style: const TextStyle(color: Colors.white))),
-        ])).toList(),
-      )
-    );
-  }
-
-  Widget _buildTablaServicios() {
-    return _containerBase(
-      DataTable(
-        columns: const [
-          DataColumn(label: Text("ID", style: TextStyle(color: Colors.white38))),
-          DataColumn(label: Text("SERVICIO", style: TextStyle(color: Colors.white38))),
-          DataColumn(label: Text("TARIFA", style: TextStyle(color: Colors.white38))),
-        ],
-        rows: _servicios.map((item) => DataRow(cells: [
-          DataCell(Text(item['id'], style: const TextStyle(color: Colors.white54))),
-          DataCell(Text(item['nombre'], style: const TextStyle(color: Colors.white))),
-          DataCell(Text("\$${item['precio']}", style: TextStyle(color: brandRed, fontWeight: FontWeight.bold))),
-        ])).toList(),
-      )
-    );
-  }
-
-  Widget _containerBase(Widget child) {
+  Widget _buildTablaInventario() {
     return Container(
-      padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(
-        color: cardBlack,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("LISTADO DE EXISTENCIAS", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          DataTable(
+            columnSpacing: 20,
+            columns: const [
+              DataColumn(label: Text("PRODUCTO", style: TextStyle(color: Colors.white38))),
+              DataColumn(label: Text("STOCK", style: TextStyle(color: Colors.white38))),
+              DataColumn(label: Text("PRECIO \$", style: TextStyle(color: Colors.white38))),
+              DataColumn(label: Text("ESTADO", style: TextStyle(color: Colors.white38))),
+            ],
+            rows: _inventario.map((p) {
+              bool bajoStock = p['stock'] <= p['minimo'];
+              return DataRow(cells: [
+                DataCell(Text(p['nombre'], style: const TextStyle(color: Colors.white, fontSize: 12))),
+                DataCell(Text(p['stock'].toString(), style: const TextStyle(color: Colors.white))),
+                DataCell(Text("\$${p['precio']}", style: const TextStyle(color: Colors.white))),
+                DataCell(Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: bajoStock ? Colors.orange.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(5)
+                  ),
+                  child: Text(bajoStock ? "RECOMPRAR" : "OK", style: TextStyle(color: bajoStock ? Colors.orange : Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                )),
+              ]);
+            }).toList(),
+          ),
+        ],
       ),
-      child: SingleChildScrollView(child: child),
+    );
+  }
+
+  Widget _inputField(String label, TextEditingController ctrl) {
+    return TextField(
+      controller: ctrl,
+      style: const TextStyle(color: Colors.white, fontSize: 13),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
+        filled: true,
+        fillColor: inputFill,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+      ),
     );
   }
 }

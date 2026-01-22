@@ -3,6 +3,12 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+// --- IMPORTACIONES ---
+import 'config_factura_web.dart'; 
+// Asumimos que estos archivos exportan una lista llamada listaClientes y listaInventario
+// import 'clientes_web.dart'; 
+// import 'inventario_web.dart';
+
 class FacturacionWebModule extends StatefulWidget {
   const FacturacionWebModule({super.key});
 
@@ -15,406 +21,317 @@ class _FacturacionWebModuleState extends State<FacturacionWebModule> {
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // --- BASES DE DATOS SIMULADAS ---
-  final List<Map<String, String>> _dbClientes = [
-    {"nombre": "PRODUCTOS RONAVA C.A.", "id": "J-00030157-3", "tel": "(0212)239.64.13", "dir": "Av. Don Diego Cisneros Edif Siemens, Los Ruices"},
-    {"nombre": "JUAN PÉREZ", "id": "V-12.345.678", "tel": "0414-1112233", "dir": "Urb. El Marqués, Caracas"},
-  ];
-
-  final List<Map<String, dynamic>> _dbInventario = [
-    {"nombre": "CÁMARA DOMO 1080P", "precio": 45.00, "stock": 25},
-    {"nombre": "DVR 4 CANALES", "precio": 85.50, "stock": 10},
-    {"nombre": "DISCO DURO 1TB", "precio": 60.00, "stock": 15},
-    {"nombre": "MANTENIMIENTO CCTV", "precio": 240671.85, "stock": 999}, 
-  ];
-
-  // --- DATOS DEL EMISOR (MVT) ---
-  final TextEditingController _confNombreEmpresa = TextEditingController(text: "MENDEZ Y VEGAS TELECOMUNICACIONES C.A.");
-  final TextEditingController _confRifEmpresa = TextEditingController(text: "J-29799471-8");
-  final TextEditingController _confDireccion = TextEditingController(text: "Urb. Simon Rodriguez, La Campiña, Caracas");
-  final TextEditingController _confTelfEmpresa = TextEditingController(text: "(0212) 639.04.57 / 0412-202.55.50");
+  // Estilos de texto grandes
+  final TextStyle labelStyle = const TextStyle(color: Colors.white70, fontSize: 18, fontWeight: FontWeight.bold);
+  final TextStyle inputTextStyle = const TextStyle(color: Colors.white, fontSize: 20);
+  final TextStyle titleStyle = const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900);
 
   // --- DATOS DEL CLIENTE ---
-  final TextEditingController _ctrlNombreCliente = TextEditingController();
-  final TextEditingController _ctrlRifCliente = TextEditingController();
-  final TextEditingController _ctrlDirCliente = TextEditingController();
-  final TextEditingController _ctrlTelfCliente = TextEditingController();
+  final TextEditingController _ctrlNombre = TextEditingController();
+  final TextEditingController _ctrlRif = TextEditingController();
+  final TextEditingController _ctrlTelf = TextEditingController();
+  final TextEditingController _ctrlDir = TextEditingController();
 
-  // --- CONTROL Y FECHA ---
-  final TextEditingController _ctrlNroFactura = TextEditingController();
-  final TextEditingController _ctrlNroControl = TextEditingController(text: "00-");
-  final TextEditingController _ctrlDia = TextEditingController(text: DateTime.now().day.toString().padLeft(2, '0'));
-  final TextEditingController _ctrlMes = TextEditingController(text: DateTime.now().month.toString().padLeft(2, '0'));
-  final TextEditingController _ctrlAnio = TextEditingController(text: DateTime.now().year.toString());
-  final TextEditingController _ctrlNotas = TextEditingController(); // VACÍO AHORA
+  // --- CONTROL DE FACTURA (Editable y Secuencial) ---
+  final TextEditingController _ctrlFacturaN = TextEditingController(text: "0919");
+  final TextEditingController _ctrlControlN = TextEditingController(text: "00-0919");
+  final TextEditingController _ctrlGarantia = TextEditingController(text: "30 DÍAS");
 
-  // --- ITEMS ACUMULATIVOS ---
-  final List<Map<String, dynamic>> _itemsFactura = [];
+  // --- CONCEPTOS ---
   final TextEditingController _itemConcepto = TextEditingController();
   final TextEditingController _itemPrecio = TextEditingController();
   final TextEditingController _itemCant = TextEditingController(text: "1");
 
-  // --- SUGERENCIAS ---
+  // --- ESTADO ---
+  bool _ivaActivo = true;
+  List<Map<String, dynamic>> _itemsFactura = [];
+  List<Map<String, dynamic>> _facturasGuardadas = [];
+  DateTime _fechaFiltro = DateTime.now();
+
+  // Bases de datos simuladas (Sustituir por los imports de clientes_web e inventario_web)
+  final List<Map<String, String>> _dbClientes = [
+    {"nombre": "PRODUCTOS RONAVA C.A.", "id": "J-00030157-3", "tel": "(0212)239.64.13", "dir": "Los Ruices, Caracas"},
+  ];
+  final List<Map<String, dynamic>> _dbInventario = [
+    {"nombre": "CÁMARA DOMO 1080P", "precio": 45.00, "stock": 25},
+    {"nombre": "DVR 4 CANALES", "precio": 85.50, "stock": 10},
+  ];
+
   List<Map<String, String>> _sugerenciasClientes = [];
   List<Map<String, dynamic>> _sugerenciasProductos = [];
 
   double get _subtotal => _itemsFactura.fold(0, (sum, item) => sum + item['total']);
-  double get _iva => _subtotal * 0.16;
-  double get _total => _subtotal + _iva;
-
-  void _buscarCliente(String query) {
-    setState(() {
-      _sugerenciasClientes = query.isEmpty 
-          ? [] 
-          : _dbClientes.where((c) => c['nombre']!.contains(query.toUpperCase())).toList();
-    });
-  }
-
-  void _buscarProducto(String query) {
-    setState(() {
-      _sugerenciasProductos = query.isEmpty 
-          ? [] 
-          : _dbInventario.where((p) => p['nombre'].contains(query.toUpperCase())).toList();
-    });
-  }
+  double get _montoIva => _ivaActivo ? (_subtotal * 0.16) : 0;
+  double get _total => _subtotal + _montoIva;
 
   void _agregarItem() {
-    if (_itemConcepto.text.isEmpty || _itemPrecio.text.isEmpty) return;
-    double precio = double.tryParse(_itemPrecio.text.replaceAll(',', '.')) ?? 0;
-    int cant = int.tryParse(_itemCant.text) ?? 1;
-
+    if (_itemConcepto.text.isEmpty) return;
+    double p = double.tryParse(_itemPrecio.text) ?? 0;
+    int c = int.tryParse(_itemCant.text) ?? 1;
     setState(() {
       _itemsFactura.add({
-        "cant": cant,
+        "linea": _itemsFactura.length + 1,
         "concepto": _itemConcepto.text.toUpperCase(),
-        "precio": precio,
-        "total": precio * cant
+        "precio": p,
+        "cant": c,
+        "total": p * c
       });
-      _itemConcepto.clear();
-      _itemPrecio.clear();
-      _itemCant.text = "1";
-      _sugerenciasProductos = []; // Limpia sugerencias al agregar
+      _itemConcepto.clear(); _itemPrecio.clear(); _itemCant.text = "1";
     });
   }
 
-  void _procesarFacturaFinal() {
-    for (var item in _itemsFactura) {
-      for (var prod in _dbInventario) {
-        if (prod['nombre'] == item['concepto']) {
-          prod['stock'] -= item['cant'];
-        }
-      }
-    }
-    _generarFacturaPDF();
-  }
-
-  Future<void> _generarFacturaPDF() async {
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(40),
-        build: (pw.Context context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text("SUPER VORTEC 5.3", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(brandRed.toARGB32()))),
-                      pw.Text(_confNombreEmpresa.text, style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                      pw.Text("R.I.F: ${_confRifEmpresa.text}", style: const pw.TextStyle(fontSize: 9)),
-                      pw.Text(_confDireccion.text, style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text("Telf: ${_confTelfEmpresa.text}", style: const pw.TextStyle(fontSize: 8)),
-                    ],
-                  ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Container(
-                        padding: const pw.EdgeInsets.all(6),
-                        decoration: pw.BoxDecoration(border: pw.Border.all(width: 1.5, color: PdfColors.red)),
-                        child: pw.Column(
-                          children: [
-                            pw.Text("N° de CONTROL", style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold, color: PdfColors.red)),
-                            pw.Text(_ctrlNroControl.text, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.red)),
-                          ],
-                        ),
-                      ),
-                      pw.SizedBox(height: 5),
-                      pw.Text("FACTURA N°: ${_ctrlNroFactura.text}", style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-                    ],
-                  ),
-                ],
-              ),
-              pw.SizedBox(height: 25),
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.all(10),
-                decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.5)),
-                child: pw.Column(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Text("NOMBRE O RAZON SOCIAL: ${_ctrlNombreCliente.text.toUpperCase()}", style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                    pw.Text("DOMICILIO FISCAL: ${_ctrlDirCliente.text.toUpperCase()}", style: const pw.TextStyle(fontSize: 9)),
-                    pw.Row(children: [
-                      pw.Text("R.I.F: ${_ctrlRifCliente.text.toUpperCase()}    ", style: const pw.TextStyle(fontSize: 9)),
-                      pw.Text("TELÉFONO: ${_ctrlTelfCliente.text}", style: const pw.TextStyle(fontSize: 9)),
-                    ]),
-                  ],
-                ),
-              ),
-              pw.SizedBox(height: 10),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.end,
-                children: [
-                  pw.Table(
-                    border: pw.TableBorder.all(width: 0.5),
-                    children: [
-                      pw.TableRow(children: [
-                        pw.Container(width: 30, child: pw.Center(child: pw.Text("Día", style: const pw.TextStyle(fontSize: 8)))),
-                        pw.Container(width: 30, child: pw.Center(child: pw.Text("Mes", style: const pw.TextStyle(fontSize: 8)))),
-                        pw.Container(width: 40, child: pw.Center(child: pw.Text("Año", style: const pw.TextStyle(fontSize: 8)))),
-                      ]),
-                      pw.TableRow(children: [
-                        pw.Center(child: pw.Text(_ctrlDia.text, style: const pw.TextStyle(fontSize: 11))),
-                        pw.Center(child: pw.Text(_ctrlMes.text, style: const pw.TextStyle(fontSize: 11))),
-                        pw.Center(child: pw.Text(_ctrlAnio.text, style: const pw.TextStyle(fontSize: 11))),
-                      ]),
-                    ]
-                  ),
-                ]
-              ),
-              pw.SizedBox(height: 15),
-              pw.Table(
-                border: pw.TableBorder.all(width: 0.5),
-                columnWidths: {0: const pw.FlexColumnWidth(1), 1: const pw.FlexColumnWidth(5), 2: const pw.FlexColumnWidth(1.5), 3: const pw.FlexColumnWidth(1.5)},
-                children: [
-                  pw.TableRow(
-                    decoration: const pw.BoxDecoration(color: PdfColors.grey200),
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Center(child: pw.Text("CANT", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Center(child: pw.Text("CONCEPTO / DESCRIPCIÓN", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Center(child: pw.Text("PRECIO", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Center(child: pw.Text("P. TOTAL", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)))),
-                    ]
-                  ),
-                  ..._itemsFactura.map((item) => pw.TableRow(
-                    children: [
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Center(child: pw.Text(item['cant'].toString(), style: const pw.TextStyle(fontSize: 9)))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Text(item['concepto'], style: const pw.TextStyle(fontSize: 9))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(item['precio'].toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)))),
-                      pw.Padding(padding: const pw.EdgeInsets.all(5), child: pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(item['total'].toStringAsFixed(2), style: const pw.TextStyle(fontSize: 9)))),
-                    ]
-                  )),
-                ]
-              ),
-              pw.SizedBox(height: 15),
-              pw.Row(
-                children: [
-                  pw.Expanded(flex: 3, child: pw.Container(padding: const pw.EdgeInsets.all(5), decoration: pw.BoxDecoration(border: pw.Border.all(width: 0.5)), child: pw.Text("NOTAS: ${_ctrlNotas.text.toUpperCase()}", style: const pw.TextStyle(fontSize: 8)))),
-                  pw.SizedBox(width: 10),
-                  pw.Expanded(flex: 2, child: pw.Table(border: pw.TableBorder.all(width: 0.5), children: [
-                    pw.TableRow(children: [pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text("SUB-TOTAL")), pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_subtotal.toStringAsFixed(2))))]),
-                    pw.TableRow(children: [pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text("I.V.A. (16%)")), pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_iva.toStringAsFixed(2))))]),
-                    pw.TableRow(children: [pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Text("TOTAL", style: pw.TextStyle(fontWeight: pw.FontWeight.bold))), pw.Padding(padding: const pw.EdgeInsets.all(4), child: pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text(_total.toStringAsFixed(2), style: pw.TextStyle(fontWeight: pw.FontWeight.bold))))]),
-                  ])),
-                ]
-              )
-            ],
-          );
-        },
-      ),
-    );
-    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  void _guardarFactura() {
+    if (_itemsFactura.isEmpty) return;
+    setState(() {
+      _facturasGuardadas.add({
+        "nro": _ctrlFacturaN.text,
+        "control": _ctrlControlN.text,
+        "cliente": _ctrlNombre.text,
+        "monto": _total,
+        "fecha": DateTime.now(),
+      });
+      // Secuencia automática
+      int nro = (int.tryParse(_ctrlFacturaN.text) ?? 0) + 1;
+      _ctrlFacturaN.text = nro.toString().padLeft(4, '0');
+      _itemsFactura.clear();
+      _ctrlNombre.clear(); _ctrlRif.clear(); _ctrlTelf.clear(); _ctrlDir.clear();
+    });
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Factura guardada exitosamente")));
   }
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(30),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.all(40),
+      child: Column(
         children: [
-          Expanded(
-            flex: 2,
-            child: Column(
-              children: [
-                _buildSectionCard("1. DATOS FISCALES DEL CLIENTE", [
-                  _buildSearchBar("Buscar Cliente...", _buscarCliente, Icons.person_search),
-                  if (_sugerenciasClientes.isNotEmpty) _buildSuggestionsClientes(),
-                  const SizedBox(height: 15),
-                  _inputField("Nombre o Razón Social", _ctrlNombreCliente, Icons.person),
-                  const SizedBox(height: 15),
-                  _inputField("Domicilio Fiscal", _ctrlDirCliente, Icons.location_on),
-                  const SizedBox(height: 15),
-                  Row(children: [
-                    Expanded(child: _inputField("R.I.F.", _ctrlRifCliente, Icons.badge)),
-                    const SizedBox(width: 15),
-                    Expanded(child: _inputField("Teléfono", _ctrlTelfCliente, Icons.phone)),
-                  ]),
-                ]),
-                const SizedBox(height: 20),
-                _buildSectionCard("2. CONCEPTOS DE LA FACTURA", [
-                  _buildSearchBar("Buscar en Inventario...", _buscarProducto, Icons.inventory),
-                  if (_sugerenciasProductos.isNotEmpty) _buildSuggestionsProductos(),
-                  const SizedBox(height: 15),
-                  Row(children: [
-                    Expanded(flex: 1, child: _itemInput("Cant", _itemCant)),
-                    const SizedBox(width: 10),
-                    Expanded(flex: 4, child: _itemInput("Concepto", _itemConcepto)),
-                    const SizedBox(width: 10),
-                    Expanded(flex: 2, child: _itemInput("Precio", _itemPrecio)),
-                    const SizedBox(width: 10),
-                    IconButton(icon: Icon(Icons.add_circle, color: brandRed, size: 35), onPressed: _agregarItem)
-                  ]),
-                  const SizedBox(height: 20),
-                  _buildItemsDataTable(),
-                  const SizedBox(height: 20),
-                  _inputField("Notas / Observaciones", _ctrlNotas, Icons.edit_note),
-                ]),
-              ],
-            ),
+          _buildHeader(),
+          const SizedBox(height: 30),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 2, child: _seccionIzquierda()),
+              const SizedBox(width: 30),
+              Expanded(flex: 1, child: _seccionDerechaTotales()),
+            ],
           ),
-          const SizedBox(width: 20),
-          Expanded(
-            flex: 1,
-            child: Column(
-              children: [
-                _buildSectionCard("3. CONTROL Y TOTALES", [
-                  _inputField("N° Factura", _ctrlNroFactura, Icons.numbers),
-                  const SizedBox(height: 10),
-                  _inputField("N° Control", _ctrlNroControl, Icons.verified),
-                  const Divider(color: Colors.white10, height: 30),
-                  _displayTotalRow("SUB-TOTAL", _subtotal),
-                  _displayTotalRow("I.V.A. (16%)", _iva),
-                  const Divider(color: Colors.white10, height: 30),
-                  _displayTotalRow("TOTAL A PAGAR", _total, isGrandTotal: true),
-                  const SizedBox(height: 30),
-                  ElevatedButton.icon(
-                    onPressed: _itemsFactura.isEmpty ? null : _procesarFacturaFinal,
-                    style: ElevatedButton.styleFrom(backgroundColor: brandRed, minimumSize: const Size(double.infinity, 55)),
-                    icon: const Icon(Icons.print, color: Colors.white),
-                    label: const Text("GUARDAR Y GENERAR PDF", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                  ),
-                ]),
-              ],
-            ),
-          ),
+          const SizedBox(height: 60),
+          _seccionHistorial(),
         ],
       ),
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
-  Widget _buildSearchBar(String hint, Function(String) onSearch, IconData icon) {
-    return TextField(
-      onChanged: onSearch,
-      style: const TextStyle(color: Colors.white, fontSize: 13),
-      decoration: InputDecoration(
-        hintText: hint, hintStyle: const TextStyle(color: Colors.white24),
-        prefixIcon: Icon(icon, color: Colors.white),
-        filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Image.asset(ConfigFactura.logoPath, height: 120, errorBuilder: (c, e, s) => Icon(Icons.bolt, color: brandRed, size: 80)),
+        Column(
+          children: [
+            _inputSecuencia("FACTURA N:", _ctrlFacturaN),
+            const SizedBox(height: 10),
+            _inputSecuencia("N DE CONTROL", _ctrlControlN),
+          ],
+        )
+      ],
+    );
+  }
+
+  Widget _seccionIzquierda() {
+    return Column(
+      children: [
+        _buildCard("DATOS FISCALES DEL CLIENTE", [
+          _buildSearchBar("Buscar cliente...", (v) {
+            setState(() => _sugerenciasClientes = v.isEmpty ? [] : _dbClientes.where((c) => c['nombre']!.contains(v.toUpperCase())).toList());
+          }, Icons.person_search),
+          if (_sugerenciasClientes.isNotEmpty) _listadoClientes(),
+          const SizedBox(height: 25),
+          _field("Nombre o Razón Social", _ctrlNombre, Icons.business),
+          const SizedBox(height: 15),
+          _field("Domicilio Fiscal", _ctrlDir, Icons.map),
+          const SizedBox(height: 15),
+          Row(children: [
+            Expanded(child: _field("R.I.F o Cédula", _ctrlRif, Icons.badge)),
+            const SizedBox(width: 15),
+            Expanded(child: _field("Teléfono", _ctrlTelf, Icons.phone)),
+          ]),
+        ]),
+        const SizedBox(height: 30),
+        _buildCard("CONCEPTOS DE FACTURA", [
+          _buildSearchBar("Buscar en Inventario...", (v) {
+            setState(() => _sugerenciasProductos = v.isEmpty ? [] : _dbInventario.where((p) => p['nombre'].contains(v.toUpperCase())).toList());
+          }, Icons.inventory),
+          if (_sugerenciasProductos.isNotEmpty) _listadoProductos(),
+          const SizedBox(height: 25),
+          Row(children: [
+            Expanded(flex: 3, child: _fieldSimple("Concepto", _itemConcepto)),
+            const SizedBox(width: 10),
+            Expanded(flex: 1, child: _fieldSimple("Precio \$", _itemPrecio)),
+            const SizedBox(width: 10),
+            Expanded(flex: 1, child: _fieldSimple("Cant", _itemCant)),
+            const SizedBox(width: 10),
+            IconButton(icon: Icon(Icons.add_circle, color: brandRed, size: 50), onPressed: _agregarItem)
+          ]),
+          const SizedBox(height: 20),
+          _buildTablaItems(),
+          const SizedBox(height: 25),
+          _field("Detalle de Garantía", _ctrlGarantia, Icons.verified),
+        ]),
+      ],
+    );
+  }
+
+  Widget _seccionDerechaTotales() {
+    return _buildCard("RESUMEN DE PAGO", [
+      _filaResumen("SUB-TOTAL", _subtotal),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text("I.V.A. (16%)", style: labelStyle),
+          Transform.scale(scale: 1.4, child: Switch(value: _ivaActivo, activeColor: brandRed, onChanged: (v) => setState(() => _ivaActivo = v))),
+        ],
       ),
-    );
+      if (_ivaActivo) _filaResumen("MONTO IVA", _montoIva),
+      const Divider(color: Colors.white24, height: 40),
+      _filaResumen("TOTAL A PAGAR", _total, destacar: true),
+      const SizedBox(height: 40),
+      _btn("GUARDAR FACTURA", Colors.green[800]!, _guardarFactura),
+      const SizedBox(height: 15),
+      _btn("CREAR PDF", brandRed, _generarFacturaPDF),
+    ]);
   }
 
-  Widget _buildSuggestionsClientes() {
-    return Container(
-      margin: const EdgeInsets.only(top: 5),
-      decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8)),
-      child: Column(children: _sugerenciasClientes.map((c) => ListTile(
-        title: Text(c['nombre']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
-        onTap: () => setState(() {
-          _ctrlNombreCliente.text = c['nombre']!; _ctrlRifCliente.text = c['id']!;
-          _ctrlDirCliente.text = c['dir']!; _ctrlTelfCliente.text = c['tel']!;
-          _sugerenciasClientes = [];
-        }),
-      )).toList()),
-    );
+  Widget _seccionHistorial() {
+    return _buildCard("HISTORIAL DE FACTURAS GUARDADAS", [
+      Row(children: [
+        Text("FILTRAR FECHA: ", style: labelStyle),
+        const SizedBox(width: 20),
+        ActionChip(
+          label: Text("${_fechaFiltro.day}/${_fechaFiltro.month}/${_fechaFiltro.year}", style: inputTextStyle),
+          onPressed: () async {
+            DateTime? pick = await showDatePicker(context: context, initialDate: _fechaFiltro, firstDate: DateTime(2025), lastDate: DateTime(2030));
+            if (pick != null) setState(() => _fechaFiltro = pick);
+          },
+        )
+      ]),
+      const SizedBox(height: 20),
+      SizedBox(
+        width: double.infinity,
+        child: DataTable(
+          headingRowColor: WidgetStateProperty.all(inputFill),
+          columns: const [
+            DataColumn(label: Text("NRO")), DataColumn(label: Text("CLIENTE")),
+            DataColumn(label: Text("TOTAL")), DataColumn(label: Text("ACCIÓN"))
+          ],
+          rows: _facturasGuardadas.map((f) => DataRow(cells: [
+            DataCell(Text(f['nro'], style: inputTextStyle)),
+            DataCell(Text(f['cliente'], style: const TextStyle(color: Colors.white70, fontSize: 18))),
+            DataCell(Text("\$${f['monto'].toStringAsFixed(2)}", style: inputTextStyle)),
+            DataCell(IconButton(icon: const Icon(Icons.delete_outline, color: Colors.white38), onPressed: () => setState(() => _facturasGuardadas.remove(f)))),
+          ])).toList(),
+        ),
+      )
+    ]);
   }
 
-  Widget _buildSuggestionsProductos() {
+  // --- WIDGETS DE SOPORTE ---
+  Widget _buildCard(String title, List<Widget> children) {
     return Container(
-      margin: const EdgeInsets.only(top: 5),
-      decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8)),
-      child: Column(children: _sugerenciasProductos.map((p) => ListTile(
-        title: Text(p['nombre'], style: const TextStyle(color: Colors.white, fontSize: 12)),
-        subtitle: Text("Stock: ${p['stock']}", style: const TextStyle(color: Colors.white38, fontSize: 10)),
-        onTap: () => setState(() {
-          _itemConcepto.text = p['nombre']; _itemPrecio.text = p['precio'].toString();
-          _sugerenciasProductos = [];
-        }),
-      )).toList()),
-    );
-  }
-
-  Widget _buildSectionCard(String title, List<Widget> children) {
-    return Container(
-      padding: const EdgeInsets.all(25),
-      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)),
+      padding: const EdgeInsets.all(30),
+      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white10)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(title, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 20), ...children,
+        Text(title, style: TextStyle(color: brandRed, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+        const SizedBox(height: 25), ...children
       ]),
     );
   }
 
-  Widget _inputField(String label, TextEditingController ctrl, IconData icon) {
-    return TextField(
-      controller: ctrl, style: const TextStyle(color: Colors.white, fontSize: 13),
-      decoration: InputDecoration(
-        labelText: label, labelStyle: const TextStyle(color: Colors.white38, fontSize: 11),
-        prefixIcon: Icon(icon, color: Colors.white, size: 18),
-        filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+  Widget _field(String label, TextEditingController ctrl, IconData icon) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label.toUpperCase(), style: labelStyle),
+      const SizedBox(height: 10),
+      TextField(controller: ctrl, style: inputTextStyle, decoration: InputDecoration(prefixIcon: Icon(icon, color: Colors.white60), filled: true, fillColor: inputFill)),
+    ]);
+  }
+
+  Widget _fieldSimple(String hint, TextEditingController ctrl) {
+    return TextField(controller: ctrl, style: inputTextStyle, decoration: InputDecoration(hintText: hint, filled: true, fillColor: inputFill));
+  }
+
+  Widget _inputSecuencia(String label, TextEditingController ctrl) {
+    return SizedBox(
+      width: 250,
+      child: TextField(
+        controller: ctrl,
+        textAlign: TextAlign.center,
+        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+        decoration: InputDecoration(labelText: label, labelStyle: const TextStyle(color: Colors.white38, fontSize: 12), enabledBorder: const OutlineInputBorder(borderSide: BorderSide(color: Colors.white10))),
       ),
     );
   }
 
-  Widget _itemInput(String label, TextEditingController ctrl) {
-    return TextField(
-      controller: ctrl, style: const TextStyle(color: Colors.white, fontSize: 13),
-      decoration: InputDecoration(
-        hintText: label, hintStyle: const TextStyle(color: Colors.white24, fontSize: 11),
-        filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-      ),
-    );
+  Widget _buildSearchBar(String hint, Function(String) onSearch, IconData icon) {
+    return TextField(onChanged: onSearch, style: inputTextStyle, decoration: InputDecoration(hintText: hint, prefixIcon: Icon(icon, color: brandRed), filled: true, fillColor: Colors.black, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30))));
   }
 
-  Widget _buildItemsDataTable() {
+  Widget _listadoClientes() {
+    return Container(color: inputFill, child: Column(children: _sugerenciasClientes.map((c) => ListTile(title: Text(c['nombre']!, style: inputTextStyle), onTap: () => setState(() { _ctrlNombre.text = c['nombre']!; _ctrlRif.text = c['id']!; _ctrlDir.text = c['dir']!; _ctrlTelf.text = c['tel']!; _sugerenciasClientes = []; }))).toList()));
+  }
+
+  Widget _listadoProductos() {
+    return Container(color: inputFill, child: Column(children: _sugerenciasProductos.map((p) => ListTile(title: Text(p['nombre'], style: inputTextStyle), trailing: Text("\$${p['precio']}", style: TextStyle(color: brandRed, fontSize: 20)), onTap: () => setState(() { _itemConcepto.text = p['nombre']; _itemPrecio.text = p['precio'].toString(); _sugerenciasProductos = []; }))).toList()));
+  }
+
+  Widget _buildTablaItems() {
     return SizedBox(
       width: double.infinity,
       child: DataTable(
-        headingRowHeight: 40,
-        columns: const [
-          DataColumn(label: Text("CANT", style: TextStyle(color: Colors.white38))),
-          DataColumn(label: Text("CONCEPTO", style: TextStyle(color: Colors.white38))),
-          DataColumn(label: Text("TOTAL", style: TextStyle(color: Colors.white38))),
-          DataColumn(label: Text("", style: TextStyle(color: Colors.white38))),
-        ],
-        rows: _itemsFactura.map((item) => DataRow(cells: [
-          DataCell(Text(item['cant'].toString(), style: const TextStyle(color: Colors.white))),
-          DataCell(Text(item['concepto'], style: const TextStyle(color: Colors.white))),
-          DataCell(Text("\$${item['total'].toStringAsFixed(2)}", style: const TextStyle(color: Colors.white))),
-          DataCell(IconButton(icon: const Icon(Icons.close, color: Colors.white24, size: 16), onPressed: () => setState(() => _itemsFactura.remove(item)))),
+        columns: const [DataColumn(label: Text("CANT")), DataColumn(label: Text("CONCEPTO")), DataColumn(label: Text("TOTAL"))],
+        rows: _itemsFactura.map((i) => DataRow(cells: [
+          DataCell(Text(i['cant'].toString(), style: inputTextStyle)),
+          DataCell(Text(i['concepto'], style: const TextStyle(color: Colors.white70, fontSize: 18))),
+          DataCell(Text("\$${i['total']}", style: inputTextStyle)),
         ])).toList(),
       ),
     );
   }
 
-  Widget _displayTotalRow(String label, double value, {bool isGrandTotal = false}) {
+  Widget _filaResumen(String label, double val, {bool destacar = false}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: isGrandTotal ? Colors.white : Colors.white38, fontSize: isGrandTotal ? 14 : 12)),
-          Text("\$${value.toStringAsFixed(2)}", style: TextStyle(color: isGrandTotal ? brandRed : Colors.white, fontSize: isGrandTotal ? 20 : 15, fontWeight: FontWeight.bold)),
-        ],
-      ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        Text(label, style: destacar ? titleStyle : labelStyle),
+        Text("\$${val.toStringAsFixed(2)}", style: TextStyle(color: destacar ? brandRed : Colors.white, fontSize: destacar ? 35 : 22, fontWeight: FontWeight.bold)),
+      ]),
     );
+  }
+
+  Widget _btn(String t, Color c, VoidCallback f) {
+    return SizedBox(width: double.infinity, height: 65, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: c, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15))), onPressed: f, child: Text(t, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))));
+  }
+
+  Future<void> _generarFacturaPDF() async {
+    final pdf = pw.Document();
+    pdf.addPage(pw.Page(
+      build: (context) => pw.Column(children: [
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+          pw.Text("SUPER VORTEC / MVT", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.red)),
+          pw.Column(children: [pw.Text("FACTURA N: ${_ctrlFacturaN.text}"), pw.Text("CONTROL N: ${_ctrlControlN.text}")])
+        ]),
+        pw.SizedBox(height: 20),
+        pw.Text("EMISOR: ${ConfigFactura.nombreEmpresa}"),
+        pw.Text("RIF: ${ConfigFactura.rifEmpresa}"),
+        pw.Divider(),
+        pw.Text("CLIENTE: ${_ctrlNombre.text}"),
+        pw.SizedBox(height: 20),
+        pw.TableHelper.fromTextArray(data: _itemsFactura.map((i) => [i['cant'], i['concepto'], i['total']]).toList()),
+        pw.SizedBox(height: 30),
+        pw.Align(alignment: pw.Alignment.centerRight, child: pw.Text("TOTAL A PAGAR: \$${_total.toStringAsFixed(2)}", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold))),
+        pw.SizedBox(height: 40),
+        pw.Text("GARANTÍA: ${_ctrlGarantia.text}"),
+      ]),
+    ));
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 }

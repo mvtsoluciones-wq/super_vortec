@@ -1,5 +1,16 @@
 import 'package:flutter/material.dart';
 
+// --- CLASE DE DATOS GLOBAL ---
+class ConfigFactura {
+  static String nombreEmpresa = "MENDEZ Y VEGAS TELECOMUNICACIONES C.A.";
+  static String rifEmpresa = "J-29799471-8";
+  static String direccionEmpresa = "Av. Trujillo, Edif. Bloque 2, Letra B, Piso 2, Caracas";
+  static String telefonoEmpresa = "(0212) 639.04.57";
+  static String correoEmpresa = "mvtsoluciones@gmail.com";
+  static String ivaPorcentaje = "16";
+  static String logoPath = "assets/weblogo.jpg";
+}
+
 class ConfigFacturaWeb extends StatefulWidget {
   const ConfigFacturaWeb({super.key});
 
@@ -8,18 +19,45 @@ class ConfigFacturaWeb extends StatefulWidget {
 }
 
 class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
-  // Colores Corporativos
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // Controladores para los datos de la empresa
-  final TextEditingController _ctrlNombreEmpresa = TextEditingController(text: "SUPER VORTEC 5.3");
-  final TextEditingController _ctrlRifEmpresa = TextEditingController(text: "J-50123456-7");
-  final TextEditingController _ctrlDireccion = TextEditingController(text: "Av. Principal con Calle Los Talleres, Caracas");
-  final TextEditingController _ctrlTelefono = TextEditingController(text: "+58 212 555 1234");
-  final TextEditingController _ctrlCorreo = TextEditingController(text: "servicios@supervortec.com");
-  final TextEditingController _ctrlIva = TextEditingController(text: "16");
+  late TextEditingController _ctrlNombreEmpresa;
+  late TextEditingController _ctrlRifEmpresa;
+  late TextEditingController _ctrlDireccion;
+  late TextEditingController _ctrlTelefono;
+  late TextEditingController _ctrlCorreo;
+  late TextEditingController _ctrlIva;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrlNombreEmpresa = TextEditingController(text: ConfigFactura.nombreEmpresa);
+    _ctrlRifEmpresa = TextEditingController(text: ConfigFactura.rifEmpresa);
+    _ctrlDireccion = TextEditingController(text: ConfigFactura.direccionEmpresa);
+    _ctrlTelefono = TextEditingController(text: ConfigFactura.telefonoEmpresa);
+    _ctrlCorreo = TextEditingController(text: ConfigFactura.correoEmpresa);
+    _ctrlIva = TextEditingController(text: ConfigFactura.ivaPorcentaje);
+  }
+
+  void _guardarConfiguracion() {
+    setState(() {
+      ConfigFactura.nombreEmpresa = _ctrlNombreEmpresa.text;
+      ConfigFactura.rifEmpresa = _ctrlRifEmpresa.text;
+      ConfigFactura.direccionEmpresa = _ctrlDireccion.text;
+      ConfigFactura.telefonoEmpresa = _ctrlTelefono.text;
+      ConfigFactura.correoEmpresa = _ctrlCorreo.text;
+      ConfigFactura.ivaPorcentaje = _ctrlIva.text;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("CONFIGURACIÓN FISCAL ACTUALIZADA"),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +65,7 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
       padding: const EdgeInsets.all(40),
       child: Center(
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 800),
+          constraints: const BoxConstraints(maxWidth: 850),
           padding: const EdgeInsets.all(40),
           decoration: BoxDecoration(
             color: cardBlack,
@@ -35,9 +73,10 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
             border: Border.all(color: Colors.white10),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
+                // CAMBIO AQUÍ: Se reemplazó .withOpacity(0.5) por .withValues(alpha: 0.5)
+                color: Colors.black.withValues(alpha: 0.5), 
                 blurRadius: 30,
-                offset: const Offset(0, 15)
+                offset: const Offset(0, 15),
               )
             ]
           ),
@@ -47,28 +86,26 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.settings_suggest, color: Colors.white, size: 28),
+                  const Icon(Icons.settings_suggest, color: Colors.white, size: 32),
                   const SizedBox(width: 15),
                   const Text(
                     "CONFIGURACIÓN DE DATOS FISCALES",
-                    style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.5),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
               const Text(
-                "Estos datos aparecerán automáticamente en el encabezado de cada PDF generado.",
-                style: TextStyle(color: Colors.white38, fontSize: 12),
+                "Los cambios realizados aquí se reflejarán en el módulo de Facturación y en los PDFs.",
+                style: TextStyle(color: Colors.white38, fontSize: 13),
               ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 25),
                 child: Divider(color: Colors.white10),
               ),
-
-              // FORMULARIO DE DATOS DE EMPRESA
               Row(
                 children: [
-                  Expanded(child: _buildConfigField("Nombre de la Empresa", _ctrlNombreEmpresa, Icons.business)),
+                  Expanded(child: _buildConfigField("Nombre o Razón Social", _ctrlNombreEmpresa, Icons.business)),
                   const SizedBox(width: 20),
                   Expanded(child: _buildConfigField("RIF Jurídico", _ctrlRifEmpresa, Icons.badge)),
                 ],
@@ -78,33 +115,27 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: _buildConfigField("Teléfono de Contacto", _ctrlTelefono, Icons.phone)),
+                  Expanded(flex: 2, child: _buildConfigField("Teléfono", _ctrlTelefono, Icons.phone)),
                   const SizedBox(width: 20),
-                  Expanded(child: _buildConfigField("Correo Electrónico", _ctrlCorreo, Icons.email)),
+                  Expanded(flex: 2, child: _buildConfigField("Email", _ctrlCorreo, Icons.email)),
                   const SizedBox(width: 20),
-                  Expanded(child: _buildConfigField("% IVA Aplicable", _ctrlIva, Icons.percent)),
+                  Expanded(flex: 1, child: _buildConfigField("% IVA", _ctrlIva, Icons.percent)),
                 ],
               ),
-
               const SizedBox(height: 40),
-
-              // BOTÓN DE GUARDADO
               SizedBox(
                 width: double.infinity,
-                height: 55,
+                height: 60,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text("CONFIGURACIÓN ACTUALIZADA EXITOSAMENTE"), backgroundColor: Colors.green),
-                    );
-                  },
+                  onPressed: _guardarConfiguracion,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: brandRed,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 5,
                   ),
-                  icon: const Icon(Icons.save, color: Colors.white),
-                  label: const Text("GUARDAR DATOS DE FACTURACIÓN", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  icon: const Icon(Icons.save_as_rounded, color: Colors.white),
+                  label: const Text("GUARDAR Y SINCRONIZAR DATOS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                 ),
               ),
             ],
@@ -120,15 +151,15 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
       children: [
         Text(
           label.toUpperCase(),
-          style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
+          style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1),
         ),
         const SizedBox(height: 10),
         TextField(
           controller: controller,
           maxLines: maxLines,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
+          style: const TextStyle(color: Colors.white, fontSize: 15),
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: Colors.white, size: 20), // ICONO BLANCO
+            prefixIcon: Icon(icon, color: Colors.white70, size: 20),
             filled: true,
             fillColor: inputFill,
             enabledBorder: OutlineInputBorder(
@@ -137,7 +168,7 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(10),
-              borderSide: BorderSide(color: brandRed, width: 1.5),
+              borderSide: BorderSide(color: brandRed, width: 2),
             ),
           ),
         ),
