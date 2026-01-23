@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
 import 'package:flutter/foundation.dart' show kIsWeb; // Necesario para detectar la web
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 // --- IMPORTACIONES DE TUS PANTALLAS ---
 import 'admin_panel.dart'; // IMPORTANTE: Asegúrate de tener este archivo
@@ -11,9 +13,14 @@ import 'notificaciones.dart';
 import 'tienda.dart';
 import 'ofertas.dart';
 import 'market.dart'; 
+import 'login_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform, // <--- REVISA QUE ESTO ESTÉ
+  );
+  runApp(const SuperVortecApp());
   
   // BLOQUEO DE PANTALLA VERTICAL
   SystemChrome.setPreferredOrientations([
@@ -57,7 +64,7 @@ class SuperVortecApp extends StatelessWidget {
           ),
           
           // MODIFICACIÓN: Enrutador inteligente
-          home: const PlatformGuard(),
+          home: const LoginScreen(),
         );
       },
     );

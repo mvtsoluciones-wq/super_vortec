@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "643800093991",
+    "project_id": "super-vortec",
+    "storage_bucket": "super-vortec.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:643800093991:android:c537050367bc18ff8d4502",
+        "android_client_info": {
+          "package_name": "com.example.super_vortec"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKV4D63zZsD5wuiz3QHyw-rE-58EDMRos"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
