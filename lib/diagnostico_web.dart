@@ -11,12 +11,12 @@ class DiagnosticoWebModule extends StatefulWidget {
 class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   final _formKey = GlobalKey<FormState>();
   
-  // Controladores Generales
+  // Controladores principales
   final TextEditingController _tituloFallaController = TextEditingController();
+  final TextEditingController _garantiaController = TextEditingController();
   final TextEditingController _scannerController = TextEditingController();
   final TextEditingController _videoController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
-  final TextEditingController _garantiaController = TextEditingController();
 
   // --- LÓGICA DE PRESUPUESTO DINÁMICO ---
   List<Map<String, dynamic>> _itemsPresupuesto = [
@@ -36,7 +36,6 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // Función para calcular el total de la falla (SÓLO UNA DEFINICIÓN)
   double _calcularTotalFalla() {
     double total = 0;
     for (var item in _itemsPresupuesto) {
@@ -60,9 +59,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
 
   Future<void> _guardarDiagnostico() async {
     if (_vehiculoSeleccionado == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ SELECCIONE UN VEHÍCULO"), backgroundColor: Colors.orange),
-      );
+      _showSnack("⚠️ SELECCIONE UN VEHÍCULO", Colors.orange);
       return;
     }
 
@@ -75,7 +72,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
 
     try {
-      // Mapear los ítems de la tabla para guardarlos en Firebase
+      // Mapear los ítems de la tabla para Firebase
       List<Map<String, dynamic>> presupuestoFinal = _itemsPresupuesto.map((e) {
         double c = double.tryParse(e['cant'].text) ?? 0;
         double p = double.tryParse(e['precio'].text) ?? 0;
@@ -106,16 +103,13 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
       if (!mounted) return;
       Navigator.pop(context);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ DIAGNÓSTICO PUBLICADO EXITOSAMENTE"), backgroundColor: Colors.green),
-      );
-
+      _showSnack("✅ DIAGNÓSTICO PUBLICADO EXITOSAMENTE", Colors.green);
       _limpiarFormulario();
       
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+      _showSnack("Error: $e", Colors.red);
     }
   }
 
@@ -132,6 +126,8 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
       _vehiculoSeleccionado = null;
     });
   }
+
+  void _showSnack(String m, Color c) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m), backgroundColor: c));
 
   @override
   Widget build(BuildContext context) {
@@ -152,44 +148,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                 style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
               const SizedBox(height: 35),
               
-              // SELECTORES DE CLIENTE Y VEHÍCULO
-              Row(
-                children: [
-                  Expanded(
-                    child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance.collection('clientes').snapshots(),
-                      builder: (context, snapshot) {
-                        List<DropdownMenuItem<String>> clientItems = [];
-                        if (snapshot.hasData) {
-                          for (var doc in snapshot.data!.docs) {
-                            clientItems.add(DropdownMenuItem(value: doc.id, child: Text(doc['nombre'].toString().toUpperCase())));
-                          }
-                        }
-                        return _buildDropdownCustom("1. Cliente", clientItems, _clienteSeleccionado, (val) {
-                          setState(() { _clienteSeleccionado = val; _vehiculoSeleccionado = null; });
-                        });
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: _clienteSeleccionado == null 
-                      ? _buildDisabledDropdown("2. Vehículo", "Elija un cliente")
-                      : StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: _clienteSeleccionado).snapshots(),
-                          builder: (context, snapshot) {
-                            List<DropdownMenuItem<String>> vehicleItems = [];
-                            if (snapshot.hasData) {
-                              for (var doc in snapshot.data!.docs) {
-                                vehicleItems.add(DropdownMenuItem(value: doc.id, child: Text("${doc.id} - ${doc['marca']}")));
-                              }
-                            }
-                            return _buildDropdownCustom("2. Vehículo", vehicleItems, _vehiculoSeleccionado, (val) => setState(() => _vehiculoSeleccionado = val));
-                          },
-                        ),
-                  ),
-                ],
-              ),
+              _buildSelectorVehiculo(),
               
               const Divider(color: Colors.white10, height: 60),
 
@@ -217,7 +176,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
 
               const Divider(color: Colors.white10, height: 60),
 
-              const Text("PRESUPUESTO", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text("PRESUPUESTO DESGLOSADO", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               _buildPresupuestoTable(),
               
@@ -225,8 +184,8 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
               Align(
                 alignment: Alignment.centerRight,
                 child: Text(
-                  "TOTAL DE ESTA FALLA: \$${_calcularTotalFalla().toStringAsFixed(2)}", 
-                  style: TextStyle(color: brandRed, fontSize: 20, fontWeight: FontWeight.bold)
+                  "TOTAL: \$${_calcularTotalFalla().toStringAsFixed(2)}", 
+                  style: TextStyle(color: brandRed, fontSize: 22, fontWeight: FontWeight.bold)
                 ),
               ),
 
@@ -235,10 +194,10 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                 width: double.infinity,
                 height: 60,
                 child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: brandRed),
+                  style: ElevatedButton.styleFrom(backgroundColor: brandRed, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                   onPressed: _guardarDiagnostico,
                   icon: const Icon(Icons.cloud_upload, color: Colors.white),
-                  label: const Text("GUARDAR EN HISTORIAL Y NOTIFICAR CLIENTE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  label: const Text("GUARDAR DIAGNÓSTICO EN HISTORIAL", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],
@@ -248,13 +207,39 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
   }
 
+  Widget _buildSelectorVehiculo() {
+    return Row(
+      children: [
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('clientes').snapshots(),
+            builder: (context, snapshot) {
+              List<DropdownMenuItem<String>> clientItems = snapshot.hasData ? snapshot.data!.docs.map((d) => DropdownMenuItem(value: d.id, child: Text(d['nombre'].toString().toUpperCase()))).toList() : [];
+              return _buildDropdownCustom("1. Seleccionar Cliente", clientItems, _clienteSeleccionado, (val) {
+                setState(() { _clienteSeleccionado = val; _vehiculoSeleccionado = null; });
+              });
+            },
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: _clienteSeleccionado == null 
+            ? _buildDisabledDropdown("2. Seleccionar Vehículo", "Primero elija un cliente")
+            : StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: _clienteSeleccionado).snapshots(),
+                builder: (context, snapshot) {
+                  List<DropdownMenuItem<String>> vehicleItems = snapshot.hasData ? snapshot.data!.docs.map((d) => DropdownMenuItem(value: d.id, child: Text("${d.id} - ${d['marca']}"))).toList() : [];
+                  return _buildDropdownCustom("2. Seleccionar Vehículo", vehicleItems, _vehiculoSeleccionado, (val) => setState(() => _vehiculoSeleccionado = val));
+                },
+              ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildPresupuestoTable() {
     return Container(
-      decoration: BoxDecoration(
-        color: inputFill,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
+      decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
       child: Column(
         children: [
           Padding(
@@ -280,9 +265,9 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
               child: Row(
                 children: [
-                  Expanded(flex: 2, child: _tableInput(row['item'], "Ej: Bobina")),
+                  Expanded(flex: 2, child: _tableInput(row['item'], "Item")),
                   const SizedBox(width: 10),
-                  Expanded(flex: 4, child: _tableInput(row['desc'], "Detalles...")),
+                  Expanded(flex: 4, child: _tableInput(row['desc'], "Descripción")),
                   const SizedBox(width: 10),
                   Expanded(flex: 1, child: _tableInput(row['cant'], "1", isNumber: true)),
                   const SizedBox(width: 10),
@@ -298,7 +283,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
           TextButton.icon(
             onPressed: _agregarFilaPresupuesto,
             icon: const Icon(Icons.add_circle, color: Colors.green),
-            label: const Text("AGREGAR OTRO ÍTEM", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+            label: const Text("AGREGAR OTRO ÍTEM AL PRESUPUESTO", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
           ),
           const SizedBox(height: 10),
         ],
@@ -306,78 +291,24 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
   }
 
+  // --- WIDGETS AUXILIARES ---
   Widget _headerText(String label) => Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold));
-
-  Widget _tableInput(TextEditingController controller, String hint, {bool isNumber = false}) {
-    return TextField(
-      controller: controller,
-      keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
-      onChanged: (v) => setState(() {}),
-      style: const TextStyle(color: Colors.white, fontSize: 13),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white10),
-        isDense: true,
-        filled: true,
-        fillColor: cardBlack,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-      ),
-    );
-  }
-
-  Widget _buildDropdownCustom(String label, List<DropdownMenuItem<String>> items, String? currentVal, Function(String?) onChanged) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 10),
-      Container(padding: const EdgeInsets.symmetric(horizontal: 15), decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: currentVal, isExpanded: true, dropdownColor: cardBlack, icon: const Icon(Icons.arrow_drop_down, color: Colors.white), style: const TextStyle(color: Colors.white), items: items, onChanged: onChanged))),
-    ]);
-  }
-
-  Widget _buildDisabledDropdown(String label, String hint) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label.toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 10),
-      Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: inputFill.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(10)), child: Text(hint, style: const TextStyle(color: Colors.white12, fontSize: 14))),
-    ]);
-  }
-
+  Widget _tableInput(TextEditingController controller, String hint, {bool isNumber = false}) => TextField(controller: controller, keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text, onChanged: (v) => setState(() {}), style: const TextStyle(color: Colors.white, fontSize: 13), decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Colors.white10), isDense: true, filled: true, fillColor: cardBlack, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)));
+  Widget _buildDropdownCustom(String label, List<DropdownMenuItem<String>> items, String? currentVal, Function(String?) onChanged) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)), const SizedBox(height: 10), Container(padding: const EdgeInsets.symmetric(horizontal: 15), decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: currentVal, isExpanded: true, dropdownColor: cardBlack, icon: const Icon(Icons.arrow_drop_down, color: Colors.white), style: const TextStyle(color: Colors.white), items: items, onChanged: onChanged)))]);
+  Widget _buildDisabledDropdown(String label, String hint) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label.toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)), const SizedBox(height: 10), Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: inputFill.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(10)), child: Text(hint, style: const TextStyle(color: Colors.white12, fontSize: 14)))]);
   Widget _buildSemaforoSelector() {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text("URGENCIA", style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
       const SizedBox(height: 15),
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        _semaforoIcon(Colors.green, 'Verde'),
-        _semaforoIcon(Colors.amber, 'Amarillo'),
-        _semaforoIcon(Colors.red, 'Rojo'),
-      ]),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_semaforoIcon(Colors.green, 'Verde'), _semaforoIcon(Colors.amber, 'Amarillo'), _semaforoIcon(Colors.red, 'Rojo')]),
       const SizedBox(height: 10),
       Center(child: Text(_semaforoSeleccionado.toUpperCase(), style: TextStyle(color: _getColorSemaforo(), fontWeight: FontWeight.bold, fontSize: 12)))
     ]);
   }
-
   Widget _semaforoIcon(Color color, String label) {
     bool isSelected = _semaforoSeleccionado == label;
-    return GestureDetector(
-      onTap: () => setState(() => _semaforoSeleccionado = label),
-      child: AnimatedContainer(duration: const Duration(milliseconds: 200), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: isSelected ? color.withValues(alpha: 0.2) : Colors.transparent, shape: BoxShape.circle, border: Border.all(color: isSelected ? color : Colors.white10, width: 2)), child: Icon(Icons.traffic, color: isSelected ? color : Colors.white, size: 30)),
-    );
+    return GestureDetector(onTap: () => setState(() => _semaforoSeleccionado = label), child: AnimatedContainer(duration: const Duration(milliseconds: 200), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: isSelected ? color.withValues(alpha: 0.2) : Colors.transparent, shape: BoxShape.circle, border: Border.all(color: isSelected ? color : Colors.white10, width: 2)), child: Icon(Icons.traffic, color: isSelected ? color : Colors.white, size: 30)));
   }
-
-  Color _getColorSemaforo() {
-    if (_semaforoSeleccionado == 'Rojo') return Colors.red;
-    if (_semaforoSeleccionado == 'Amarillo') return Colors.orange;
-    return Colors.green;
-  }
-
-  Widget _buildField(String label, IconData icon, {int maxLines = 1, TextEditingController? controller, String? hint}) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 10),
-      TextFormField(
-        controller: controller, maxLines: maxLines,
-        style: const TextStyle(color: Colors.white, fontSize: 14),
-        decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Colors.white10), prefixIcon: Icon(icon, color: Colors.white, size: 20), filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: brandRed, width: 1))),
-      ),
-    ]);
-  }
+  Color _getColorSemaforo() => _semaforoSeleccionado == 'Rojo' ? Colors.red : (_semaforoSeleccionado == 'Amarillo' ? Colors.orange : Colors.green);
+  Widget _buildField(String label, IconData icon, {int maxLines = 1, TextEditingController? controller, String? hint}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)), const SizedBox(height: 10), TextFormField(controller: controller, maxLines: maxLines, style: const TextStyle(color: Colors.white, fontSize: 14), decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Colors.white10), prefixIcon: Icon(icon, color: Colors.white, size: 20), filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: brandRed, width: 1))))]);
 }
