@@ -11,12 +11,17 @@ class DiagnosticoWebModule extends StatefulWidget {
 class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   final _formKey = GlobalKey<FormState>();
   
-  // Controladores principales
   final TextEditingController _tituloFallaController = TextEditingController();
   final TextEditingController _garantiaController = TextEditingController();
   final TextEditingController _scannerController = TextEditingController();
   final TextEditingController _videoController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
+
+  // Variables de control
+  String _semaforoSeleccionado = 'Verde'; 
+  String? _clienteSeleccionado; 
+  String? _vehiculoSeleccionado; // Guarda la Placa
+  String? _modeloSeleccionado;   // Guarda el nombre del Modelo (Ej: RENAULT)
 
   // --- LÓGICA DE PRESUPUESTO DINÁMICO ---
   List<Map<String, dynamic>> _itemsPresupuesto = [
@@ -27,10 +32,6 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
       'precio': TextEditingController(),
     }
   ];
-
-  String _semaforoSeleccionado = 'Verde'; 
-  String? _clienteSeleccionado; 
-  String? _vehiculoSeleccionado;
 
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
@@ -58,7 +59,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   }
 
   Future<void> _guardarDiagnostico() async {
-    if (_vehiculoSeleccionado == null) {
+    if (_vehiculoSeleccionado == null || _modeloSeleccionado == null) {
       _showSnack("⚠️ SELECCIONE UN VEHÍCULO", Colors.orange);
       return;
     }
@@ -72,7 +73,6 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
 
     try {
-      // Mapear los ítems de la tabla para Firebase
       List<Map<String, dynamic>> presupuestoFinal = _itemsPresupuesto.map((e) {
         double c = double.tryParse(e['cant'].text) ?? 0;
         double p = double.tryParse(e['precio'].text) ?? 0;
@@ -87,6 +87,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
 
       await FirebaseFirestore.instance.collection('diagnosticos').add({
         'placa_vehiculo': _vehiculoSeleccionado,
+        'modelo_vehiculo': _modeloSeleccionado, // <--- AHORA SE GUARDA EL MODELO CORRECTO
         'cliente_id': _clienteSeleccionado,
         'sistema_reparar': _tituloFallaController.text.trim().toUpperCase(),
         'total_reparacion': _calcularTotalFalla(),
@@ -124,6 +125,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
         {'item': TextEditingController(), 'desc': TextEditingController(), 'cant': TextEditingController(text: "1"), 'precio': TextEditingController()}
       ];
       _vehiculoSeleccionado = null;
+      _modeloSeleccionado = null;
     });
   }
 
@@ -216,7 +218,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
             builder: (context, snapshot) {
               List<DropdownMenuItem<String>> clientItems = snapshot.hasData ? snapshot.data!.docs.map((d) => DropdownMenuItem(value: d.id, child: Text(d['nombre'].toString().toUpperCase()))).toList() : [];
               return _buildDropdownCustom("1. Seleccionar Cliente", clientItems, _clienteSeleccionado, (val) {
-                setState(() { _clienteSeleccionado = val; _vehiculoSeleccionado = null; });
+                setState(() { _clienteSeleccionado = val; _vehiculoSeleccionado = null; _modeloSeleccionado = null; });
               });
             },
           ),
@@ -228,8 +230,22 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
             : StreamBuilder<QuerySnapshot>(
                 stream: FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: _clienteSeleccionado).snapshots(),
                 builder: (context, snapshot) {
-                  List<DropdownMenuItem<String>> vehicleItems = snapshot.hasData ? snapshot.data!.docs.map((d) => DropdownMenuItem(value: d.id, child: Text("${d.id} - ${d['marca']}"))).toList() : [];
-                  return _buildDropdownCustom("2. Seleccionar Vehículo", vehicleItems, _vehiculoSeleccionado, (val) => setState(() => _vehiculoSeleccionado = val));
+                  if (!snapshot.hasData) return const LinearProgressIndicator();
+                  
+                  // Mapeamos los documentos para tener acceso al MODELO y a la PLACA
+                  List<DropdownMenuItem<String>> vehicleItems = snapshot.data!.docs.map((doc) {
+                    String placa = doc.id;
+                    String modelo = doc['modelo'].toString().toUpperCase();
+                    return DropdownMenuItem(
+                      value: placa, 
+                      onTap: () => _modeloSeleccionado = modelo, // CAPTURA EL MODELO AL TOCAR
+                      child: Text("$placa - $modelo")
+                    );
+                  }).toList();
+
+                  return _buildDropdownCustom("2. Seleccionar Vehículo", vehicleItems, _vehiculoSeleccionado, (val) {
+                    setState(() { _vehiculoSeleccionado = val; });
+                  });
                 },
               ),
         ),
