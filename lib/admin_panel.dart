@@ -39,7 +39,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController(); // NUEVO CAMPO
+  final TextEditingController _addressController = TextEditingController(); 
   final TextEditingController _brandController = TextEditingController(); 
   final TextEditingController _modelController = TextEditingController(); 
   final TextEditingController _plateController = TextEditingController();
@@ -49,14 +49,45 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   final TextEditingController _obsController = TextEditingController();
   final TextEditingController _videoController = TextEditingController();
 
+  // --- NUEVA FUNCIÓN: BUSCADOR DE CLIENTE RECURRENTE ---
+  Future<void> _buscarClienteRecurrente() async {
+    String cedula = _idController.text.trim();
+    if (cedula.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("⚠️ INGRESE UNA CÉDULA PARA BUSCAR"), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    try {
+      var doc = await FirebaseFirestore.instance.collection('clientes').doc(cedula).get();
+      if (doc.exists) {
+        var data = doc.data()!;
+        setState(() {
+          _nameController.text = data['nombre'] ?? "";
+          _emailController.text = data['email'] ?? "";
+          _phoneController.text = data['telefono'] ?? "";
+          _addressController.text = data['direccion'] ?? "";
+        });
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("✅ DATOS DEL CLIENTE RECUPERADOS"), backgroundColor: Colors.blueAccent),
+        );
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("ℹ️ CLIENTE NO REGISTRADO (NUEVO)"), backgroundColor: Colors.orange),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error al buscar cliente: $e");
+    }
+  }
+
   Future<void> _guardarRegistroEnBaseDeDatos() async {
-    // Validación estricta: Si falta un solo campo, se detiene.
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("⚠️ ERROR: TODOS LOS CAMPOS SON OBLIGATORIOS PARA EL REGISTRO"),
-          backgroundColor: Colors.orange,
-        ),
+        const SnackBar(content: Text("⚠️ ERROR: TODOS LOS CAMPOS SON OBLIGATORIOS"), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -71,15 +102,17 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       String clienteId = _idController.text.trim();
       String placa = _plateController.text.trim().toUpperCase();
 
+      // --- REGISTRO/ACTUALIZACIÓN DE CLIENTE (MERGE: TRUE) ---
       await FirebaseFirestore.instance.collection('clientes').doc(clienteId).set({
         'nombre': _nameController.text.trim().toUpperCase(),
         'email': _emailController.text.trim().toLowerCase(),
         'telefono': _phoneController.text.trim(),
         'cedula': clienteId,
-        'direccion': _addressController.text.trim().toUpperCase(), // GUARDAR NUEVO CAMPO
+        'direccion': _addressController.text.trim().toUpperCase(),
         'ultima_visita': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
+      // --- REGISTRO DEL VEHÍCULO ---
       await FirebaseFirestore.instance.collection('vehiculos').doc(placa).set({
         'placa': placa,
         'marca': _brandController.text.trim().toUpperCase(),
@@ -98,10 +131,17 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       Navigator.pop(context); 
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ REGISTRO TÉCNICO ALMACENADO"), backgroundColor: Colors.green),
+        const SnackBar(content: Text("✅ VEHÍCULO VINCULADO AL CLIENTE"), backgroundColor: Colors.green),
       );
 
-      _formKey.currentState!.reset();
+      // Limpieza selectiva: se limpian datos del vehículo, pero se mantienen los del cliente
+      _plateController.clear();
+      _brandController.clear();
+      _modelController.clear();
+      _colorController.clear();
+      _yearController.clear();
+      _kmController.clear();
+      _obsController.clear();
       _videoController.clear();
       
     } catch (e) {
@@ -283,7 +323,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     return SingleChildScrollView(
       child: Form(
         key: _formKey,
-        // --- GRUPO DE ENFOQUE PARA EL TABULADOR ---
         child: FocusTraversalGroup(
           policy: OrderedTraversalPolicy(),
           child: Container(
@@ -301,21 +340,33 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 const SizedBox(height: 35),
                 Row(
                   children: [
-                    Expanded(child: _buildFormField("Propietario", Icons.person_outline, controller: _nameController)),
+                    // --- CAMPO CÉDULA CON BOTÓN DE BÚSQUEDA INTEGRADO ---
+                    Expanded(
+                      child: _buildFormField(
+                        "Cédula / ID", 
+                        Icons.badge_outlined, 
+                        isNumber: true, 
+                        controller: _idController,
+                        suffix: IconButton(
+                          icon: const Icon(Icons.search, color: Colors.blueAccent),
+                          onPressed: _buscarClienteRecurrente,
+                          tooltip: "Buscar Cliente",
+                        )
+                      )
+                    ),
                     const SizedBox(width: 25),
-                    Expanded(child: _buildFormField("E-mail", Icons.alternate_email_rounded, controller: _emailController)),
+                    Expanded(child: _buildFormField("Propietario", Icons.person_outline, controller: _nameController)),
                   ],
                 ),
                 const SizedBox(height: 25),
                 Row(
                   children: [
-                    Expanded(child: _buildFormField("Cédula / ID", Icons.badge_outlined, isNumber: true, controller: _idController)),
+                    Expanded(child: _buildFormField("E-mail", Icons.alternate_email_rounded, controller: _emailController)),
                     const SizedBox(width: 25),
                     Expanded(child: _buildFormField("Teléfono Móvil", Icons.smartphone_rounded, isNumber: true, controller: _phoneController)),
                   ],
                 ),
                 const SizedBox(height: 25),
-                // --- NUEVO CAMPO AGREGADO: DIRECCIÓN ---
                 _buildFormField("Dirección de Habitación", Icons.location_on_outlined, controller: _addressController),
                 
                 const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
@@ -358,7 +409,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     );
   }
 
-  Widget _buildFormField(String label, IconData icon, {bool isNumber = false, int maxLines = 1, TextEditingController? controller}) {
+  Widget _buildFormField(String label, IconData icon, {bool isNumber = false, int maxLines = 1, TextEditingController? controller, Widget? suffix}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -369,18 +420,14 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           maxLines: maxLines,
           keyboardType: isNumber ? TextInputType.number : TextInputType.text,
           style: const TextStyle(color: Colors.white, fontSize: 15),
-          
-          // --- ACCIÓN DE TECLADO ---
           textInputAction: TextInputAction.next,
-
           validator: (val) {
-            if (val == null || val.trim().isEmpty) {
-              return "Falta llenar: $label";
-            }
+            if (val == null || val.trim().isEmpty) return "Falta llenar: $label";
             return null;
           },
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: Colors.white, size: 20), 
+            suffixIcon: suffix, // INTEGRACIÓN DEL BOTÓN DE BÚSQUEDA
             filled: true,
             fillColor: inputFill,
             errorStyle: const TextStyle(color: Colors.orangeAccent),
@@ -407,7 +454,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
             children: [
               const Icon(Icons.video_library_rounded, color: Colors.white, size: 20),
               const SizedBox(width: 12),
-              const Text("EVIDENCIA MULTIMEDIA", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              const Text("VIDEO RECEPCION DEL VEHICULO", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
               const Spacer(),
               ElevatedButton.icon(
                 onPressed: _launchYouTubeStudio,
@@ -421,13 +468,10 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           TextFormField(
             controller: _videoController,
             style: const TextStyle(color: Colors.white, fontSize: 13),
-            
-            // --- VIDEO OBLIGATORIO ---
             validator: (val) {
                if (val == null || val.trim().isEmpty) return "⚠️ Agregue link de video de recepción";
                return null;
             },
-
             decoration: InputDecoration(
               hintText: "URL de YouTube (OBLIGATORIO)",
               hintStyle: const TextStyle(color: Colors.white24),
