@@ -15,6 +15,7 @@ import 'market_web.dart';
 import 'facturacion_web.dart';
 import 'inventario_web.dart';
 import 'config_factura_web.dart'; 
+import 'historial_web.dart';
 
 class AdminControlPanel extends StatefulWidget {
   const AdminControlPanel({super.key});
@@ -237,6 +238,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   _sidebarItem(1, Icons.analytics_outlined, "DIAGNÓSTICO"),
                   _sidebarItem(2, Icons.gps_fixed_rounded, "SEGUIMIENTO"),
                   _sidebarItem(3, Icons.person_search_rounded, "CLIENTES"),
+                  _sidebarItem(11, Icons.history_edu_rounded, "HISTORIAL"),
                   _buildDivider(),
                   _buildSectionTitle("HERRAMIENTAS"),
                   _sidebarItem(4, Icons.notifications_active_outlined, "NOTIFICACIÓN"),
@@ -314,6 +316,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       case 12: return const ConfigFacturaWeb(); 
       case 9: return const PresupuestoWebModule();
       case 10: return const InventarioWebModule();
+      case 11: return const HistorialWebModule();
       default:
         return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
     }

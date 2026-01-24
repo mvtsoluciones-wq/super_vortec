@@ -11,11 +11,23 @@ class DiagnosticoWebModule extends StatefulWidget {
 class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   final _formKey = GlobalKey<FormState>();
   
+  // Controladores Generales
+  final TextEditingController _tituloFallaController = TextEditingController();
   final TextEditingController _scannerController = TextEditingController();
   final TextEditingController _videoController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
+  final TextEditingController _garantiaController = TextEditingController();
 
-  // Variables de control
+  // --- LÓGICA DE PRESUPUESTO DINÁMICO ---
+  List<Map<String, dynamic>> _itemsPresupuesto = [
+    {
+      'item': TextEditingController(),
+      'desc': TextEditingController(),
+      'cant': TextEditingController(text: "1"),
+      'precio': TextEditingController(),
+    }
+  ];
+
   String _semaforoSeleccionado = 'Verde'; 
   String? _clienteSeleccionado; 
   String? _vehiculoSeleccionado;
@@ -24,10 +36,32 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
+  // Función para calcular el total de la falla (SÓLO UNA DEFINICIÓN)
+  double _calcularTotalFalla() {
+    double total = 0;
+    for (var item in _itemsPresupuesto) {
+      double c = double.tryParse(item['cant'].text) ?? 0;
+      double p = double.tryParse(item['precio'].text) ?? 0;
+      total += (c * p);
+    }
+    return total;
+  }
+
+  void _agregarFilaPresupuesto() {
+    setState(() {
+      _itemsPresupuesto.add({
+        'item': TextEditingController(),
+        'desc': TextEditingController(),
+        'cant': TextEditingController(text: "1"),
+        'precio': TextEditingController(),
+      });
+    });
+  }
+
   Future<void> _guardarDiagnostico() async {
     if (_vehiculoSeleccionado == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ DEBE SELECCIONE UN VEHÍCULO"), backgroundColor: Colors.orange),
+        const SnackBar(content: Text("⚠️ SELECCIONE UN VEHÍCULO"), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -41,13 +75,31 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
 
     try {
+      // Mapear los ítems de la tabla para guardarlos en Firebase
+      List<Map<String, dynamic>> presupuestoFinal = _itemsPresupuesto.map((e) {
+        double c = double.tryParse(e['cant'].text) ?? 0;
+        double p = double.tryParse(e['precio'].text) ?? 0;
+        return {
+          'item': e['item'].text.toUpperCase(),
+          'descripcion': e['desc'].text.toUpperCase(),
+          'cantidad': c,
+          'precio_unitario': p,
+          'subtotal': c * p,
+        };
+      }).toList();
+
       await FirebaseFirestore.instance.collection('diagnosticos').add({
         'placa_vehiculo': _vehiculoSeleccionado,
         'cliente_id': _clienteSeleccionado,
+        'sistema_reparar': _tituloFallaController.text.trim().toUpperCase(),
+        'total_reparacion': _calcularTotalFalla(),
+        'garantia': _garantiaController.text.trim().toUpperCase(),
         'link_escanner': _scannerController.text.trim(),
         'link_video': _videoController.text.trim(),
-        'descripcion': _descController.text.trim().toUpperCase(),
+        'descripcion_falla': _descController.text.trim().toUpperCase(),
         'urgencia': _semaforoSeleccionado,
+        'presupuesto_items': presupuestoFinal, 
+        'aprobado': false,
         'fecha': FieldValue.serverTimestamp(),
       });
 
@@ -55,23 +107,30 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
       Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ DIAGNÓSTICO PUBLICADO"), backgroundColor: Colors.green),
+        const SnackBar(content: Text("✅ DIAGNÓSTICO PUBLICADO EXITOSAMENTE"), backgroundColor: Colors.green),
       );
 
-      _formKey.currentState!.reset();
-      _scannerController.clear();
-      _videoController.clear();
-      _descController.clear();
-      setState(() {
-        _vehiculoSeleccionado = null;
-        _clienteSeleccionado = null;
-      });
-
+      _limpiarFormulario();
+      
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
     }
+  }
+
+  void _limpiarFormulario() {
+    _tituloFallaController.clear();
+    _garantiaController.clear();
+    _descController.clear();
+    _videoController.clear();
+    _scannerController.clear();
+    setState(() {
+      _itemsPresupuesto = [
+        {'item': TextEditingController(), 'desc': TextEditingController(), 'cant': TextEditingController(text: "1"), 'precio': TextEditingController()}
+      ];
+      _vehiculoSeleccionado = null;
+    });
   }
 
   @override
@@ -84,16 +143,16 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
           decoration: BoxDecoration(
             color: cardBlack,
             borderRadius: BorderRadius.circular(16),
-            boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 15))],
             border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("PANEL DE DIAGNÓSTICO AVANZADO", 
+              const Text("GENERADOR DE DIAGNÓSTICO Y PRESUPUESTO", 
                 style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
               const SizedBox(height: 35),
               
+              // SELECTORES DE CLIENTE Y VEHÍCULO
               Row(
                 children: [
                   Expanded(
@@ -103,17 +162,11 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                         List<DropdownMenuItem<String>> clientItems = [];
                         if (snapshot.hasData) {
                           for (var doc in snapshot.data!.docs) {
-                            clientItems.add(DropdownMenuItem(
-                              value: doc.id,
-                              child: Text(doc['nombre'].toString().toUpperCase()),
-                            ));
+                            clientItems.add(DropdownMenuItem(value: doc.id, child: Text(doc['nombre'].toString().toUpperCase())));
                           }
                         }
-                        return _buildDropdownCustom("1. Buscar Cliente", clientItems, _clienteSeleccionado, (val) {
-                          setState(() {
-                            _clienteSeleccionado = val;
-                            _vehiculoSeleccionado = null;
-                          });
+                        return _buildDropdownCustom("1. Cliente", clientItems, _clienteSeleccionado, (val) {
+                          setState(() { _clienteSeleccionado = val; _vehiculoSeleccionado = null; });
                         });
                       },
                     ),
@@ -121,85 +174,72 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                   const SizedBox(width: 20),
                   Expanded(
                     child: _clienteSeleccionado == null 
-                      ? _buildDisabledDropdown("2. Seleccionar Vehículo", "Primero elija un cliente")
+                      ? _buildDisabledDropdown("2. Vehículo", "Elija un cliente")
                       : StreamBuilder<QuerySnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('vehiculos')
-                              .where('propietario_id', isEqualTo: _clienteSeleccionado)
-                              .snapshots(),
+                          stream: FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: _clienteSeleccionado).snapshots(),
                           builder: (context, snapshot) {
                             List<DropdownMenuItem<String>> vehicleItems = [];
                             if (snapshot.hasData) {
                               for (var doc in snapshot.data!.docs) {
-                                vehicleItems.add(DropdownMenuItem(
-                                  value: doc.id,
-                                  child: Text("${doc.id} - ${doc['marca']} ${doc['modelo']}"),
-                                ));
+                                vehicleItems.add(DropdownMenuItem(value: doc.id, child: Text("${doc.id} - ${doc['marca']}")));
                               }
                             }
-                            return _buildDropdownCustom("2. Seleccionar Vehículo", vehicleItems, _vehiculoSeleccionado, (val) {
-                              setState(() => _vehiculoSeleccionado = val);
-                            });
+                            return _buildDropdownCustom("2. Vehículo", vehicleItems, _vehiculoSeleccionado, (val) => setState(() => _vehiculoSeleccionado = val));
                           },
                         ),
                   ),
                 ],
               ),
               
-              const SizedBox(height: 25),
+              const Divider(color: Colors.white10, height: 60),
 
+              _buildField("Sistema a Reparar (Ej: MODULO ABS)", Icons.settings_applications, controller: _tituloFallaController),
+              const SizedBox(height: 20),
+              
               Row(
                 children: [
-                  Expanded(child: _buildField("Link Informe Escáner", Icons.qr_code_scanner, controller: _scannerController, hint: "URL del informe")),
-                  const SizedBox(width: 20),
-                  Expanded(child: _buildField("Link Video Falla (YouTube)", Icons.play_circle_fill, controller: _videoController, hint: "URL de video")),
-                ],
-              ),
-              const SizedBox(height: 25),
-
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: _buildField("Descripción del Diagnóstico", Icons.description, controller: _descController, maxLines: 4),
-                  ),
+                  Expanded(flex: 2, child: _buildField("Descripción Técnica de la Falla", Icons.description, controller: _descController, maxLines: 3)),
                   const SizedBox(width: 25),
-                  Expanded(
-                    flex: 1,
-                    child: _buildSemaforoSelector(),
-                  ),
+                  Expanded(flex: 1, child: _buildSemaforoSelector()),
                 ],
               ),
-
-              const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
+              const SizedBox(height: 20),
 
               Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: brandRed),
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: () {},
-                      icon: const Icon(Icons.add_circle_outline),
-                      label: const Text("AGREGAR FALLA AL LISTADO"),
-                    ),
-                  ),
+                  Expanded(child: _buildField("Link Informe Escáner", Icons.qr_code_scanner, controller: _scannerController)),
                   const SizedBox(width: 20),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: brandRed,
-                        padding: const EdgeInsets.symmetric(vertical: 20),
-                      ),
-                      onPressed: _guardarDiagnostico,
-                      child: const Text("GUARDAR DIAGNÓSTICO", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-                    ),
-                  ),
+                  Expanded(child: _buildField("Link Video Evidencia", Icons.play_circle_fill, controller: _videoController)),
+                  const SizedBox(width: 20),
+                  Expanded(child: _buildField("Garantía", Icons.verified, controller: _garantiaController, hint: "Ej: 6 Meses")),
                 ],
+              ),
+
+              const Divider(color: Colors.white10, height: 60),
+
+              const Text("PRESUPUESTO", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              _buildPresupuestoTable(),
+              
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  "TOTAL DE ESTA FALLA: \$${_calcularTotalFalla().toStringAsFixed(2)}", 
+                  style: TextStyle(color: brandRed, fontSize: 20, fontWeight: FontWeight.bold)
+                ),
+              ),
+
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 60,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: brandRed),
+                  onPressed: _guardarDiagnostico,
+                  icon: const Icon(Icons.cloud_upload, color: Colors.white),
+                  label: const Text("GUARDAR EN HISTORIAL Y NOTIFICAR CLIENTE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
               ),
             ],
           ),
@@ -208,116 +248,136 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
   }
 
-  Widget _buildDropdownCustom(String label, List<DropdownMenuItem<String>> items, String? currentVal, Function(String?) onChanged) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: currentVal,
-              isExpanded: true,
-              dropdownColor: cardBlack,
-              icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
-              style: const TextStyle(color: Colors.white),
-              hint: const Text("Seleccionar...", style: TextStyle(color: Colors.white24, fontSize: 14)),
-              items: items,
-              onChanged: onChanged,
+  Widget _buildPresupuestoTable() {
+    return Container(
+      decoration: BoxDecoration(
+        color: inputFill,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(15),
+            child: Row(
+              children: [
+                Expanded(flex: 2, child: _headerText("ITEM")),
+                const SizedBox(width: 10),
+                Expanded(flex: 4, child: _headerText("DESCRIPCIÓN")),
+                const SizedBox(width: 10),
+                Expanded(flex: 1, child: _headerText("CANT")),
+                const SizedBox(width: 10),
+                Expanded(flex: 2, child: _headerText("PRECIO \$")),
+                const SizedBox(width: 40),
+              ],
             ),
           ),
-        ),
-      ],
+          const Divider(color: Colors.white10, height: 1),
+          ..._itemsPresupuesto.asMap().entries.map((entry) {
+            int index = entry.key;
+            var row = entry.value;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(flex: 2, child: _tableInput(row['item'], "Ej: Bobina")),
+                  const SizedBox(width: 10),
+                  Expanded(flex: 4, child: _tableInput(row['desc'], "Detalles...")),
+                  const SizedBox(width: 10),
+                  Expanded(flex: 1, child: _tableInput(row['cant'], "1", isNumber: true)),
+                  const SizedBox(width: 10),
+                  Expanded(flex: 2, child: _tableInput(row['precio'], "0.00", isNumber: true)),
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle_outline, color: Colors.redAccent, size: 20),
+                    onPressed: () => setState(() => _itemsPresupuesto.removeAt(index)),
+                  )
+                ],
+              ),
+            );
+          }),
+          TextButton.icon(
+            onPressed: _agregarFilaPresupuesto,
+            icon: const Icon(Icons.add_circle, color: Colors.green),
+            label: const Text("AGREGAR OTRO ÍTEM", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 10),
+        ],
+      ),
     );
+  }
+
+  Widget _headerText(String label) => Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold));
+
+  Widget _tableInput(TextEditingController controller, String hint, {bool isNumber = false}) {
+    return TextField(
+      controller: controller,
+      keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+      onChanged: (v) => setState(() {}),
+      style: const TextStyle(color: Colors.white, fontSize: 13),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: Colors.white10),
+        isDense: true,
+        filled: true,
+        fillColor: cardBlack,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+      ),
+    );
+  }
+
+  Widget _buildDropdownCustom(String label, List<DropdownMenuItem<String>> items, String? currentVal, Function(String?) onChanged) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 10),
+      Container(padding: const EdgeInsets.symmetric(horizontal: 15), decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: currentVal, isExpanded: true, dropdownColor: cardBlack, icon: const Icon(Icons.arrow_drop_down, color: Colors.white), style: const TextStyle(color: Colors.white), items: items, onChanged: onChanged))),
+    ]);
   }
 
   Widget _buildDisabledDropdown(String label, String hint) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(15),
-          decoration: BoxDecoration(color: inputFill.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(10)),
-          child: Text(hint, style: const TextStyle(color: Colors.white12, fontSize: 14)),
-        ),
-      ],
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label.toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 10),
+      Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: inputFill.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(10)), child: Text(hint, style: const TextStyle(color: Colors.white12, fontSize: 14))),
+    ]);
   }
 
   Widget _buildSemaforoSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("NIVEL DE URGENCIA", style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 15),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _semaforoIcon(Colors.green, 'Verde'),
-            _semaforoIcon(Colors.amber, 'Amarillo'),
-            _semaforoIcon(Colors.red, 'Rojo'),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Center(
-          child: Text(_semaforoSeleccionado.toUpperCase(), 
-            style: TextStyle(color: _getColorSemaforo(), fontWeight: FontWeight.bold, fontSize: 12)),
-        )
-      ],
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text("URGENCIA", style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 15),
+      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        _semaforoIcon(Colors.green, 'Verde'),
+        _semaforoIcon(Colors.amber, 'Amarillo'),
+        _semaforoIcon(Colors.red, 'Rojo'),
+      ]),
+      const SizedBox(height: 10),
+      Center(child: Text(_semaforoSeleccionado.toUpperCase(), style: TextStyle(color: _getColorSemaforo(), fontWeight: FontWeight.bold, fontSize: 12)))
+    ]);
   }
 
   Widget _semaforoIcon(Color color, String label) {
     bool isSelected = _semaforoSeleccionado == label;
     return GestureDetector(
       onTap: () => setState(() => _semaforoSeleccionado = label),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: isSelected ? color.withValues(alpha: 0.2) : Colors.transparent,
-          shape: BoxShape.circle,
-          border: Border.all(color: isSelected ? color : Colors.white10, width: 2),
-        ),
-        child: Icon(Icons.traffic, color: isSelected ? color : Colors.white, size: 30),
-      ),
+      child: AnimatedContainer(duration: const Duration(milliseconds: 200), padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: isSelected ? color.withValues(alpha: 0.2) : Colors.transparent, shape: BoxShape.circle, border: Border.all(color: isSelected ? color : Colors.white10, width: 2)), child: Icon(Icons.traffic, color: isSelected ? color : Colors.white, size: 30)),
     );
   }
 
   Color _getColorSemaforo() {
     if (_semaforoSeleccionado == 'Rojo') return Colors.red;
-    if (_semaforoSeleccionado == 'Amarillo') return Colors.amber;
+    if (_semaforoSeleccionado == 'Amarillo') return Colors.orange;
     return Colors.green;
   }
 
-  Widget _buildField(String label, IconData icon, {int maxLines = 1, String? hint, TextEditingController? controller}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 10),
-        TextFormField(
-          controller: controller,
-          maxLines: maxLines,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          validator: (val) => (val == null || val.isEmpty) ? "Campo obligatorio" : null,
-          decoration: InputDecoration(
-            hintText: hint,
-            hintStyle: const TextStyle(color: Colors.white12),
-            prefixIcon: Icon(icon, color: Colors.white, size: 20),
-            filled: true,
-            fillColor: inputFill,
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: brandRed, width: 1)),
-          ),
-        ),
-      ],
-    );
+  Widget _buildField(String label, IconData icon, {int maxLines = 1, TextEditingController? controller, String? hint}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 10),
+      TextFormField(
+        controller: controller, maxLines: maxLines,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Colors.white10), prefixIcon: Icon(icon, color: Colors.white, size: 20), filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: brandRed, width: 1))),
+      ),
+    ]);
   }
 }
