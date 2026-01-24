@@ -15,15 +15,19 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
 
-  // --- 1. FUNCIÓN: ABRIR WHATSAPP ---
+  // --- 1. FUNCIÓN: ABRIR WHATSAPP (CON LIMPIEZA DE NÚMERO) ---
   Future<void> _abrirWhatsApp(String telefono, String nombre) async {
     String numeroLimpio = telefono.replaceAll(RegExp(r'[^0-9]'), '');
-    if (!numeroLimpio.startsWith('58') && numeroLimpio.length <= 10) {
+    
+    // Formateo para Venezuela si el número es local
+    if (numeroLimpio.startsWith('0')) {
+      numeroLimpio = '58${numeroLimpio.substring(1)}';
+    } else if (numeroLimpio.length == 10) {
       numeroLimpio = '58$numeroLimpio';
     }
 
     final String mensaje = "Hola $nombre, te saludamos de JMendez Performance. ";
-    final Uri url = Uri.parse("https://wa.me/$numeroLimpio?text=${Uri.encodeComponent(mensaje)}");
+    final Uri url = Uri.parse("https://api.whatsapp.com/send?phone=$numeroLimpio&text=${Uri.encodeComponent(mensaje)}");
 
     try {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
@@ -94,7 +98,7 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
       }
       
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop(); // Cierre seguro
+      Navigator.of(context, rootNavigator: true).pop();
       _showSuccessDialog(!estadoActual ? "ACCESO HABILITADO" : "ACCESO SUSPENDIDO", "Configuración de acceso actualizada.");
     } catch (e) {
       if (!mounted) return;
@@ -103,7 +107,7 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
     }
   }
 
-  // --- 4. EDICIÓN MAESTRA (CORREGIDA) ---
+  // --- 4. EDICIÓN MAESTRA ---
   void _editMasterData(Map<String, dynamic> clientData) async {
     var vehiculoQuery = await FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: clientData['cedula']).get();
     if (vehiculoQuery.docs.isEmpty) return;
@@ -155,7 +159,6 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: brandRed),
               onPressed: () async {
-                // Guardamos referencias antes del await
                 final scaffoldMessenger = ScaffoldMessenger.of(context);
                 final navigator = Navigator.of(dialogContext);
 
@@ -164,7 +167,6 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
                 String oldPlaca = vDoc.id;
                 String newPlaca = editPlaca.text.trim().toUpperCase();
 
-                // Actualizar Cliente
                 Map<String, dynamic> cObj = {
                   'nombre': editNombre.text.trim().toUpperCase(),
                   'cedula': newCedula,
@@ -178,7 +180,6 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
                   await FirebaseFirestore.instance.collection('clientes').doc(oldCedula).delete();
                 } else { await FirebaseFirestore.instance.collection('clientes').doc(oldCedula).update(cObj); }
 
-                // Actualizar Vehículo
                 Map<String, dynamic> vObj = {
                   'marca': editMarca.text.trim().toUpperCase(),
                   'modelo': editModelo.text.trim().toUpperCase(),
@@ -193,7 +194,7 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
                 } else { await FirebaseFirestore.instance.collection('vehiculos').doc(oldPlaca).update(vObj); }
 
                 if (!mounted) return;
-                navigator.pop(); // Uso seguro del navegador
+                navigator.pop();
                 scaffoldMessenger.showSnackBar(const SnackBar(content: Text("DATOS ACTUALIZADOS")));
               },
               child: const Text("GUARDAR CAMBIOS"),
