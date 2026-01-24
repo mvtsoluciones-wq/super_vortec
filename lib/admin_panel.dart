@@ -39,6 +39,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _addressController = TextEditingController(); // NUEVO CAMPO
   final TextEditingController _brandController = TextEditingController(); 
   final TextEditingController _modelController = TextEditingController(); 
   final TextEditingController _plateController = TextEditingController();
@@ -75,6 +76,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         'email': _emailController.text.trim().toLowerCase(),
         'telefono': _phoneController.text.trim(),
         'cedula': clienteId,
+        'direccion': _addressController.text.trim().toUpperCase(), // GUARDAR NUEVO CAMPO
         'ultima_visita': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
@@ -312,6 +314,10 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                     Expanded(child: _buildFormField("Teléfono Móvil", Icons.smartphone_rounded, isNumber: true, controller: _phoneController)),
                   ],
                 ),
+                const SizedBox(height: 25),
+                // --- NUEVO CAMPO AGREGADO: DIRECCIÓN ---
+                _buildFormField("Dirección de Habitación", Icons.location_on_outlined, controller: _addressController),
+                
                 const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
                 
                 // --- SECCIÓN VEHÍCULO ---

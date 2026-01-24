@@ -40,7 +40,7 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
     }
   }
 
-  // --- 2. ELIMINAR REGISTRO ---
+  // --- 2. ELIMINAR REGISTRO COMPLETO ---
   Future<void> _eliminarCliente(String cedula, String nombre) async {
     bool? confirmar = await showDialog<bool>(
       context: context,
@@ -92,8 +92,9 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
       } else {
         await FirebaseFirestore.instance.collection('clientes').doc(data['cedula']).update({'acceso_app': false});
       }
+      
       if (!mounted) return;
-      Navigator.of(context, rootNavigator: true).pop();
+      Navigator.of(context, rootNavigator: true).pop(); // Cierre seguro
       _showSuccessDialog(!estadoActual ? "ACCESO HABILITADO" : "ACCESO SUSPENDIDO", "Configuración de acceso actualizada.");
     } catch (e) {
       if (!mounted) return;
@@ -102,7 +103,7 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
     }
   }
 
-  // --- 4. EDICIÓN MAESTRA ---
+  // --- 4. EDICIÓN MAESTRA (CORREGIDA) ---
   void _editMasterData(Map<String, dynamic> clientData) async {
     var vehiculoQuery = await FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: clientData['cedula']).get();
     if (vehiculoQuery.docs.isEmpty) return;
@@ -123,74 +124,83 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
     final TextEditingController editAnio = TextEditingController(text: vData['anio'].toString());
     final TextEditingController editKM = TextEditingController(text: vData['km'].toString());
 
+    if (!mounted) return;
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: cardBlack,
-        title: const Text("MODIFICAR REGISTRO", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-        content: SizedBox(
-          width: 700,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildSectionLabel("PERFIL DEL CLIENTE"),
-                Row(children: [Expanded(child: _buildEditField("NOMBRE", editNombre, Icons.person)), const SizedBox(width: 15), Expanded(child: _buildEditField("CÉDULA", editCedula, Icons.badge))]),
-                Row(children: [Expanded(child: _buildEditField("CORREO", editEmail, Icons.email)), const SizedBox(width: 15), Expanded(child: _buildEditField("TELÉFONO", editTel, Icons.phone))]),
-                _buildEditField("DIRECCIÓN", editDir, Icons.location_on),
-                const SizedBox(height: 30),
-                _buildSectionLabel("FICHA DEL VEHÍCULO"),
-                Row(children: [Expanded(child: _buildEditField("PLACA", editPlaca, Icons.pin)), const SizedBox(width: 15), Expanded(child: _buildEditField("MARCA", editMarca, Icons.factory))]),
-                Row(children: [Expanded(child: _buildEditField("MODELO", editModelo, Icons.directions_car)), const SizedBox(width: 15), Expanded(child: _buildEditField("COLOR", editColor, Icons.color_lens))]),
-                Row(children: [Expanded(child: _buildEditField("AÑO", editAnio, Icons.calendar_today)), const SizedBox(width: 15), Expanded(child: _buildEditField("KM ACTUAL", editKM, Icons.speed))]),
-              ],
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: cardBlack,
+          title: const Text("MODIFICAR REGISTRO", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+          content: SizedBox(
+            width: 700,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildSectionLabel("PERFIL DEL CLIENTE"),
+                  Row(children: [Expanded(child: _buildEditField("NOMBRE", editNombre, Icons.person)), const SizedBox(width: 15), Expanded(child: _buildEditField("CÉDULA", editCedula, Icons.badge))]),
+                  Row(children: [Expanded(child: _buildEditField("CORREO", editEmail, Icons.email)), const SizedBox(width: 15), Expanded(child: _buildEditField("TELÉFONO", editTel, Icons.phone))]),
+                  _buildEditField("DIRECCIÓN", editDir, Icons.location_on),
+                  const SizedBox(height: 30),
+                  _buildSectionLabel("FICHA DEL VEHÍCULO"),
+                  Row(children: [Expanded(child: _buildEditField("PLACA", editPlaca, Icons.pin)), const SizedBox(width: 15), Expanded(child: _buildEditField("MARCA", editMarca, Icons.factory))]),
+                  Row(children: [Expanded(child: _buildEditField("MODELO", editModelo, Icons.directions_car)), const SizedBox(width: 15), Expanded(child: _buildEditField("COLOR", editColor, Icons.color_lens))]),
+                  Row(children: [Expanded(child: _buildEditField("AÑO", editAnio, Icons.calendar_today)), const SizedBox(width: 15), Expanded(child: _buildEditField("KM ACTUAL", editKM, Icons.speed))]),
+                ],
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("CANCELAR")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: brandRed),
-            onPressed: () async {
-              String oldCedula = clientData['cedula'];
-              String newCedula = editCedula.text.trim();
-              String oldPlaca = vDoc.id;
-              String newPlaca = editPlaca.text.trim().toUpperCase();
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("CANCELAR")),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: brandRed),
+              onPressed: () async {
+                // Guardamos referencias antes del await
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(dialogContext);
 
-              Map<String, dynamic> cObj = {
-                'nombre': editNombre.text.trim().toUpperCase(),
-                'cedula': newCedula,
-                'email': editEmail.text.trim().toLowerCase(),
-                'telefono': editTel.text.trim(),
-                'direccion': editDir.text.trim().toUpperCase(),
-                'acceso_app': clientData['acceso_app'] ?? false,
-              };
-              if (newCedula != oldCedula) {
-                await FirebaseFirestore.instance.collection('clientes').doc(newCedula).set(cObj);
-                await FirebaseFirestore.instance.collection('clientes').doc(oldCedula).delete();
-              } else { await FirebaseFirestore.instance.collection('clientes').doc(oldCedula).update(cObj); }
+                String oldCedula = clientData['cedula'];
+                String newCedula = editCedula.text.trim();
+                String oldPlaca = vDoc.id;
+                String newPlaca = editPlaca.text.trim().toUpperCase();
 
-              Map<String, dynamic> vObj = {
-                'marca': editMarca.text.trim().toUpperCase(),
-                'modelo': editModelo.text.trim().toUpperCase(),
-                'color': editColor.text.trim().toUpperCase(),
-                'anio': editAnio.text.trim(),
-                'km': editKM.text.trim(),
-                'propietario_id': newCedula,
-              };
-              if (newPlaca != oldPlaca) {
-                await FirebaseFirestore.instance.collection('vehiculos').doc(newPlaca).set(vObj);
-                await FirebaseFirestore.instance.collection('vehiculos').doc(oldPlaca).delete();
-              } else { await FirebaseFirestore.instance.collection('vehiculos').doc(oldPlaca).update(vObj); }
+                // Actualizar Cliente
+                Map<String, dynamic> cObj = {
+                  'nombre': editNombre.text.trim().toUpperCase(),
+                  'cedula': newCedula,
+                  'email': editEmail.text.trim().toLowerCase(),
+                  'telefono': editTel.text.trim(),
+                  'direccion': editDir.text.trim().toUpperCase(),
+                  'acceso_app': clientData['acceso_app'] ?? false,
+                };
+                if (newCedula != oldCedula) {
+                  await FirebaseFirestore.instance.collection('clientes').doc(newCedula).set(cObj);
+                  await FirebaseFirestore.instance.collection('clientes').doc(oldCedula).delete();
+                } else { await FirebaseFirestore.instance.collection('clientes').doc(oldCedula).update(cObj); }
 
-              if (!mounted) return;
-              Navigator.pop(dialogContext);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("DATOS ACTUALIZADOS")));
-            },
-            child: const Text("GUARDAR CAMBIOS"),
-          ),
-        ],
-      ),
+                // Actualizar Vehículo
+                Map<String, dynamic> vObj = {
+                  'marca': editMarca.text.trim().toUpperCase(),
+                  'modelo': editModelo.text.trim().toUpperCase(),
+                  'color': editColor.text.trim().toUpperCase(),
+                  'anio': editAnio.text.trim(),
+                  'km': editKM.text.trim(),
+                  'propietario_id': newCedula,
+                };
+                if (newPlaca != oldPlaca) {
+                  await FirebaseFirestore.instance.collection('vehiculos').doc(newPlaca).set(vObj);
+                  await FirebaseFirestore.instance.collection('vehiculos').doc(oldPlaca).delete();
+                } else { await FirebaseFirestore.instance.collection('vehiculos').doc(oldPlaca).update(vObj); }
+
+                if (!mounted) return;
+                navigator.pop(); // Uso seguro del navegador
+                scaffoldMessenger.showSnackBar(const SnackBar(content: Text("DATOS ACTUALIZADOS")));
+              },
+              child: const Text("GUARDAR CAMBIOS"),
+            ),
+          ],
+        );
+      }
     );
   }
 
@@ -246,7 +256,6 @@ class _ClientesWebModuleState extends State<ClientesWebModule> {
                           width: 35, height: 35,
                           decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.15), shape: BoxShape.circle),
                           child: IconButton(
-                            // --- SOLUCIÓN AL ERROR: USAMOS Icons.chat PORQUE whatsapp NO EXISTE POR DEFECTO ---
                             icon: const Icon(Icons.chat_bubble_outline_rounded, color: Colors.green, size: 18),
                             onPressed: () => _abrirWhatsApp(client['telefono'], client['nombre']),
                             tooltip: "WhatsApp",
