@@ -10,275 +10,247 @@ class ClientesWebModule extends StatefulWidget {
 }
 
 class _ClientesWebModuleState extends State<ClientesWebModule> {
-  final _formKey = GlobalKey<FormState>();
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  // Colores corporativos
+  String _searchQuery = "";
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
-  final Color inputFill = const Color(0xFF1E1E1E);
 
-  // Controladores
-  final TextEditingController _nombreCtrl = TextEditingController();
-  final TextEditingController _cedulaCtrl = TextEditingController();
-  final TextEditingController _telCtrl = TextEditingController();
-  final TextEditingController _emailCtrl = TextEditingController();
-  final TextEditingController _dirCtrl = TextEditingController();
-  final TextEditingController _vehiculoCtrl = TextEditingController();
-
-  // --- FUNCIÓN PARA GUARDAR EN FIRESTORE ---
-  Future<void> _guardarCliente() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    // Mostrar diálogo de carga
-    _showLoading();
-
-    try {
-      String docId = _cedulaCtrl.text.trim().toUpperCase();
-
-      await _db.collection('usuarios').doc(docId).set({
-        'nombre': _nombreCtrl.text.trim().toUpperCase(),
-        'cedula': docId,
-        'telefono': _telCtrl.text.trim(),
-        'email': _emailCtrl.text.trim().toLowerCase(),
-        'direccion': _dirCtrl.text.trim().toUpperCase(),
-        'vehiculo_inicial': _vehiculoCtrl.text.trim().toUpperCase(),
-        'rol': 'cliente',
-        'acceso_app': false,
-        'fecha_registro': FieldValue.serverTimestamp(),
-      });
-
-      if (!mounted) return;
-      Navigator.pop(context); // Quitar carga
-      _limpiarFormulario();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ CLIENTE GUARDADO EN LA NUBE"), backgroundColor: Colors.green),
-      );
-    } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ ERROR AL GUARDAR: $e"), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  // --- FUNCIÓN PARA CREAR ACCESO A LA APP ---
-  Future<void> _habilitarAccesoApp(Map<String, dynamic> datosCliente) async {
-    // Generar clave temporal basada en la cédula
-    String rawNumbers = datosCliente['cedula'].replaceAll(RegExp(r'[^0-9]'), '');
-    String tempPassword = "Vortec$rawNumbers";
-
-    _showLoading();
-
-    try {
-      // 1. Crear usuario en Firebase Auth
-      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: datosCliente['email'],
-        password: tempPassword,
-      );
-
-      // 2. Actualizar el documento en Firestore con el UID real
-      await _db.collection('usuarios').doc(datosCliente['cedula']).update({
-        'uid': userCredential.user!.uid,
-        'acceso_app': true,
-      });
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      _showSuccessDialog(datosCliente['email'], tempPassword);
-      
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("❌ ERROR: El correo ya está en uso o es inválido"), backgroundColor: Colors.red),
-      );
-    }
-  }
-
-  void _showLoading() {
-    showDialog(
+  // --- 1. FUNCIÓN: ELIMINAR REGISTRO COMPLETO ---
+  Future<void> _eliminarCliente(String cedula, String nombre) async {
+    bool? confirmar = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (c) => const Center(child: CircularProgressIndicator(color: Color(0xFFD50000))),
-    );
-  }
-
-  void _showSuccessDialog(String email, String pass) {
-    showDialog(
-      context: context,
-      builder: (c) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         backgroundColor: cardBlack,
-        title: const Text("ACCESO HABILITADO", style: TextStyle(color: Colors.white)),
-        content: SelectableText(
-          "El cliente ya puede entrar a la App.\n\nUsuario: $email\nClave temporal: $pass",
-          style: const TextStyle(color: Colors.white70),
-        ),
+        title: const Text("¿ELIMINAR REGISTRO?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: Text("Se borrarán los datos de $nombre y sus vehículos asociados."),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(c), child: Text("CERRAR", style: TextStyle(color: brandRed)))
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCELAR")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: brandRed),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text("BORRAR TODO", style: TextStyle(color: Colors.white)),
+          ),
         ],
       ),
     );
+
+    if (confirmar == true) {
+      try {
+        var vehiculosQuery = await FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: cedula).get();
+        for (var doc in vehiculosQuery.docs) { await doc.reference.delete(); }
+        await FirebaseFirestore.instance.collection('clientes').doc(cedula).delete();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("REGISTRO ELIMINADO")));
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+      }
+    }
   }
 
-  void _limpiarFormulario() {
-    _nombreCtrl.clear(); _cedulaCtrl.clear(); _telCtrl.clear();
-    _emailCtrl.clear(); _dirCtrl.clear(); _vehiculoCtrl.clear();
+  // --- 2. GESTIONAR ACCESO APP ---
+  Future<void> _gestionarAcceso(Map<String, dynamic> data, bool estadoActual) async {
+    String email = data['email'].toString().trim();
+    String clave = data['cedula'].toString().replaceAll(RegExp(r'[^0-9]'), '').trim();
+    showDialog(context: context, barrierDismissible: false, builder: (c) => const Center(child: CircularProgressIndicator(color: Color(0xFFD50000))));
+    try {
+      if (!estadoActual) {
+        try { await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: clave); } 
+        on FirebaseAuthException catch (e) { if (e.code != 'email-already-in-use') rethrow; }
+        await FirebaseFirestore.instance.collection('clientes').doc(data['cedula']).update({'acceso_app': true, 'rol': 'cliente'});
+      } else {
+        await FirebaseFirestore.instance.collection('clientes').doc(data['cedula']).update({'acceso_app': false});
+      }
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      _showSuccessDialog(!estadoActual ? "ACCESO HABILITADO" : "ACCESO SUSPENDIDO", "Configuración de acceso actualizada.");
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+    }
+  }
+
+  // --- 3. EDICIÓN MAESTRA (FIREBASE) ---
+  void _editMasterData(Map<String, dynamic> clientData) async {
+    var vehiculoQuery = await FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: clientData['cedula']).get();
+    if (vehiculoQuery.docs.isEmpty) return;
+    if (!mounted) return;
+    
+    var vDoc = vehiculoQuery.docs.first;
+    var vData = vDoc.data();
+
+    final TextEditingController editNombre = TextEditingController(text: clientData['nombre']);
+    final TextEditingController editCedula = TextEditingController(text: clientData['cedula']);
+    final TextEditingController editEmail = TextEditingController(text: clientData['email']);
+    final TextEditingController editTel = TextEditingController(text: clientData['telefono']);
+    final TextEditingController editDir = TextEditingController(text: clientData['direccion'] ?? "");
+    final TextEditingController editPlaca = TextEditingController(text: vDoc.id);
+    final TextEditingController editMarca = TextEditingController(text: vData['marca']);
+    final TextEditingController editModelo = TextEditingController(text: vData['modelo']);
+    final TextEditingController editColor = TextEditingController(text: vData['color']);
+    final TextEditingController editAnio = TextEditingController(text: vData['anio'].toString());
+    final TextEditingController editKM = TextEditingController(text: vData['km'].toString());
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: cardBlack,
+        title: const Text("MODIFICAR REGISTRO TÉCNICO", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: 700,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildSectionLabel("PERFIL DEL CLIENTE"),
+                Row(children: [Expanded(child: _buildEditField("NOMBRE COMPLETO", editNombre, Icons.person)), const SizedBox(width: 15), Expanded(child: _buildEditField("CÉDULA / RIF", editCedula, Icons.badge))]),
+                Row(children: [Expanded(child: _buildEditField("CORREO", editEmail, Icons.email)), const SizedBox(width: 15), Expanded(child: _buildEditField("TELÉFONO", editTel, Icons.phone))]),
+                _buildEditField("DIRECCIÓN COMPLETA", editDir, Icons.location_on),
+                const SizedBox(height: 30),
+                _buildSectionLabel("FICHA DEL VEHÍCULO"),
+                Row(children: [Expanded(child: _buildEditField("PLACA", editPlaca, Icons.pin)), const SizedBox(width: 15), Expanded(child: _buildEditField("MARCA", editMarca, Icons.factory))]),
+                Row(children: [Expanded(child: _buildEditField("MODELO", editModelo, Icons.directions_car)), const SizedBox(width: 15), Expanded(child: _buildEditField("COLOR", editColor, Icons.color_lens))]),
+                Row(children: [Expanded(child: _buildEditField("AÑO", editAnio, Icons.calendar_today)), const SizedBox(width: 15), Expanded(child: _buildEditField("KM ACTUAL", editKM, Icons.speed))]),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text("CANCELAR")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: brandRed, padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 15)),
+            onPressed: () async {
+              String oldCedula = clientData['cedula'];
+              String newCedula = editCedula.text.trim();
+              String oldPlaca = vDoc.id;
+              String newPlaca = editPlaca.text.trim().toUpperCase();
+
+              // Actualizar Cliente
+              Map<String, dynamic> cObj = {
+                'nombre': editNombre.text.trim().toUpperCase(),
+                'cedula': newCedula,
+                'email': editEmail.text.trim().toLowerCase(),
+                'telefono': editTel.text.trim(),
+                'direccion': editDir.text.trim().toUpperCase(),
+                'acceso_app': clientData['acceso_app'] ?? false,
+              };
+              if (newCedula != oldCedula) {
+                await FirebaseFirestore.instance.collection('clientes').doc(newCedula).set(cObj);
+                await FirebaseFirestore.instance.collection('clientes').doc(oldCedula).delete();
+              } else { await FirebaseFirestore.instance.collection('clientes').doc(oldCedula).update(cObj); }
+
+              // Actualizar Vehículo
+              Map<String, dynamic> vObj = {
+                'marca': editMarca.text.trim().toUpperCase(),
+                'modelo': editModelo.text.trim().toUpperCase(),
+                'color': editColor.text.trim().toUpperCase(),
+                'anio': editAnio.text.trim(),
+                'km': editKM.text.trim(),
+                'propietario_id': newCedula,
+              };
+              if (newPlaca != oldPlaca) {
+                await FirebaseFirestore.instance.collection('vehiculos').doc(newPlaca).set(vObj);
+                await FirebaseFirestore.instance.collection('vehiculos').doc(oldPlaca).delete();
+              } else { await FirebaseFirestore.instance.collection('vehiculos').doc(oldPlaca).update(vObj); }
+
+              if (!mounted) return;
+              Navigator.pop(dialogContext);
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("DATOS ACTUALIZADOS")));
+            },
+            child: const Text("GUARDAR CAMBIOS", style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(40),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // --- FORMULARIO IZQUIERDO ---
-          Expanded(
-            flex: 1,
-            child: Container(
-              padding: const EdgeInsets.all(30),
-              decoration: BoxDecoration(
-                color: cardBlack,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-              ),
-              child: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("REGISTRO DE CLIENTE", style: TextStyle(color: brandRed, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: 1)),
-                      const SizedBox(height: 25),
-                      _buildField("Nombre Completo", _nombreCtrl, Icons.person),
-                      const SizedBox(height: 15),
-                      _buildField("Cédula / RIF", _cedulaCtrl, Icons.badge),
-                      const SizedBox(height: 15),
-                      _buildField("Teléfono", _telCtrl, Icons.phone, isPhone: true),
-                      const SizedBox(height: 15),
-                      _buildField("Email", _emailCtrl, Icons.alternate_email),
-                      const SizedBox(height: 15),
-                      _buildField("Dirección", _dirCtrl, Icons.location_on),
-                      const SizedBox(height: 15),
-                      _buildField("Vehículo (Marca/Modelo)", _vehiculoCtrl, Icons.directions_car),
-                      const SizedBox(height: 30),
-                      _buildSaveButton(),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 40),
-
-          // --- TABLA DERECHA (TIEMPO REAL) ---
-          Expanded(
-            flex: 2,
-            child: _buildRealTimeTable(),
-          ),
-        ],
-      ),
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      _buildHeaderStats(), const SizedBox(height: 30), _buildSearchBar(), const SizedBox(height: 20), Expanded(child: _buildClientsList()),
+    ]);
   }
 
-  Widget _buildSaveButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 55,
-      child: ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: brandRed, 
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-        ),
-        onPressed: _guardarCliente,
-        icon: const Icon(Icons.cloud_upload),
-        label: const Text("GUARDAR EN BASE DE DATOS", style: TextStyle(fontWeight: FontWeight.bold)),
-      ),
-    );
-  }
-
-  Widget _buildRealTimeTable() {
+  Widget _buildClientsList() {
     return StreamBuilder<QuerySnapshot>(
-      stream: _db.collection('usuarios').where('rol', isEqualTo: 'cliente').snapshots(),
+      stream: FirebaseFirestore.instance.collection('clientes').snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-
-        return Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: cardBlack, 
-            borderRadius: BorderRadius.circular(12), 
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1))
-          ),
-          child: SingleChildScrollView(
-            child: DataTable(
-              headingTextStyle: TextStyle(color: brandRed, fontWeight: FontWeight.bold),
-              columns: const [
-                DataColumn(label: Text("CLIENTE")),
-                DataColumn(label: Text("CÉDULA")),
-                DataColumn(label: Text("ESTADO")),
-                DataColumn(label: Text("ACCIONES")),
-              ],
-              rows: snapshot.data!.docs.map((doc) {
-                Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-                bool tieneAcceso = data['acceso_app'] ?? false;
-
-                return DataRow(cells: [
-                  DataCell(Text(data['nombre'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 13))),
-                  DataCell(Text(data['cedula'] ?? '', style: const TextStyle(color: Colors.white70))),
-                  DataCell(_buildStatusBadge(tieneAcceso)),
-                  DataCell(
-                    IconButton(
-                      icon: Icon(Icons.vpn_key, color: tieneAcceso ? Colors.green : Colors.blue),
-                      tooltip: tieneAcceso ? "Acceso Activo" : "Habilitar Acceso App",
-                      onPressed: tieneAcceso ? null : () => _habilitarAccesoApp(data),
+        var docs = snapshot.data!.docs.where((d) => d['nombre'].toString().toLowerCase().contains(_searchQuery) || d['cedula'].toString().contains(_searchQuery)).toList();
+        return ListView.builder(
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            var client = docs[index].data() as Map<String, dynamic>;
+            return Container(
+              margin: const EdgeInsets.only(bottom: 15),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+              child: IntrinsicHeight(
+                child: Row(children: [
+                  // COLUMNA CLIENTE
+                  Expanded(flex: 4, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(client['nombre'].toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    _infoRow(Icons.badge, "ID: ${client['cedula']}"),
+                    _infoRow(Icons.email, client['email']),
+                    _infoRow(Icons.phone, client['telefono']),
+                    _infoRow(Icons.location_on, client['direccion'] ?? "SIN DIRECCIÓN", isDim: true),
+                  ])),
+                  const VerticalDivider(color: Colors.white10, indent: 5, endIndent: 5),
+                  // COLUMNA VEHÍCULO (FICHA TÉCNICA REAL)
+                  Expanded(flex: 5, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 15), child: _buildVehicleDetail(client['cedula']))),
+                  // ACCIONES
+                  Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    ElevatedButton(
+                      onPressed: () => _gestionarAcceso(client, client['acceso_app'] ?? false),
+                      style: ElevatedButton.styleFrom(backgroundColor: (client['acceso_app'] ?? false) ? Colors.green.withValues(alpha: 0.1) : brandRed.withValues(alpha: 0.1), foregroundColor: (client['acceso_app'] ?? false) ? Colors.green : brandRed, minimumSize: const Size(120, 35)),
+                      child: Text((client['acceso_app'] ?? false) ? "ACTIVO" : "SIN ACCESO", style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
-                  ),
-                ]);
-              }).toList(),
-            ),
-          ),
+                    const SizedBox(height: 10),
+                    Row(children: [
+                      IconButton(icon: const Icon(Icons.edit_note, color: Colors.blueAccent), onPressed: () => _editMasterData(client)),
+                      IconButton(icon: const Icon(Icons.delete_forever, color: Colors.redAccent), onPressed: () => _eliminarCliente(client['cedula'], client['nombre'])),
+                    ])
+                  ]),
+                ]),
+              ),
+            );
+          },
         );
-      }
+      },
     );
   }
 
-  Widget _buildStatusBadge(bool status) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: status ? Colors.green.withValues(alpha: 0.1) : Colors.orange.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(status ? "ACTIVO" : "SIN ACCESO", 
-        style: TextStyle(color: status ? Colors.green : Colors.orange, fontSize: 10, fontWeight: FontWeight.bold)),
+  Widget _buildVehicleDetail(String cedula) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: cedula).snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData || snap.data!.docs.isEmpty) return const Center(child: Text("SIN VEHÍCULO", style: TextStyle(color: Colors.white24, fontSize: 11)));
+        var vDoc = snap.data!.docs.first;
+        var v = vDoc.data() as Map<String, dynamic>;
+        
+        // --- AQUÍ SE REFLEJAN LOS DATOS REALES (MARCA, MODELO, PLACA, AÑO, COLOR, KM) ---
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text("${v['marca']} ${v['modelo']}".toUpperCase(), style: TextStyle(color: brandRed, fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            _badge(vDoc.id, Colors.orange), // ESTA ES LA PLACA
+            _badge("AÑO: ${v['anio']}", Colors.blueGrey),
+            _badge(v['color'] ?? "COLOR", Colors.white54),
+            _badge("${v['km']} KM", Colors.green),
+          ]),
+        ]);
+      },
     );
   }
 
-  Widget _buildField(String label, TextEditingController controller, IconData icon, {bool isPhone = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
-          style: const TextStyle(color: Colors.white, fontSize: 14),
-          validator: (value) => value!.isEmpty ? "Campo obligatorio" : null,
-          decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: Colors.white70, size: 20),
-            filled: true, 
-            fillColor: inputFill,
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: brandRed)),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-          ),
-        ),
-      ],
-    );
-  }
+  // WIDGETS AUXILIARES
+  Widget _infoRow(IconData i, String t, {bool isDim = false}) => Padding(padding: const EdgeInsets.only(top: 4), child: Row(children: [Icon(i, size: 13, color: isDim ? Colors.white24 : Colors.white54), const SizedBox(width: 10), Expanded(child: Text(t, style: TextStyle(color: isDim ? Colors.white24 : Colors.white70, fontSize: 11), overflow: TextOverflow.ellipsis))]));
+  Widget _badge(String t, Color c) => Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: c.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(5), border: Border.all(color: c.withValues(alpha: 0.2))), child: Text(t.toUpperCase(), style: TextStyle(color: c, fontSize: 11, fontWeight: FontWeight.bold)));
+  Widget _buildSectionLabel(String t) => Padding(padding: const EdgeInsets.only(bottom: 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: TextStyle(color: brandRed, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 2)), const Divider(color: Colors.white10, thickness: 1)]));
+  Widget _buildEditField(String l, TextEditingController c, IconData i) => Padding(padding: const EdgeInsets.only(bottom: 18), child: TextField(controller: c, style: const TextStyle(color: Colors.white, fontSize: 13), decoration: InputDecoration(labelText: l, labelStyle: const TextStyle(color: Colors.white38, fontSize: 11), floatingLabelBehavior: FloatingLabelBehavior.always, prefixIcon: Icon(i, color: brandRed, size: 18), filled: true, fillColor: const Color(0xFF161616), border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none), focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: brandRed, width: 1)))));
+  void _showSuccessDialog(String t, String m) { showDialog(context: context, builder: (c) => AlertDialog(backgroundColor: cardBlack, title: Text(t, style: const TextStyle(color: Colors.white)), content: Text(m, style: const TextStyle(color: Colors.white70)), actions: [TextButton(onPressed: () => Navigator.pop(c), child: Text("LISTO", style: TextStyle(color: brandRed)))])); }
+  Widget _buildHeaderStats() { return StreamBuilder<QuerySnapshot>(stream: FirebaseFirestore.instance.collection('clientes').snapshots(), builder: (context, snapshot) { int total = snapshot.hasData ? snapshot.data!.docs.length : 0; return Row(children: [_statCard("CLIENTES", total.toString(), Icons.people, Colors.blue), const SizedBox(width: 20), _statCard("SOPORTE", "ACTIVO", Icons.verified, Colors.green)]); }); }
+  Widget _statCard(String t, String v, IconData i, Color c) => Expanded(child: Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)), child: Row(children: [Icon(i, color: c, size: 28), const SizedBox(width: 18), Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: const TextStyle(color: Colors.white38, fontSize: 10)), Text(v, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900))])])));
+  Widget _buildSearchBar() => TextField(onChanged: (v) => setState(() => _searchQuery = v.toLowerCase()), style: const TextStyle(color: Colors.white), decoration: InputDecoration(hintText: "Buscar por nombre o cédula...", prefixIcon: Icon(Icons.search, color: brandRed), filled: true, fillColor: cardBlack, border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none)));
 }
