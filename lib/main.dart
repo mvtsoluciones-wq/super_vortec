@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; 
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; // Necesario para detectar la web
+import 'package:flutter/foundation.dart' show kIsWeb; 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // <--- AGREGADO: Faltaba esta importación
 import 'firebase_options.dart';
 
 // --- IMPORTACIONES DE TUS PANTALLAS ---
-import 'admin_panel.dart'; // IMPORTANTE: Asegúrate de tener este archivo
+import 'admin_panel.dart'; 
 import 'citas.dart';
 import 'diagnostico.dart';
 import 'notificaciones.dart';
@@ -18,11 +19,9 @@ import 'login_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform, // <--- REVISA QUE ESTO ESTÉ
+    options: DefaultFirebaseOptions.currentPlatform,
   );
-  runApp(const SuperVortecApp());
   
-  // BLOQUEO DE PANTALLA VERTICAL
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -46,55 +45,71 @@ class SuperVortecApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           title: 'Mi Garaje',
           themeMode: mode, 
-          
-          // TEMA CLARO
           theme: ThemeData(
             brightness: Brightness.light,
             primaryColor: const Color(0xFFD50000), 
             scaffoldBackgroundColor: const Color(0xFFF5F5F5), 
             useMaterial3: true,
           ),
-
-          // TEMA OSCURO
           darkTheme: ThemeData(
             brightness: Brightness.dark,
             primaryColor: const Color(0xFFD50000),
             scaffoldBackgroundColor: Colors.black,
             useMaterial3: true,
           ),
-          
-          // MODIFICACIÓN: Enrutador inteligente
-          home: const LoginScreen(),
+          home: const AuthWrapper(), // Ahora sí encontrará la clase de abajo
         );
       },
     );
   }
 }
 
-// --- ESCUDO DE PLATAFORMA MODIFICADO ---
+// --- CLASE QUE FALTABA: EL VIGILANTE DE SESIÓN ---
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // 1. Cargando
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD50000))));
+        }
+        // 2. Usuario Logueado -> Verificar Plataforma
+        if (snapshot.hasData) {
+          return const PlatformGuard();
+        }
+        // 3. No logueado -> Login
+        return const LoginScreen();
+      },
+    );
+  }
+}
+
+// --- ESCUDO DE PLATAFORMA ---
 class PlatformGuard extends StatelessWidget {
   const PlatformGuard({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Obtenemos el ancho de la pantalla
     double screenWidth = MediaQuery.of(context).size.width;
 
     if (kIsWeb) {
-      // MODIFICACIÓN: Si es Web y la pantalla es de PC (ej: mayor a 1000px)
       if (screenWidth > 1000) {
-        return const AdminControlPanel(); // Abre el panel de control
+        // NOTA: Asegúrate que en admin_panel.dart la clase se llame 'AdminControlPanel'
+        // Si se llama 'AdminPanel', cambia la línea de abajo por: return const AdminPanel();
+        return const AdminControlPanel(); 
       }
-      // Si es Web pero pantalla pequeña, bloquea (tlf intentando entrar a la web)
       return const WebBlockedScreen();
     }
-
-    // Si es la App instalada (Android/iOS), carga la pantalla normal del cliente
+    // Si es móvil, muestra tu pantalla de cliente que ya tienes diseñada
     return const ClientHomeScreen();
   }
 }
 
-// --- PANTALLA DE ACCESO DENEGADO EN WEB (Sin cambios) ---
+// --- PANTALLA DE BLOQUEO WEB ---
 class WebBlockedScreen extends StatelessWidget {
   const WebBlockedScreen({super.key});
 
@@ -117,14 +132,15 @@ class WebBlockedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 15),
               const Text(
-                "Por seguridad y precisión técnica, el acceso a 'Mi Garaje' está restringido exclusivamente a la aplicación móvil oficial.",
+                "Acceso exclusivo desde la App Móvil.",
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 40),
-              const Text(
-                "PROYECTO SUPER VORTEC 5.3",
-                style: TextStyle(color: Colors.white24, fontSize: 10, letterSpacing: 2),
+              // Botón de emergencia para cerrar sesión si quedaste atrapado en web móvil
+              TextButton(
+                onPressed: () => FirebaseAuth.instance.signOut(),
+                child: const Text("Cerrar Sesión", style: TextStyle(color: Colors.white54)),
               ),
             ],
           ),
