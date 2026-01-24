@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // --- IMPORTACIONES DE MÓDULOS ---
 import 'diagnostico_web.dart';
@@ -33,9 +34,69 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   final Color cardBlack = const Color(0xFF101010);  
   final Color inputFill = const Color(0xFF1E1E1E); 
 
+  // --- CONTROLADORES ---
+  final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _idController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _plateController = TextEditingController();
+  final TextEditingController _colorController = TextEditingController();
+  final TextEditingController _yearController = TextEditingController();
+  final TextEditingController _kmController = TextEditingController();
+  final TextEditingController _obsController = TextEditingController();
   final TextEditingController _videoController = TextEditingController();
+
+  Future<void> _guardarRegistroEnBaseDeDatos() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator(color: Color(0xFFD50000))),
+    );
+
+    try {
+      String clienteId = _idController.text.trim();
+      String placa = _plateController.text.trim().toUpperCase();
+
+      await FirebaseFirestore.instance.collection('clientes').doc(clienteId).set({
+        'nombre': _nameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'telefono': _phoneController.text.trim(),
+        'cedula': clienteId,
+        'ultima_visita': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await FirebaseFirestore.instance.collection('vehiculos').doc(placa).set({
+        'placa': placa,
+        'color': _colorController.text.trim().toUpperCase(),
+        'anio': _yearController.text.trim(),
+        'km': _kmController.text.trim(),
+        'observaciones_ingreso': _obsController.text.trim(),
+        'video_recepcion': _videoController.text.trim(),
+        'propietario_id': clienteId,
+        'en_taller': true,
+        'fecha_ingreso': FieldValue.serverTimestamp(),
+      });
+
+      if (!mounted) return;
+      Navigator.pop(context); 
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("✅ REGISTRO GUARDADO EN SUPER VORTEC"), backgroundColor: Colors.green),
+      );
+
+      _formKey.currentState!.reset();
+      _videoController.clear();
+      
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ ERROR: $e"), backgroundColor: Colors.red),
+      );
+    }
+  }
 
   Future<void> _launchYouTubeStudio() async {
     final Uri url = Uri.parse('https://studio.youtube.com/');
@@ -100,40 +161,52 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         color: deepBlack,
         boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 15)],
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, 
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(25, 60, 25, 30),
-              child: Image.asset(
-                'assets/weblogo.jpg',
-                height: 180,
-                fit: BoxFit.contain,
-                errorBuilder: (context, error, stackTrace) => Icon(Icons.directions_car, color: brandRed, size: 60),
+      child: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start, 
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(25, 60, 25, 30),
+                    child: Image.asset(
+                      'assets/weblogo.jpg',
+                      height: 180,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Icon(Icons.directions_car, color: brandRed, size: 60),
+                    ),
+                  ),
+                  _buildSectionTitle("OPCIONES DEL TALLER"),
+                  _sidebarItem(0, Icons.car_repair_rounded, "RECEPCIÓN"),
+                  _sidebarItem(1, Icons.analytics_outlined, "DIAGNÓSTICO"),
+                  _sidebarItem(2, Icons.gps_fixed_rounded, "SEGUIMIENTO"),
+                  _sidebarItem(3, Icons.person_search_rounded, "CLIENTES"),
+                  _buildDivider(),
+                  _buildSectionTitle("HERRAMIENTAS"),
+                  _sidebarItem(4, Icons.notifications_active_outlined, "NOTIFICACIÓN"),
+                  _sidebarItem(5, Icons.storefront_rounded, "TIENDA"),
+                  _sidebarItem(6, Icons.local_fire_department_rounded, "OFERTAS"),
+                  _sidebarItem(7, Icons.hub_outlined, "MARKET"),
+                  _buildDivider(),
+                  _buildSectionTitle("ADMINISTRACIÓN"),
+                  _sidebarItem(8, Icons.account_balance_wallet_outlined, "FACTURACIÓN"),
+                  _sidebarItem(12, Icons.settings_suggest_rounded, "CONFIG. FISCAL"),
+                  _sidebarItem(9, Icons.request_quote_outlined, "PRESUPUESTOS"),
+                  _sidebarItem(10, Icons.inventory_2_outlined, "INVENTARIO"),
+                ],
               ),
             ),
-            _buildSectionTitle("OPCIONES DEL TALLER"),
-            _sidebarItem(0, Icons.car_repair_rounded, "RECEPCIÓN"),
-            _sidebarItem(1, Icons.analytics_outlined, "DIAGNÓSTICO"),
-            _sidebarItem(2, Icons.gps_fixed_rounded, "SEGUIMIENTO"),
-            _sidebarItem(3, Icons.person_search_rounded, "CLIENTES"),
-            _buildDivider(),
-            _buildSectionTitle("HERRAMIENTAS"),
-            _sidebarItem(4, Icons.notifications_active_outlined, "NOTIFICACIÓN"),
-            _sidebarItem(5, Icons.storefront_rounded, "TIENDA"),
-            _sidebarItem(6, Icons.local_fire_department_rounded, "OFERTAS"),
-            _sidebarItem(7, Icons.hub_outlined, "MARKET"),
-            _buildDivider(),
-            _buildSectionTitle("ADMINISTRACIÓN"),
-            _sidebarItem(8, Icons.account_balance_wallet_outlined, "FACTURACIÓN"),
-            _sidebarItem(12, Icons.settings_suggest_rounded, "CONFIG. FISCAL"),
-            _sidebarItem(9, Icons.request_quote_outlined, "PRESUPUESTOS"),
-            _sidebarItem(10, Icons.inventory_2_outlined, "INVENTARIO"),
-            _sidebarItem(11, Icons.shopping_cart_checkout_rounded, "COMPRAS"),
-            const SizedBox(height: 50),
-          ],
-        ),
+          ),
+          _buildDivider(),
+          ListTile(
+            onTap: () async => await FirebaseAuth.instance.signOut(),
+            leading: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
+            title: const Text("CERRAR SESIÓN", style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
     );
   }
@@ -145,41 +218,29 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       leading: Icon(icon, color: isSelected ? Colors.white : Colors.white38, size: 20),
       title: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white38, fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
       selected: isSelected,
-      selectedTileColor: brandRed.withValues(alpha: 0.15), // CORRECCIÓN 1
+      // CORRECCIÓN: Usando .withValues en lugar de .withOpacity
+      selectedTileColor: brandRed.withValues(alpha: 0.15),
       contentPadding: const EdgeInsets.symmetric(horizontal: 25),
     );
   }
 
   Widget _buildHeader() {
-    return Stack(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          "SISTEMA DE CONTROL",
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1,
-            foreground: Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = 2
-              ..color = Colors.black,
-          ),
-        ),
-        const Text(
-          "SISTEMA DE CONTROL",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 32,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1,
-            shadows: [
-              Shadow(
-                blurRadius: 10.0,
-                color: Colors.black54,
-                offset: Offset(4.0, 4.0),
-              ),
-            ],
-          ),
+        const Text("JMendez Performance", style: TextStyle(color: Colors.white24, fontSize: 12, letterSpacing: 4, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 5),
+        Row(
+          children: [
+            const Text(
+              "SISTEMA DE CONTROL",
+              style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 1),
+            ),
+            const SizedBox(width: 15),
+            Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+            const SizedBox(width: 5),
+            const Text("ONLINE", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+          ],
         ),
       ],
     );
@@ -214,7 +275,8 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
             color: cardBlack, 
             borderRadius: BorderRadius.circular(16),
             boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 15))],
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)), // CORRECCIÓN 2
+            // CORRECCIÓN: Usando .withValues
+            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,7 +285,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               const SizedBox(height: 35),
               Row(
                 children: [
-                  Expanded(child: _buildFormField("Propietario", Icons.person_outline)),
+                  Expanded(child: _buildFormField("Propietario", Icons.person_outline, controller: _nameController)),
                   const SizedBox(width: 25),
                   Expanded(child: _buildFormField("E-mail", Icons.alternate_email_rounded, controller: _emailController)),
                 ],
@@ -231,7 +293,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               const SizedBox(height: 25),
               Row(
                 children: [
-                  Expanded(child: _buildFormField("Cédula / ID", Icons.badge_outlined, isNumber: true)),
+                  Expanded(child: _buildFormField("Cédula / ID", Icons.badge_outlined, isNumber: true, controller: _idController)),
                   const SizedBox(width: 25),
                   Expanded(child: _buildFormField("Teléfono Móvil", Icons.smartphone_rounded, isNumber: true, controller: _phoneController)),
                 ],
@@ -239,21 +301,21 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
               Row(
                 children: [
-                  Expanded(child: _buildFormField("Placa / Matrícula", Icons.tag)),
+                  Expanded(child: _buildFormField("Placa / Matrícula", Icons.tag, controller: _plateController)),
                   const SizedBox(width: 25),
-                  Expanded(child: _buildFormField("Color", Icons.color_lens_outlined)),
+                  Expanded(child: _buildFormField("Color", Icons.color_lens_outlined, controller: _colorController)),
                 ],
               ),
               const SizedBox(height: 25),
               Row(
                 children: [
-                  Expanded(child: _buildFormField("Año", Icons.event_note_rounded, isNumber: true)),
+                  Expanded(child: _buildFormField("Año", Icons.event_note_rounded, isNumber: true, controller: _yearController)),
                   const SizedBox(width: 25),
-                  Expanded(child: _buildFormField("Kilometraje (Km)", Icons.speed_rounded, isNumber: true)),
+                  Expanded(child: _buildFormField("Kilometraje (Km)", Icons.speed_rounded, isNumber: true, controller: _kmController)),
                 ],
               ),
               const SizedBox(height: 25),
-              _buildFormField("Observaciones Técnicas", Icons.edit_note_rounded, maxLines: 3),
+              _buildFormField("Observaciones Técnicas", Icons.edit_note_rounded, maxLines: 3, controller: _obsController),
               const SizedBox(height: 35),
               _buildVideoCard(),
               const SizedBox(height: 40),
@@ -275,8 +337,8 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           controller: controller,
           maxLines: maxLines,
           keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-          inputFormatters: isNumber ? [FilteringTextInputFormatter.digitsOnly] : null,
           style: const TextStyle(color: Colors.white, fontSize: 15),
+          validator: (val) => val == null || val.isEmpty ? "Requerido" : null,
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: Colors.white, size: 20), 
             filled: true,
@@ -295,7 +357,8 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       decoration: BoxDecoration(
         color: inputFill,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)), // CORRECCIÓN 3
+        // CORRECCIÓN: Usando .withValues
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
         children: [
@@ -341,7 +404,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 10,
         ),
-        onPressed: () { if (_formKey.currentState!.validate()) {} },
+        onPressed: _guardarRegistroEnBaseDeDatos,
         child: const Text("GUARDAR REGISTRO TÉCNICO", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
       ),
     );

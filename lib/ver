@@ -1,156 +1,53 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; 
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // <--- AGREGADO: Faltaba esta importación
-import 'firebase_options.dart';
+Future<void> _guardarRegistroTecnico() async {
+  if (!_formKey.currentState!.validate()) return;
 
-// --- IMPORTACIONES DE TUS PANTALLAS ---
-import 'admin_panel.dart'; 
-import 'citas.dart';
-import 'diagnostico.dart';
-import 'notificaciones.dart';
-import 'tienda.dart';
-import 'ofertas.dart';
-import 'market.dart'; 
-import 'login_screen.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  // Mostrar círculo de carga
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => const Center(child: CircularProgressIndicator(color: Color(0xFFD50000))),
   );
-  
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
 
-  runApp(const SuperVortecApp());
-}
+  try {
+    String clienteId = _idController.text.trim();
 
-// CONTROLADOR GLOBAL DEL TEMA
-final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
+    // 1. Guardar o actualizar datos del Cliente
+    await FirebaseFirestore.instance.collection('clientes').doc(clienteId).set({
+      'nombre': _nameController.text.trim(),
+      'email': _emailController.text.trim(),
+      'telefono': _phoneController.text.trim(),
+      'cedula': clienteId,
+      'fecha_registro': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
-class SuperVortecApp extends StatelessWidget {
-  const SuperVortecApp({super.key});
+    // 2. Guardar el Vehículo asociado a ese Cliente
+    await FirebaseFirestore.instance.collection('vehiculos').doc(_plateController.text.trim()).set({
+      'placa': _plateController.text.trim().toUpperCase(),
+      'color': _colorController.text.trim().toUpperCase(),
+      'anio': _yearController.text.trim(),
+      'km': _kmController.text.trim(),
+      'observaciones': _obsController.text.trim(),
+      'video_recepcion': _videoController.text.trim(),
+      'propietario_id': clienteId, // Enlace al cliente
+      'en_taller': true,
+      'ultima_actualizacion': FieldValue.serverTimestamp(),
+    });
 
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, mode, child) {
-        return MaterialApp(
-          debugShowCheckedModeBanner: false,
-          title: 'Mi Garaje',
-          themeMode: mode, 
-          theme: ThemeData(
-            brightness: Brightness.light,
-            primaryColor: const Color(0xFFD50000), 
-            scaffoldBackgroundColor: const Color(0xFFF5F5F5), 
-            useMaterial3: true,
-          ),
-          darkTheme: ThemeData(
-            brightness: Brightness.dark,
-            primaryColor: const Color(0xFFD50000),
-            scaffoldBackgroundColor: Colors.black,
-            useMaterial3: true,
-          ),
-          home: const AuthWrapper(), // Ahora sí encontrará la clase de abajo
-        );
-      },
+    if (!mounted) return;
+    Navigator.pop(context); // Quitar círculo de carga
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("✅ Registro guardado exitosamente en Super Vortec")),
+    );
+
+    // Limpiar campos después de guardar
+    _formKey.currentState!.reset();
+    
+  } catch (e) {
+    if (!mounted) return;
+    Navigator.pop(context);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("❌ Error al guardar: $e"), backgroundColor: Colors.red),
     );
   }
 }
-
-// --- CLASE QUE FALTABA: EL VIGILANTE DE SESIÓN ---
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
-        // 1. Cargando
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD50000))));
-        }
-        // 2. Usuario Logueado -> Verificar Plataforma
-        if (snapshot.hasData) {
-          return const PlatformGuard();
-        }
-        // 3. No logueado -> Login
-        return const LoginScreen();
-      },
-    );
-  }
-}
-
-// --- ESCUDO DE PLATAFORMA ---
-class PlatformGuard extends StatelessWidget {
-  const PlatformGuard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
-
-    if (kIsWeb) {
-      if (screenWidth > 1000) {
-        // NOTA: Asegúrate que en admin_panel.dart la clase se llame 'AdminControlPanel'
-        // Si se llama 'AdminPanel', cambia la línea de abajo por: return const AdminPanel();
-        return const AdminControlPanel(); 
-      }
-      return const WebBlockedScreen();
-    }
-    // Si es móvil, muestra tu pantalla de cliente que ya tienes diseñada
-    return const ClientHomeScreen();
-  }
-}
-
-// --- PANTALLA DE BLOQUEO WEB ---
-class WebBlockedScreen extends StatelessWidget {
-  const WebBlockedScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.phonelink_lock, color: Color(0xFFD50000), size: 100),
-              const SizedBox(height: 30),
-              const Text(
-                "APP NO DISPONIBLE EN WEB",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 1),
-              ),
-              const SizedBox(height: 15),
-              const Text(
-                "Acceso exclusivo desde la App Móvil.",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 14),
-              ),
-              const SizedBox(height: 40),
-              // Botón de emergencia para cerrar sesión si quedaste atrapado en web móvil
-              TextButton(
-                onPressed: () => FirebaseAuth.instance.signOut(),
-                child: const Text("Cerrar Sesión", style: TextStyle(color: Colors.white54)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// -------------------------------------------------------------------------
-// AQUÍ ABAJO PEGA TU CÓDIGO DE ClientHomeScreen, RepairDetailScreen, ETC.
-// (Mantén todo lo que tenías desde la línea 'class ClientHomeScreen ...')
-// -------------------------------------------------------------------------
