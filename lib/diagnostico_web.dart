@@ -11,24 +11,23 @@ class DiagnosticoWebModule extends StatefulWidget {
 class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   final _formKey = GlobalKey<FormState>();
   
-  // Controladores para los campos de texto
   final TextEditingController _scannerController = TextEditingController();
   final TextEditingController _videoController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
 
   // Variables de control
   String _semaforoSeleccionado = 'Verde'; 
-  String? _vehiculoSeleccionado; // Almacenará la PLACA del vehículo
+  String? _clienteSeleccionado; 
+  String? _vehiculoSeleccionado;
 
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // --- FUNCIÓN PARA GUARDAR EN FIREBASE ---
   Future<void> _guardarDiagnostico() async {
     if (_vehiculoSeleccionado == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ POR FAVOR SELECCIONE UN VEHÍCULO"), backgroundColor: Colors.orange),
+        const SnackBar(content: Text("⚠️ DEBE SELECCIONE UN VEHÍCULO"), backgroundColor: Colors.orange),
       );
       return;
     }
@@ -44,6 +43,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     try {
       await FirebaseFirestore.instance.collection('diagnosticos').add({
         'placa_vehiculo': _vehiculoSeleccionado,
+        'cliente_id': _clienteSeleccionado,
         'link_escanner': _scannerController.text.trim(),
         'link_video': _videoController.text.trim(),
         'descripcion': _descController.text.trim().toUpperCase(),
@@ -52,18 +52,20 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
       });
 
       if (!mounted) return;
-      Navigator.pop(context); // Cerrar loading
+      Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ DIAGNÓSTICO PUBLICADO EXITOSAMENTE"), backgroundColor: Colors.green),
+        const SnackBar(content: Text("✅ DIAGNÓSTICO PUBLICADO"), backgroundColor: Colors.green),
       );
 
-      // Limpiar formulario
       _formKey.currentState!.reset();
       _scannerController.clear();
       _videoController.clear();
       _descController.clear();
-      setState(() => _vehiculoSeleccionado = null);
+      setState(() {
+        _vehiculoSeleccionado = null;
+        _clienteSeleccionado = null;
+      });
 
     } catch (e) {
       if (!mounted) return;
@@ -92,23 +94,56 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                 style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
               const SizedBox(height: 35),
               
-              // --- DROPDOWN CONECTADO A FIREBASE ---
-              StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('vehiculos').where('en_taller', isEqualTo: true).snapshots(),
-                builder: (context, snapshot) {
-                  List<DropdownMenuItem<String>> vehicleItems = [];
-                  if (snapshot.hasData) {
-                    for (var doc in snapshot.data!.docs) {
-                      vehicleItems.add(DropdownMenuItem(
-                        value: doc.id,
-                        child: Text("${doc.id} - ${doc['marca']} ${doc['modelo']}"),
-                      ));
-                    }
-                  }
-                  return _buildDropdownCustom("Seleccionar Vehículo en Taller", vehicleItems, _vehiculoSeleccionado, (val) {
-                    setState(() => _vehiculoSeleccionado = val);
-                  });
-                },
+              Row(
+                children: [
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance.collection('clientes').snapshots(),
+                      builder: (context, snapshot) {
+                        List<DropdownMenuItem<String>> clientItems = [];
+                        if (snapshot.hasData) {
+                          for (var doc in snapshot.data!.docs) {
+                            clientItems.add(DropdownMenuItem(
+                              value: doc.id,
+                              child: Text(doc['nombre'].toString().toUpperCase()),
+                            ));
+                          }
+                        }
+                        return _buildDropdownCustom("1. Buscar Cliente", clientItems, _clienteSeleccionado, (val) {
+                          setState(() {
+                            _clienteSeleccionado = val;
+                            _vehiculoSeleccionado = null;
+                          });
+                        });
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: _clienteSeleccionado == null 
+                      ? _buildDisabledDropdown("2. Seleccionar Vehículo", "Primero elija un cliente")
+                      : StreamBuilder<QuerySnapshot>(
+                          stream: FirebaseFirestore.instance
+                              .collection('vehiculos')
+                              .where('propietario_id', isEqualTo: _clienteSeleccionado)
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            List<DropdownMenuItem<String>> vehicleItems = [];
+                            if (snapshot.hasData) {
+                              for (var doc in snapshot.data!.docs) {
+                                vehicleItems.add(DropdownMenuItem(
+                                  value: doc.id,
+                                  child: Text("${doc.id} - ${doc['marca']} ${doc['modelo']}"),
+                                ));
+                              }
+                            }
+                            return _buildDropdownCustom("2. Seleccionar Vehículo", vehicleItems, _vehiculoSeleccionado, (val) {
+                              setState(() => _vehiculoSeleccionado = val);
+                            });
+                          },
+                        ),
+                  ),
+                ],
               ),
               
               const SizedBox(height: 25),
@@ -148,9 +183,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                         padding: const EdgeInsets.symmetric(vertical: 20),
                         foregroundColor: Colors.white,
                       ),
-                      onPressed: () {
-                        // Aquí podrías agregar lógica para múltiples fallas si lo deseas
-                      },
+                      onPressed: () {},
                       icon: const Icon(Icons.add_circle_outline),
                       label: const Text("AGREGAR FALLA AL LISTADO"),
                     ),
@@ -175,8 +208,6 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
   }
 
-  // --- WIDGETS DE APOYO ---
-
   Widget _buildDropdownCustom(String label, List<DropdownMenuItem<String>> items, String? currentVal, Function(String?) onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,11 +224,27 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
               dropdownColor: cardBlack,
               icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
               style: const TextStyle(color: Colors.white),
-              hint: const Text("Seleccionar vehículo...", style: TextStyle(color: Colors.white24, fontSize: 14)),
+              hint: const Text("Seleccionar...", style: TextStyle(color: Colors.white24, fontSize: 14)),
               items: items,
               onChanged: onChanged,
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDisabledDropdown(String label, String hint) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label.toUpperCase(), style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(color: inputFill.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(10)),
+          child: Text(hint, style: const TextStyle(color: Colors.white12, fontSize: 14)),
         ),
       ],
     );
