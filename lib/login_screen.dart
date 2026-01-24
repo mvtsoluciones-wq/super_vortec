@@ -59,7 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
   if (!mounted) return;
   // Esto nos dirá el código de error real (ej: [core/no-app] o [auth/network-request-failed])
   _showSnackBar("ERROR TÉCNICO: $e", Colors.purple); 
-  print("DEBUG ERROR: $e"); // Esto saldrá en tu consola de VS Code
+  debugPrint("DEBUG ERROR: $e"); // Esto saldrá en tu consola de VS Code
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

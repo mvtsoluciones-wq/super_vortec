@@ -39,6 +39,8 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _brandController = TextEditingController(); 
+  final TextEditingController _modelController = TextEditingController(); 
   final TextEditingController _plateController = TextEditingController();
   final TextEditingController _colorController = TextEditingController();
   final TextEditingController _yearController = TextEditingController();
@@ -47,7 +49,16 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   final TextEditingController _videoController = TextEditingController();
 
   Future<void> _guardarRegistroEnBaseDeDatos() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Validación estricta: Si falta un solo campo, se detiene.
+    if (!_formKey.currentState!.validate()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("⚠️ ERROR: TODOS LOS CAMPOS SON OBLIGATORIOS PARA EL REGISTRO"),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     showDialog(
       context: context,
@@ -60,8 +71,8 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       String placa = _plateController.text.trim().toUpperCase();
 
       await FirebaseFirestore.instance.collection('clientes').doc(clienteId).set({
-        'nombre': _nameController.text.trim(),
-        'email': _emailController.text.trim(),
+        'nombre': _nameController.text.trim().toUpperCase(),
+        'email': _emailController.text.trim().toLowerCase(),
         'telefono': _phoneController.text.trim(),
         'cedula': clienteId,
         'ultima_visita': FieldValue.serverTimestamp(),
@@ -69,6 +80,8 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
 
       await FirebaseFirestore.instance.collection('vehiculos').doc(placa).set({
         'placa': placa,
+        'marca': _brandController.text.trim().toUpperCase(),
+        'modelo': _modelController.text.trim().toUpperCase(),
         'color': _colorController.text.trim().toUpperCase(),
         'anio': _yearController.text.trim(),
         'km': _kmController.text.trim(),
@@ -83,7 +96,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       Navigator.pop(context); 
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ REGISTRO GUARDADO EN SUPER VORTEC"), backgroundColor: Colors.green),
+        const SnackBar(content: Text("✅ REGISTRO TÉCNICO ALMACENADO"), backgroundColor: Colors.green),
       );
 
       _formKey.currentState!.reset();
@@ -93,7 +106,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       if (!mounted) return;
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ ERROR: $e"), backgroundColor: Colors.red),
+        SnackBar(content: Text("❌ ERROR DE CONEXIÓN: $e"), backgroundColor: Colors.red),
       );
     }
   }
@@ -104,7 +117,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("No se pudo abrir el enlace")),
+          const SnackBar(content: Text("No se pudo abrir YouTube Studio")),
         );
       }
     } catch (e) {
@@ -218,7 +231,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       leading: Icon(icon, color: isSelected ? Colors.white : Colors.white38, size: 20),
       title: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white38, fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
       selected: isSelected,
-      // CORRECCIÓN: Usando .withValues en lugar de .withOpacity
       selectedTileColor: brandRed.withValues(alpha: 0.15),
       contentPadding: const EdgeInsets.symmetric(horizontal: 25),
     );
@@ -269,58 +281,71 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     return SingleChildScrollView(
       child: Form(
         key: _formKey,
-        child: Container(
-          padding: const EdgeInsets.all(40),
-          decoration: BoxDecoration(
-            color: cardBlack, 
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 15))],
-            // CORRECCIÓN: Usando .withValues
-            border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text("REGISTRO DE INGRESO TÉCNICO", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-              const SizedBox(height: 35),
-              Row(
-                children: [
-                  Expanded(child: _buildFormField("Propietario", Icons.person_outline, controller: _nameController)),
-                  const SizedBox(width: 25),
-                  Expanded(child: _buildFormField("E-mail", Icons.alternate_email_rounded, controller: _emailController)),
-                ],
-              ),
-              const SizedBox(height: 25),
-              Row(
-                children: [
-                  Expanded(child: _buildFormField("Cédula / ID", Icons.badge_outlined, isNumber: true, controller: _idController)),
-                  const SizedBox(width: 25),
-                  Expanded(child: _buildFormField("Teléfono Móvil", Icons.smartphone_rounded, isNumber: true, controller: _phoneController)),
-                ],
-              ),
-              const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
-              Row(
-                children: [
-                  Expanded(child: _buildFormField("Placa / Matrícula", Icons.tag, controller: _plateController)),
-                  const SizedBox(width: 25),
-                  Expanded(child: _buildFormField("Color", Icons.color_lens_outlined, controller: _colorController)),
-                ],
-              ),
-              const SizedBox(height: 25),
-              Row(
-                children: [
-                  Expanded(child: _buildFormField("Año", Icons.event_note_rounded, isNumber: true, controller: _yearController)),
-                  const SizedBox(width: 25),
-                  Expanded(child: _buildFormField("Kilometraje (Km)", Icons.speed_rounded, isNumber: true, controller: _kmController)),
-                ],
-              ),
-              const SizedBox(height: 25),
-              _buildFormField("Observaciones Técnicas", Icons.edit_note_rounded, maxLines: 3, controller: _obsController),
-              const SizedBox(height: 35),
-              _buildVideoCard(),
-              const SizedBox(height: 40),
-              _buildFinalButton(),
-            ],
+        // --- GRUPO DE ENFOQUE PARA EL TABULADOR ---
+        child: FocusTraversalGroup(
+          policy: OrderedTraversalPolicy(),
+          child: Container(
+            padding: const EdgeInsets.all(40),
+            decoration: BoxDecoration(
+              color: cardBlack, 
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 15))],
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("REGISTRO DE INGRESO TÉCNICO", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                const SizedBox(height: 35),
+                Row(
+                  children: [
+                    Expanded(child: _buildFormField("Propietario", Icons.person_outline, controller: _nameController)),
+                    const SizedBox(width: 25),
+                    Expanded(child: _buildFormField("E-mail", Icons.alternate_email_rounded, controller: _emailController)),
+                  ],
+                ),
+                const SizedBox(height: 25),
+                Row(
+                  children: [
+                    Expanded(child: _buildFormField("Cédula / ID", Icons.badge_outlined, isNumber: true, controller: _idController)),
+                    const SizedBox(width: 25),
+                    Expanded(child: _buildFormField("Teléfono Móvil", Icons.smartphone_rounded, isNumber: true, controller: _phoneController)),
+                  ],
+                ),
+                const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
+                
+                // --- SECCIÓN VEHÍCULO ---
+                Row(
+                  children: [
+                    Expanded(child: _buildFormField("Marca", Icons.factory_outlined, controller: _brandController)),
+                    const SizedBox(width: 25),
+                    Expanded(child: _buildFormField("Modelo", Icons.directions_car_filled, controller: _modelController)),
+                  ],
+                ),
+                const SizedBox(height: 25),
+                Row(
+                  children: [
+                    Expanded(child: _buildFormField("Placa / Matrícula", Icons.tag, controller: _plateController)),
+                    const SizedBox(width: 25),
+                    Expanded(child: _buildFormField("Color", Icons.color_lens_outlined, controller: _colorController)),
+                  ],
+                ),
+                const SizedBox(height: 25),
+                Row(
+                  children: [
+                    Expanded(child: _buildFormField("Año", Icons.event_note_rounded, isNumber: true, controller: _yearController)),
+                    const SizedBox(width: 25),
+                    Expanded(child: _buildFormField("Kilometraje (Km)", Icons.speed_rounded, isNumber: true, controller: _kmController)),
+                  ],
+                ),
+                const SizedBox(height: 25),
+                _buildFormField("Observaciones Técnicas", Icons.edit_note_rounded, maxLines: 3, controller: _obsController),
+                const SizedBox(height: 35),
+                _buildVideoCard(),
+                const SizedBox(height: 40),
+                _buildFinalButton(),
+              ],
+            ),
           ),
         ),
       ),
@@ -338,13 +363,24 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           maxLines: maxLines,
           keyboardType: isNumber ? TextInputType.number : TextInputType.text,
           style: const TextStyle(color: Colors.white, fontSize: 15),
-          validator: (val) => val == null || val.isEmpty ? "Requerido" : null,
+          
+          // --- ACCIÓN DE TECLADO ---
+          textInputAction: TextInputAction.next,
+
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) {
+              return "Falta llenar: $label";
+            }
+            return null;
+          },
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: Colors.white, size: 20), 
             filled: true,
             fillColor: inputFill,
+            errorStyle: const TextStyle(color: Colors.orangeAccent),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: brandRed, width: 1.5)),
+            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.orangeAccent, width: 1)),
           ),
         ),
       ],
@@ -357,7 +393,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       decoration: BoxDecoration(
         color: inputFill,
         borderRadius: BorderRadius.circular(12),
-        // CORRECCIÓN: Usando .withValues
         border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
       ),
       child: Column(
@@ -380,12 +415,21 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           TextFormField(
             controller: _videoController,
             style: const TextStyle(color: Colors.white, fontSize: 13),
+            
+            // --- VIDEO OBLIGATORIO ---
+            validator: (val) {
+               if (val == null || val.trim().isEmpty) return "⚠️ Agregue link de video de recepción";
+               return null;
+            },
+
             decoration: InputDecoration(
-              hintText: "URL de YouTube",
+              hintText: "URL de YouTube (OBLIGATORIO)",
               hintStyle: const TextStyle(color: Colors.white24),
               filled: true,
               fillColor: deepBlack,
+              errorStyle: const TextStyle(color: Colors.orangeAccent),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.orangeAccent, width: 1)),
             ),
           ),
         ],
