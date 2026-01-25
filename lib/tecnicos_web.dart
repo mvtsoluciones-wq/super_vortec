@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'config_factura_web.dart'; // Asegúrate de que la ruta sea correcta
+import 'config_factura_web.dart'; 
 
 class TecnicosWebModule extends StatefulWidget {
   const TecnicosWebModule({super.key});
@@ -22,14 +22,11 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // --- FUNCIÓN OPTIMIZADA: GENERACIÓN DE PDF INSTANTÁNEA Y CON MÁRGENES ---
+  // --- FUNCIÓN PARA REIMPRIMIR OT DESDE EL HISTORIAL ---
   Future<void> _verPDFHistorial(Map<String, dynamic> data) async {
     final pdf = pw.Document();
-    
-    // Preparación de datos previa para velocidad
     final DateTime fechaDoc = (data['fecha'] as Timestamp).toDate();
     final String fechaFormateada = DateFormat('dd/MM/yyyy').format(fechaDoc);
-    final String numeroOT = data['numero_ot'] ?? "00-000";
 
     pdf.addPage(
       pw.Page(
@@ -43,7 +40,6 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // ENCABEZADO FISCAL (Desde ConfigFactura)
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
@@ -60,29 +56,21 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
                       pw.Text("ORDEN DE TRABAJO (COPIA)", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold)),
-                      pw.Text("Nº: $numeroOT", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.red700)),
+                      pw.Text("Nº: ${data['numero_ot'] ?? '00-000'}", style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold, color: PdfColors.red700)),
                       pw.Text("FECHA: $fechaFormateada", style: const pw.TextStyle(fontSize: 8)),
                     ],
                   ),
                 ],
               ),
               pw.SizedBox(height: 10),
-              pw.Divider(thickness: 0.5, color: PdfColors.grey),
+              pw.Divider(thickness: 0.5),
               pw.SizedBox(height: 15),
-              
-              pw.Text("TÉCNICO RESPONSABLE: ${data['tecnico']?.toString().toUpperCase()}", 
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-              
+              pw.Text("TÉCNICO: ${data['tecnico']?.toString().toUpperCase()}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
               pw.SizedBox(height: 15),
-              
-              // DATOS DEL VEHÍCULO
               pw.Container(
                 width: double.infinity,
                 padding: const pw.EdgeInsets.all(8),
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: PdfColors.black, width: 0.5),
-                  borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2)),
-                ),
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black, width: 0.5)),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
@@ -95,36 +83,22 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
                   ],
                 ),
               ),
-
               pw.SizedBox(height: 20),
-              
               pw.Text("INSTRUCCIONES ASIGNADAS:", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
               pw.SizedBox(height: 5),
-              pw.Expanded(
-                child: pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(10),
-                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black, width: 0.5)),
-                  child: pw.Text(data['instrucciones'] ?? "SIN INSTRUCCIONES", style: const pw.TextStyle(fontSize: 9)),
-                ),
-              ),
-
-              pw.SizedBox(height: 20),
-              
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
-                children: [
-                  pw.Column(children: [pw.SizedBox(width: 100, child: pw.Divider(thickness: 0.5)), pw.Text("Firma Mecánico", style: const pw.TextStyle(fontSize: 7))]),
-                  pw.Column(children: [pw.SizedBox(width: 100, child: pw.Divider(thickness: 0.5)), pw.Text("Recibido Cliente", style: const pw.TextStyle(fontSize: 7))]),
-                ],
+              pw.Container(
+                width: double.infinity,
+                height: 150,
+                padding: const pw.EdgeInsets.all(10),
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.black, width: 0.5)),
+                child: pw.Text(data['instrucciones'] ?? "", style: const pw.TextStyle(fontSize: 9)),
               ),
             ],
           );
         },
       ),
     );
-
-    await Printing.layoutPdf(onLayout: (format) async => pdf.save(), name: "OT_REIMPRESION_$numeroOT");
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save(), name: "OT_REIMPRESION_${data['numero_ot']}.pdf");
   }
 
   // --- PANEL LATERAL DE HISTORIAL ---
@@ -172,7 +146,7 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
                             onChanged: (val) => setModalState(() => filtroModelo = val.toUpperCase()),
                             style: const TextStyle(color: Colors.white, fontSize: 13),
                             decoration: InputDecoration(
-                              hintText: "BUSCAR MODELO (Ej: SILVERADO)...",
+                              hintText: "BUSCAR MODELO...",
                               prefixIcon: const Icon(Icons.search, color: Colors.white24),
                               filled: true, fillColor: inputFill,
                               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -205,7 +179,7 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
                             return matchesM;
                           }).toList();
 
-                          if (ordenes.isEmpty) return const Center(child: Text("Sin registros para este técnico", style: TextStyle(color: Colors.white10)));
+                          if (ordenes.isEmpty) return const Center(child: Text("Sin registros", style: TextStyle(color: Colors.white10)));
 
                           return ListView.builder(
                             itemCount: ordenes.length,
@@ -252,7 +226,7 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
     );
   }
 
-  // --- CRUD TÉCNICOS ---
+  // --- REGISTRAR TÉCNICO ---
   Future<void> _registrarTecnico() async {
     if (_nombreController.text.isEmpty) return;
     await FirebaseFirestore.instance.collection('mecanicos').add({
@@ -265,13 +239,13 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
     _nombreController.clear(); _especialidadController.clear(); _telefonoController.clear();
   }
 
+  // --- ELIMINAR TÉCNICO ---
   void _eliminarTecnico(String id) {
     showDialog(
       context: context,
       builder: (c) => AlertDialog(
         backgroundColor: cardBlack,
         title: const Text("¿ELIMINAR TÉCNICO?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text("Esta acción eliminará al técnico permanentemente.", style: TextStyle(color: Colors.white70)),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c), child: const Text("CANCELAR")),
           ElevatedButton(
@@ -342,10 +316,10 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
   Widget _buildTecnicoCard(String id, Map<String, dynamic> t) {
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white10)),
+      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
       child: Row(
         children: [
-          CircleAvatar(backgroundColor: brandRed.withValues(alpha: 0.1), child: Icon(Icons.engineering, color: brandRed, size: 20)),
+          CircleAvatar(backgroundColor: brandRed.withValues(alpha: 0.1), child: const Icon(Icons.engineering, color: Colors.white, size: 20)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -353,10 +327,7 @@ class _TecnicosWebModuleState extends State<TecnicosWebModule> {
               Text(t['especialidad'] ?? "GENERAL", style: const TextStyle(color: Colors.white38, fontSize: 10)),
             ]),
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18),
-            onPressed: () => _eliminarTecnico(id),
-          )
+          IconButton(icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18), onPressed: () => _eliminarTecnico(id))
         ],
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 
 class HistorialWebModule extends StatefulWidget {
   const HistorialWebModule({super.key});
@@ -9,125 +10,149 @@ class HistorialWebModule extends StatefulWidget {
 }
 
 class _HistorialWebModuleState extends State<HistorialWebModule> {
-  String _filtroNombre = "";
-  String? _clienteId;
-  String? _clienteNombre;
-
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // --- LÓGICA DE TIEMPOS Y GARANTÍA ---
-  Widget _buildGarantiaStatus(Map<String, dynamic> data) {
-    if (data['fecha'] == null) return const SizedBox();
-    
-    DateTime fechaFinalizado = (data['fecha'] as Timestamp).toDate();
-    int diasDesdeReparacion = DateTime.now().difference(fechaFinalizado).inDays;
-    
-    // Extraer número de meses de la garantía (ej: "6 MESES" -> 6)
-    int mesesGarantia = int.tryParse(data['garantia']?.toString().split(' ')[0] ?? '0') ?? 0;
-    DateTime fechaVencimiento = DateTime(fechaFinalizado.year, fechaFinalizado.month + mesesGarantia, fechaFinalizado.day);
-    int diasParaVencer = fechaVencimiento.difference(DateTime.now()).inDays;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("REALIZADO HACE: $diasDesdeReparacion DÍAS", 
-          style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        if (mesesGarantia > 0)
-          Text(
-            diasParaVencer < 0 ? "⚠️ GARANTÍA EXPIRADA" : "QUEDAN $diasParaVencer DÍAS DE GARANTÍA",
-            style: TextStyle(
-              color: diasParaVencer < 0 ? Colors.red : Colors.greenAccent, 
-              fontSize: 11, 
-              fontWeight: FontWeight.w900
-            )
-          ),
-      ],
-    );
-  }
+  String _filtroTexto = "";
+  String? _tecnicoSeleccionado; // Ahora sí lo usaremos en la Query
+  DateTime? _fechaFiltro;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(_clienteId == null ? "HISTORIAL DE TRABAJOS ENTREGADOS" : "CLIENTE: ${_clienteNombre?.toUpperCase()}", 
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
-            const Spacer(),
-            if (_clienteId != null)
-              OutlinedButton.icon(
-                onPressed: () => setState(() { _clienteId = null; }),
-                icon: const Icon(Icons.arrow_back, size: 16, color: Colors.black),
-                label: const Text("VOLVER", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(backgroundColor: Colors.white, side: const BorderSide(color: Colors.black, width: 2)),
-              )
-          ],
-        ),
-        const SizedBox(height: 25),
-        _clienteId == null ? _buildBuscadorClientes() : _buildListaFinalizados(),
-      ],
-    );
-  }
-
-  Widget _buildBuscadorClientes() {
-    return Expanded(
+    return Container(
+      padding: const EdgeInsets.all(30),
+      color: const Color(0xFF0A0A0A),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)),
-            child: TextField(
-              style: const TextStyle(color: Colors.white),
-              onChanged: (val) => setState(() => _filtroNombre = val.toUpperCase()),
-              decoration: const InputDecoration(hintText: "BUSCAR CLIENTE POR NOMBRE...", prefixIcon: Icon(Icons.person_search, color: Colors.white54), border: InputBorder.none, contentPadding: EdgeInsets.all(20)),
-            ),
-          ),
+          _buildHeader(),
+          const SizedBox(height: 30),
+          _buildFiltros(),
           const SizedBox(height: 20),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot>(
-              stream: FirebaseFirestore.instance.collection('clientes').snapshots(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-                var docs = snapshot.data!.docs.where((doc) => doc['nombre'].toString().toUpperCase().contains(_filtroNombre)).toList();
-                return ListView.builder(
-                  itemCount: docs.length,
-                  itemBuilder: (context, index) {
-                    var c = docs[index];
-                    return ListTile(
-                      onTap: () => setState(() { _clienteId = c.id; _clienteNombre = c['nombre']; }),
-                      leading: CircleAvatar(backgroundColor: brandRed, child: const Icon(Icons.history, color: Colors.white)),
-                      title: Text(c['nombre'].toString().toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      subtitle: Text("ID: ${c.id}", style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
+          const Divider(color: Colors.white10),
+          const SizedBox(height: 10),
+          _buildTablaHistorialClientes(),
         ],
       ),
     );
   }
 
-  Widget _buildListaFinalizados() {
+  Widget _buildHeader() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("REPORTE DE SERVICIOS - VISTA CLIENTE", 
+          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+        Text("Estos datos se sincronizan directamente con la App móvil de Super Vortec", 
+          style: TextStyle(color: Colors.white38, fontSize: 13)),
+      ],
+    );
+  }
+
+  Widget _buildFiltros() {
+    return Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: TextField(
+            onChanged: (val) => setState(() => _filtroTexto = val.toUpperCase()),
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+            decoration: InputDecoration(
+              hintText: "BUSCAR PLACA O MODELO...",
+              prefixIcon: const Icon(Icons.directions_car, color: Colors.white54),
+              filled: true,
+              fillColor: inputFill,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
+            ),
+          ),
+        ),
+        const SizedBox(width: 15),
+        
+        // FILTRO POR TÉCNICO (Soluciona el error de unused_field)
+        Expanded(
+          flex: 2,
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('mecanicos').orderBy('nombre').snapshots(),
+            builder: (context, snapshot) {
+              List<String> lista = ["TODOS LOS TÉCNICOS"];
+              if (snapshot.hasData) {
+                for (var doc in snapshot.data!.docs) {
+                  lista.add(doc['nombre']);
+                }
+              }
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _tecnicoSeleccionado ?? "TODOS LOS TÉCNICOS",
+                    dropdownColor: cardBlack,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    items: lista.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                    onChanged: (val) => setState(() => _tecnicoSeleccionado = (val == "TODOS LOS TÉCNICOS") ? null : val),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 15),
+        
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: _fechaFiltro == null ? inputFill : brandRed,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 22),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+          ),
+          onPressed: () async {
+            DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: DateTime.now(),
+              firstDate: DateTime(2024),
+              lastDate: DateTime.now(),
+            );
+            if (picked != null) setState(() => _fechaFiltro = picked);
+          },
+          icon: const Icon(Icons.event, color: Colors.white, size: 18),
+          label: Text(_fechaFiltro == null ? "FECHA" : DateFormat('dd/MM/yyyy').format(_fechaFiltro!)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTablaHistorialClientes() {
+    // Aplicamos el filtro de técnico en la consulta de Firestore
+    Query query = FirebaseFirestore.instance.collection('historial_web').orderBy('fecha_finalizacion', descending: true);
+    
+    if (_tecnicoSeleccionado != null) {
+      query = query.where('tecnico', isEqualTo: _tecnicoSeleccionado);
+    }
+
     return Expanded(
       child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('diagnosticos')
-            .where('cliente_id', isEqualTo: _clienteId)
-            .where('finalizado', isEqualTo: true) // <--- SOLO LOS TERMINADOS
-            .snapshots(),
+        stream: query.snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          var docs = snapshot.data!.docs;
-          if (docs.isEmpty) return const Center(child: Text("Sin trabajos finalizados registrados", style: TextStyle(color: Colors.white24)));
+
+          var docs = snapshot.data!.docs.where((doc) {
+            var data = doc.data() as Map<String, dynamic>;
+            bool matchTexto = (data['placa_vehiculo'] ?? "").toString().contains(_filtroTexto) || 
+                             (data['modelo_vehiculo'] ?? "").toString().toUpperCase().contains(_filtroTexto);
+            
+            bool matchFecha = true;
+            if (_fechaFiltro != null && data['fecha_finalizacion'] != null) {
+              DateTime f = (data['fecha_finalizacion'] as Timestamp).toDate();
+              matchFecha = f.day == _fechaFiltro!.day && f.month == _fechaFiltro!.month && f.year == _fechaFiltro!.year;
+            }
+            return matchTexto && matchFecha;
+          }).toList();
+
           return ListView.builder(
             itemCount: docs.length,
             itemBuilder: (context, index) {
               var data = docs[index].data() as Map<String, dynamic>;
-              return _buildHistorialCard(data);
+              return _buildClienteCard(data);
             },
           );
         },
@@ -135,37 +160,70 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     );
   }
 
-  Widget _buildHistorialCard(Map<String, dynamic> data) {
+  Widget _buildClienteCard(Map<String, dynamic> data) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
-      child: ExpansionTile(
-        iconColor: brandRed,
-        title: Row(
-          children: [
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(data['modelo_vehiculo']?.toString().toUpperCase() ?? "VEHÍCULO", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              Text("SISTEMA: ${data['sistema_reparar']}", style: const TextStyle(color: Colors.white54, fontSize: 11)),
-            ]),
-            const Spacer(),
-            Text("\$${(data['total_reparacion'] ?? 0).toStringAsFixed(2)}", style: TextStyle(color: brandRed, fontWeight: FontWeight.bold, fontSize: 18)),
-          ],
-        ),
-        subtitle: _buildGarantiaStatus(data),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: cardBlack,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05))
+      ),
+      child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            color: Colors.black.withValues(alpha: 0.2),
+          const Icon(Icons.stars, color: Colors.amber, size: 24),
+          const SizedBox(width: 20),
+          Expanded(
+            flex: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("REPORTE TÉCNICO: ${data['descripcion_falla']}", style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(height: 15),
-                const Text("GARANTÍA ORIGINAL:", style: TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
-                Text(data['garantia'] ?? "SIN ESPECIFICAR", style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(data['modelo_vehiculo'] ?? "S/D", 
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text("PLACA: ${data['placa_vehiculo']}", 
+                  style: const TextStyle(color: Colors.white38, fontSize: 11)),
               ],
             ),
-          )
+          ),
+          
+          // Datos de interés para el Cliente (Kilometraje y Mantenimiento)
+          Expanded(
+            flex: 2,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("KILOMETRAJE", style: TextStyle(color: Colors.white38, fontSize: 8)),
+                Text("${data['kilometraje'] ?? '---'} KM", style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                const SizedBox(height: 4),
+                const Text("PRÓXIMO SERV.", style: TextStyle(color: Colors.white38, fontSize: 8)),
+                Text(data['proximo_mantenimiento'] ?? "No programado", style: const TextStyle(color: Colors.amber, fontSize: 10, fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("REPORTE TÉCNICO:", style: TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
+                Text(data['instrucciones'] ?? "Mantenimiento General", 
+                  maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70, fontSize: 12)),
+              ],
+            ),
+          ),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(data['fecha_finalizacion'] != null 
+                ? DateFormat('dd MMM yyyy').format((data['fecha_finalizacion'] as Timestamp).toDate())
+                : "", 
+                style: const TextStyle(color: Colors.white38, fontSize: 11)),
+              const Text("ENTREGADO", style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold)),
+            ],
+          ),
         ],
       ),
     );

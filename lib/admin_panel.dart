@@ -322,7 +322,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       case 10: return const InventarioWebModule();
       case 11: return const HistorialWebModule();
       case 13: return const PresupuestoAppModule();
-      case 14: return const TecnicosWebModule();
+      case 14: return const TecnicosWebModule ();
      
       default:
         return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
