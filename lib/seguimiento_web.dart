@@ -14,21 +14,20 @@ class SeguimientoWebModule extends StatefulWidget {
 
 class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
   String? _tecnicoSeleccionado;
-  // Mapa para almacenar temporalmente los links de video por cada diagnóstico activo
   final Map<String, String> _evidenciasYoutube = {}; 
 
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color bgDark = const Color(0xFF0A0A0A);
 
-  // --- 1. FINALIZAR TRABAJO Y MOVER A HISTORIAL_WEB CON VIDEO ---
+  // --- 1. FINALIZAR TRABAJO: ARCHIVA Y ELIMINA REGISTROS ACTIVOS ---
   Future<void> _finalizarTrabajo(String docId, Map<String, dynamic> data) async {
     bool? confirmar = await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cardBlack,
-        title: const Text("¿FINALIZAR REPARACIÓN?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text("El vehículo se moverá al historial con sus evidencias y saldrá de la lista activa.", style: TextStyle(color: Colors.white70)),
+        title: const Text("¿FINALIZAR Y ARCHIVAR?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        content: const Text("Se guardarán los diagnósticos y evidencias en el historial definitivo. El registro actual se eliminará para mantener limpia la base de datos."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCELAR")),
           ElevatedButton(
@@ -42,30 +41,33 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
 
     if (confirmar == true) {
       try {
-        // Obtenemos el link de youtube si fue ingresado
-        String urlVideo = _evidenciasYoutube[docId] ?? "";
+        String urlVideoReparacion = _evidenciasYoutube[docId] ?? "";
 
+        // PASO A: CREAR EL REGISTRO EN EL HISTORIAL (COPIA ÍNTEGRA)
         await FirebaseFirestore.instance.collection('historial_web').add({
-          ...data,
+          ...data, // Copia automática de todos los campos del diagnóstico
           'fecha_finalizacion': FieldValue.serverTimestamp(),
           'estado_entrega': 'FINALIZADO',
-          'url_evidencia_video': urlVideo, // Campo nuevo para el cliente
+          'url_evidencia_video': urlVideoReparacion,
         });
 
-        await FirebaseFirestore.instance.collection('diagnosticos').doc(docId).update({
-          'finalizado': true,
-        });
+        // PASO B: ELIMINAR EL DOCUMENTO DE LA COLECCIÓN DE TRABAJO
+        await FirebaseFirestore.instance.collection('diagnosticos').doc(docId).delete();
 
         if (!mounted) return;
-        // Limpiar el mapa temporal
         setState(() => _evidenciasYoutube.remove(docId));
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("✅ TRABAJO COMPLETADO Y ARCHIVADO CON VIDEO"), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text("✅ TRABAJO ARCHIVADO Y BASE DE DATOS OPTIMIZADA"), 
+            backgroundColor: Colors.green
+          ),
         );
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("❌ ERROR AL ARCHIVAR: $e"), backgroundColor: Colors.red),
+        );
       }
     }
   }
@@ -222,7 +224,7 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
     await Printing.layoutPdf(onLayout: (format) async => pdf.save(), name: "OT_$numeroOT.pdf");
   }
 
-  // --- 4. INTERFAZ DE TARJETA ACTUALIZADA ---
+  // --- 4. INTERFAZ DE TARJETA ---
   Widget _buildTrabajoCard(String docId, Map<String, dynamic> data) {
     String faseActual = data['fase_reparacion'] ?? "EN ESPERA";
     bool tieneVideo = _evidenciasYoutube.containsKey(docId) && _evidenciasYoutube[docId]!.isNotEmpty;
@@ -277,7 +279,6 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
           _buildActionButton(Icons.assignment_rounded, "OT", () => _mostrarDialogoOT(data)),
           const SizedBox(width: 15),
           
-          // BOTÓN DE EVIDENCIA EN VIDEO (YOUTUBE)
           Column(
             children: [
               IconButton(
@@ -441,7 +442,6 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
       stream: FirebaseFirestore.instance
           .collection('diagnosticos')
           .where('mecanico_asignado', isEqualTo: _tecnicoSeleccionado)
-          .where('finalizado', isEqualTo: false) 
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());

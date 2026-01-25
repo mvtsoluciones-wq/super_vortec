@@ -406,7 +406,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   ],
                 ),
                 const SizedBox(height: 25),
-                _buildFormField("Observaciones Técnicas", Icons.edit_note_rounded, maxLines: 3, controller: _obsController),
+                _buildFormField("Descripcion de falla", Icons.edit_note_rounded, maxLines: 3, controller: _obsController),
                 const SizedBox(height: 35),
                 _buildVideoCard(),
                 const SizedBox(height: 40),

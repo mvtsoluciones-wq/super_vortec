@@ -19,7 +19,14 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
   DateTime? _fechaFiltro;
   String? _tecnicoSeleccionado;
 
-  // --- FUNCIÓN PARA ABRIR VIDEO ---
+  // EFECTO DE BORDE NEGRO PARA TÍTULOS (Stroke effect)
+  final List<Shadow> _bordeNegro = [
+    const Shadow(offset: Offset(-1.5, -1.5), color: Colors.black),
+    const Shadow(offset: Offset(1.5, -1.5), color: Colors.black),
+    const Shadow(offset: Offset(1.5, 1.5), color: Colors.black),
+    const Shadow(offset: Offset(-1.5, 1.5), color: Colors.black),
+  ];
+
   Future<void> _abrirVideo(String url) async {
     if (url.isEmpty) return;
     final Uri uri = Uri.parse(url);
@@ -32,41 +39,62 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     }
   }
 
-  // --- LÓGICA DE TIEMPOS Y GARANTÍAS ---
   String _calcularTiempoDesdeEntrega(DateTime fechaFin) {
     final diferencia = DateTime.now().difference(fechaFin).inDays;
     if (diferencia == 0) return "ENTREGADO HOY";
     return "HACE $diferencia DÍAS";
   }
 
-  Map<String, dynamic> _calcularGarantia(DateTime fechaFin, int diasGarantia) {
-    final fechaVencimiento = fechaFin.add(Duration(days: diasGarantia));
+  Map<String, dynamic> _calcularGarantia(DateTime fechaFin, dynamic garantiaData) {
+    int diasTotales = 30; 
+    String totalTexto = "30 DÍAS";
+
+    try {
+      if (garantiaData != null) {
+        totalTexto = garantiaData.toString().toUpperCase();
+        if (garantiaData is int) {
+          diasTotales = garantiaData;
+        } else if (garantiaData is String) {
+          String raw = garantiaData.toUpperCase();
+          if (raw.contains("MESES")) {
+            int meses = int.tryParse(raw.split(' ')[0]) ?? 1;
+            diasTotales = meses * 30;
+          } else {
+            diasTotales = int.tryParse(raw.split(' ')[0]) ?? 30;
+          }
+        }
+      }
+    } catch (e) {
+      diasTotales = 30;
+    }
+
+    final fechaVencimiento = fechaFin.add(Duration(days: diasTotales));
     final restante = fechaVencimiento.difference(DateTime.now()).inDays;
     return {
       "restante": restante < 0 ? 0 : restante,
       "vencida": restante < 0,
+      "total_db": totalTexto
     };
   }
 
-  // --- DIÁLOGO DE DETALLE DE PRESUPUESTO ---
   void _mostrarPresupuestoDetalle(Map<String, dynamic> data) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: cardBlack,
         title: Text("DETALLE DE PRESUPUESTO APROBADO", 
-          style: TextStyle(color: brandRed, fontSize: 16, fontWeight: FontWeight.bold)),
+          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, shadows: _bordeNegro)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("TOTAL APROBADO: \$${data['presupuesto_total'] ?? '0.00'}", 
+            Text("TOTAL APROBADO: \$${data['total_reparacion'] ?? '0.00'}", 
               style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.w900)),
             const Divider(color: Colors.white10, height: 20),
             const Text("OBSERVACIONES COMERCIALES:", style: TextStyle(color: Colors.white38, fontSize: 10)),
             const SizedBox(height: 5),
             Text(data['notas_presupuesto'] ?? "Sin notas adicionales.", 
-              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              style: const TextStyle(color: Colors.white38, fontSize: 13)),
           ],
         ),
         actions: [
@@ -97,12 +125,12 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
   }
 
   Widget _buildHeader() {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text("HISTORIAL DE SERVICIOS Y GARANTÍAS", 
-          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        Text("Control de post-venta, tiempos de protección y presupuestos", 
+          style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.2, shadows: _bordeNegro)),
+        const Text("Control de post-venta, tiempos de protección y presupuestos", 
           style: TextStyle(color: Colors.white38, fontSize: 13)),
       ],
     );
@@ -118,6 +146,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
             style: const TextStyle(color: Colors.white, fontSize: 14),
             decoration: InputDecoration(
               hintText: "BUSCAR POR PLACA O MODELO...",
+              hintStyle: const TextStyle(color: Colors.white24),
               prefixIcon: const Icon(Icons.search, color: Colors.white54),
               filled: true, fillColor: inputFill,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
@@ -168,7 +197,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
             if (picked != null) setState(() => _fechaFiltro = picked);
           },
           icon: const Icon(Icons.calendar_month, color: Colors.white, size: 18),
-          label: Text(_fechaFiltro == null ? "FILTRAR FECHA" : DateFormat('dd/MM/yyyy').format(_fechaFiltro!)),
+          label: Text(_fechaFiltro == null ? "FILTRAR FECHA" : DateFormat('dd/MM/yyyy').format(_fechaFiltro!), style: const TextStyle(color: Colors.white)),
         ),
       ],
     );
@@ -210,8 +239,8 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
 
   Widget _buildReporteCard(Map<String, dynamic> data) {
     DateTime fechaFin = (data['fecha_finalizacion'] as Timestamp).toDate();
-    int diasGarantia = data['dias_garantia'] ?? 30;
-    var infoGarantia = _calcularGarantia(fechaFin, diasGarantia);
+    var infoGarantia = _calcularGarantia(fechaFin, data['garantia']);
+    String placa = data['placa_vehiculo'] ?? "";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
@@ -219,7 +248,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
       decoration: BoxDecoration(
         color: cardBlack,
         borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05))
+        border: Border.all(color: Colors.white10)
       ),
       child: Column(
         children: [
@@ -232,17 +261,28 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(data['modelo_vehiculo'] ?? "S/D", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                    Text("PLACA: ${data['placa_vehiculo']}", style: const TextStyle(color: Colors.white38, fontSize: 12)),
+                    Text(data['modelo_vehiculo'] ?? "S/D", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18, shadows: _bordeNegro)),
+                    Text("PLACA: $placa", style: const TextStyle(color: Colors.white38, fontSize: 12)),
                     const SizedBox(height: 20),
-                    _buildVideoBtn("VIDEO RECEPCIÓN", data['url_video_recepcion'] ?? "", Icons.videocam),
+                    
+                    // --- MODIFICACIÓN: VIDEO RECEPCIÓN DESDE COLECCIÓN VEHICULOS ---
+                    FutureBuilder<DocumentSnapshot>(
+                      future: FirebaseFirestore.instance.collection('vehiculos').doc(placa).get(),
+                      builder: (context, snapshot) {
+                        String urlRepo = "";
+                        if (snapshot.hasData && snapshot.data!.exists) {
+                          urlRepo = snapshot.data!.get('video_recepcion') ?? "";
+                        }
+                        return _buildVideoBtn("VIDEO RECEPCIÓN", urlRepo, Icons.videocam_outlined);
+                      },
+                    ),
                     const SizedBox(height: 10),
                     _buildVideoBtn("VIDEO REPARACIÓN", data['url_evidencia_video'] ?? data['evidencia_youtube'] ?? "", Icons.play_circle_fill),
                   ],
                 ),
               ),
               
-              // COLUMNA 2: DETALLES TÉCNICOS Y GARANTÍAS (AJUSTADA ALTO)
+              // COLUMNA 2: DETALLES TÉCNICOS Y GARANTÍA ALINEADA
               Expanded(
                 flex: 4,
                 child: Padding(
@@ -250,26 +290,38 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // SECCIÓN SUPERIOR: FALLA Y GARANTÍA RESTANTE ALINEADAS
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: _buildTextBlock("FALLA DE ENTRADA:", data['falla_reportada'] ?? "No especificada"),
+                            child: _buildTextBlock("DESCRIPCIÓN DE FALLA:", data['descripcion_falla'] ?? "No especificada en recepción"),
                           ),
-                          const SizedBox(width: 10),
-                          _buildInfoRow("GARANTÍA RESTANTE:", "${infoGarantia['restante']} DÍAS", 
-                            color: infoGarantia['vencida'] ? Colors.red : Colors.greenAccent),
+                          const SizedBox(width: 15),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: infoGarantia['vencida'] ? Colors.red.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: infoGarantia['vencida'] ? Colors.red.withValues(alpha: 0.3) : Colors.green.withValues(alpha: 0.3))
+                            ),
+                            child: Column(
+                              children: [
+                                Text("${infoGarantia['restante']}", 
+                                  style: TextStyle(color: infoGarantia['vencida'] ? Colors.red : Colors.greenAccent, fontSize: 18, fontWeight: FontWeight.bold, shadows: _bordeNegro)),
+                                Text("DÍAS RESTANTES", style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 7, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 15),
-                      _buildTextBlock("DETALLE DEL DIAGNÓSTICO:", data['diagnostico_tecnico'] ?? "Sin detalle técnico"),
+                      _buildTextBlock("SISTEMA A REPARAR:", data['sistema_reparar'] ?? "Sin sistema asignado"),
                       const SizedBox(height: 15),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildInfoRow("GARANTÍA TOTAL:", "$diasGarantia DÍAS"),
+                          _buildInfoRow("GARANTÍA TOTAL:", infoGarantia['total_db']),
                           _buildInfoRow("TIEMPO DESDE ENTREGA:", _calcularTiempoDesdeEntrega(fechaFin)),
                         ],
                       ),
@@ -278,30 +330,30 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                 ),
               ),
 
-              // COLUMNA 3: PRESUPUESTO Y ESTADO
+              // COLUMNA 3: PRESUPUESTO
               Expanded(
                 flex: 2,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Text("MONTO APROBADO", style: TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
-                    Text("\$${data['presupuesto_total'] ?? '0.00'}", 
+                    Text("MONTO APROBADO", style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold, shadows: _bordeNegro)),
+                    Text("\$${data['total_reparacion'] ?? '0.00'}", 
                       style: const TextStyle(color: Colors.amber, fontSize: 22, fontWeight: FontWeight.w900)),
                     const SizedBox(height: 10),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.white.withValues(alpha: 0.05),
-                        foregroundColor: Colors.white70,
+                        foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         side: const BorderSide(color: Colors.white12)
                       ),
                       onPressed: () => _mostrarPresupuestoDetalle(data),
-                      icon: const Icon(Icons.receipt_long, size: 14),
-                      label: const Text("VER PRESUPUESTO", style: TextStyle(fontSize: 10)),
+                      icon: const Icon(Icons.receipt_long, size: 14, color: Colors.white),
+                      label: const Text("VER PRESUPUESTO", style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 20),
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       decoration: BoxDecoration(
                         color: infoGarantia['vencida'] ? Colors.red.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8)
@@ -323,19 +375,19 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: brandRed, fontSize: 10, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, shadows: _bordeNegro)),
         const SizedBox(height: 4),
-        Text(content, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+        Text(content, style: const TextStyle(color: Colors.white38, fontSize: 12, height: 1.4)),
       ],
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {Color color = Colors.white70}) {
+  Widget _buildInfoRow(String label, String value) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text("$label ", style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
-        Text(value, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
+        Text("$label ", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, shadows: _bordeNegro)),
+        Text(value, style: const TextStyle(color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -346,6 +398,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
       onTap: activo ? () => _abrirVideo(url) : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        margin: const EdgeInsets.only(bottom: 5),
         decoration: BoxDecoration(
           color: activo ? brandRed.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
@@ -356,7 +409,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
           children: [
             Icon(icon, color: activo ? brandRed : Colors.white10, size: 16),
             const SizedBox(width: 8),
-            Text(label, style: TextStyle(color: activo ? Colors.white : Colors.white10, fontSize: 10, fontWeight: FontWeight.bold)),
+            Text(label, style: TextStyle(color: activo ? Colors.white : Colors.white24, fontSize: 10, fontWeight: FontWeight.bold, shadows: activo ? _bordeNegro : null)),
           ],
         ),
       ),
