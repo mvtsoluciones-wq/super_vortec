@@ -1,0 +1,319 @@
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+
+class PresupuestoAppModule extends StatefulWidget {
+  const PresupuestoAppModule({super.key});
+
+  @override
+  State<PresupuestoAppModule> createState() => _PresupuestoAppModuleState();
+}
+
+class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
+  String _filtroNombre = "";
+  String? _clienteSeleccionadoId; 
+  String? _clienteSeleccionadoNombre;
+
+  final Color brandRed = const Color(0xFFD50000);
+  final Color cardBlack = const Color(0xFF101010);
+  final Color inputFill = const Color(0xFF1E1E1E);
+
+  // --- FUNCIÓN PARA GENERAR PDF ---
+  Future<void> _generarPDF(Map<String, dynamic> data) async {
+    final pdf = pw.Document();
+    final List items = data['presupuesto_items'] ?? [];
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text("JMENDEZ PERFORMANCE", 
+                    style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.red900)),
+                  pw.Text("PRESUPUESTO DIGITAL", style: pw.TextStyle(fontSize: 10, color: PdfColors.grey700)),
+                ],
+              ),
+              pw.Divider(thickness: 2, color: PdfColors.red900),
+              pw.SizedBox(height: 20),
+              pw.Text("Modelo: ${data['modelo_vehiculo'] ?? 'N/A'}"),
+              pw.Text("Placa: ${data['placa_vehiculo'] ?? 'N/A'}"),
+              pw.Text("Sistema: ${data['sistema_reparar']}"),
+              pw.SizedBox(height: 20),
+              pw.TableHelper.fromTextArray(
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.grey900),
+                context: context,
+                data: <List<String>>[
+                  <String>['Item', 'Descripción', 'Cant', 'Total'],
+                  ...items.map((i) => [
+                    i['item'].toString(),
+                    i['descripcion'].toString(),
+                    i['cantidad'].toString(),
+                    "\$${i['subtotal'].toStringAsFixed(2)}"
+                  ])
+                ],
+              ),
+              pw.SizedBox(height: 20),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text("TOTAL: \$${(data['total_reparacion'] ?? 0).toStringAsFixed(2)}", 
+                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
+  // --- FUNCIÓN EDITAR ---
+  void _abrirEditorPresupuesto(String docId, Map<String, dynamic> data) {
+    final TextEditingController editSistema = TextEditingController(text: data['sistema_reparar']);
+    final TextEditingController editDesc = TextEditingController(text: data['descripcion_falla']);
+    final TextEditingController editGarantia = TextEditingController(text: data['garantia']);
+    
+    List<Map<String, dynamic>> editItems = (data['presupuesto_items'] as List).map((item) => {
+      'item': TextEditingController(text: item['item']),
+      'descripcion': TextEditingController(text: item['descripcion']),
+      'cantidad': TextEditingController(text: item['cantidad'].toString()),
+      'precio_unitario': TextEditingController(text: item['precio_unitario'].toString()),
+    }).toList();
+
+    showDialog(
+      context: context,
+      builder: (diagCtx) => StatefulBuilder(
+        builder: (diagCtx, setDialogState) => AlertDialog(
+          backgroundColor: cardBlack,
+          title: Text("EDITAR PRESUPUESTO: ${data['modelo_vehiculo']}", style: const TextStyle(color: Colors.white)),
+          content: SizedBox(
+            width: 850,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildEditField("SISTEMA", editSistema),
+                  const SizedBox(height: 15),
+                  _buildEditField("DESCRIPCIÓN", editDesc, maxLines: 3),
+                  const SizedBox(height: 15),
+                  _buildEditField("GARANTÍA", editGarantia),
+                  const Divider(color: Colors.white10, height: 40),
+                  ...editItems.asMap().entries.map((entry) {
+                    int idx = entry.key;
+                    var row = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          Expanded(flex: 2, child: _buildTableInput(row['item'], "Item")),
+                          const SizedBox(width: 5),
+                          Expanded(flex: 1, child: _buildTableInput(row['cantidad'], "Cant.", isNum: true)),
+                          const SizedBox(width: 5),
+                          Expanded(flex: 1, child: _buildTableInput(row['precio_unitario'], "\$", isNum: true)),
+                          IconButton(icon: const Icon(Icons.remove_circle, color: Colors.redAccent), onPressed: () => setDialogState(() => editItems.removeAt(idx)))
+                        ],
+                      ),
+                    );
+                  }),
+                  TextButton.icon(onPressed: () => setDialogState(() => editItems.add({'item': TextEditingController(), 'descripcion': TextEditingController(), 'cantidad': TextEditingController(text: "1"), 'precio_unitario': TextEditingController()})), icon: const Icon(Icons.add_circle, color: Colors.green), label: const Text("AÑADIR ÍTEM"))
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(diagCtx), child: const Text("CANCELAR")),
+            ElevatedButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(diagCtx);
+                double nuevoTotal = 0;
+                List<Map<String, dynamic>> itemsParaSubir = editItems.map((e) {
+                  double c = double.tryParse(e['cantidad'].text) ?? 0;
+                  double p = double.tryParse(e['precio_unitario'].text) ?? 0;
+                  nuevoTotal += (c * p);
+                  return {'item': e['item'].text.toUpperCase(), 'descripcion': e['descripcion'].text.toUpperCase(), 'cantidad': c, 'precio_unitario': p, 'subtotal': c * p};
+                }).toList();
+
+                try {
+                  await FirebaseFirestore.instance.collection('diagnosticos').doc(docId).update({
+                    'sistema_reparar': editSistema.text.toUpperCase(),
+                    'descripcion_falla': editDesc.text.toUpperCase(),
+                    'garantia': editGarantia.text.toUpperCase(),
+                    'presupuesto_items': itemsParaSubir,
+                    'total_reparacion': nuevoTotal,
+                  });
+                  if (!mounted) return;
+                  navigator.pop();
+                  messenger.showSnackBar(const SnackBar(content: Text("✅ ACTUALIZADO")));
+                } catch (e) {
+                  if (!mounted) return;
+                  messenger.showSnackBar(SnackBar(content: Text("❌ ERROR: $e")));
+                }
+              },
+              child: const Text("GUARDAR"),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(_clienteSeleccionadoId == null ? "PRESUPUESTOS PENDIENTES" : "CLIENTE: ${_clienteSeleccionadoNombre?.toUpperCase()}", 
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+            const Spacer(),
+            if (_clienteSeleccionadoId != null)
+              OutlinedButton.icon(
+                onPressed: () => setState(() { _clienteSeleccionadoId = null; }),
+                icon: const Icon(Icons.arrow_back, size: 16, color: Colors.black),
+                label: const Text("CAMBIAR CLIENTE", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.black, width: 2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+              )
+          ],
+        ),
+        const SizedBox(height: 25),
+        _clienteSeleccionadoId == null ? _buildBuscadorClientes() : _buildListaPresupuestos(),
+      ],
+    );
+  }
+
+  Widget _buildBuscadorClientes() {
+    return Expanded(
+      child: Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)),
+            child: TextField(
+              style: const TextStyle(color: Colors.white),
+              onChanged: (val) => setState(() => _filtroNombre = val.toUpperCase()),
+              decoration: const InputDecoration(hintText: "BUSCAR CLIENTE...", prefixIcon: Icon(Icons.person_search, color: Colors.white54), border: InputBorder.none, contentPadding: EdgeInsets.all(20)),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance.collection('clientes').snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                var docs = snapshot.data!.docs.where((doc) => doc['nombre'].toString().toUpperCase().contains(_filtroNombre)).toList();
+                return ListView.builder(
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    var c = docs[index];
+                    return ListTile(
+                      onTap: () => setState(() { _clienteSeleccionadoId = c.id; _clienteSeleccionadoNombre = c['nombre']; }),
+                      leading: CircleAvatar(backgroundColor: brandRed, child: const Icon(Icons.person, color: Colors.white)),
+                      title: Text(c['nombre'].toString().toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      subtitle: Text("ID: ${c.id}", style: const TextStyle(color: Colors.white38, fontSize: 11)),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildListaPresupuestos() {
+    return Expanded(
+      child: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance.collection('diagnosticos')
+            .where('cliente_id', isEqualTo: _clienteSeleccionadoId)
+            .where('finalizado', isEqualTo: false) // <--- SOLO LOS NO FINALIZADOS
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          var docs = snapshot.data!.docs;
+          if (docs.isEmpty) return const Center(child: Text("Sin presupuestos pendientes", style: TextStyle(color: Colors.white24)));
+          return ListView.builder(
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              var data = docs[index].data() as Map<String, dynamic>;
+              return _buildHistorialCard(docs[index].id, data);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHistorialCard(String docId, Map<String, dynamic> data) {
+    
+    String modeloText = data['modelo_vehiculo'] ?? "VEHÍCULO";
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+      child: ExpansionTile(
+        iconColor: brandRed,
+        collapsedIconColor: Colors.white54,
+        title: Row(
+          children: [
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(modeloText.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("PLACA: ${data['placa_vehiculo']}", style: const TextStyle(color: Colors.white38, fontSize: 10)),
+            ]),
+            const Spacer(),
+            IconButton(icon: const Icon(Icons.picture_as_pdf, color: Colors.blueAccent, size: 22), onPressed: () => _generarPDF(data)),
+            const SizedBox(width: 10),
+            Text("\$${(data['total_reparacion'] ?? 0).toStringAsFixed(2)}", style: TextStyle(color: brandRed, fontWeight: FontWeight.bold, fontSize: 18)),
+          ],
+        ),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            color: Colors.black.withValues(alpha: 0.2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  Text("GARANTÍA: ${data['garantia']}", style: const TextStyle(color: Colors.amber, fontSize: 11, fontWeight: FontWeight.bold)),
+                  Row(children: [
+                    IconButton(icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 20), onPressed: () => _abrirEditorPresupuesto(docId, data)),
+                    IconButton(icon: const Icon(Icons.check_circle, color: Colors.green, size: 20), 
+                      onPressed: () => FirebaseFirestore.instance.collection('diagnosticos').doc(docId).update({'finalizado': true}),
+                      tooltip: "Finalizar Trabajo",
+                    ),
+                  ])
+                ]),
+                Text("DETALLES: ${data['descripcion_falla']}", style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  // --- WIDGETS DE APOYO ---
+  Widget _buildEditField(String label, TextEditingController controller, {int maxLines = 1}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 5),
+      TextField(controller: controller, maxLines: maxLines, style: const TextStyle(color: Colors.white), decoration: InputDecoration(filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none))),
+    ]);
+  }
+
+  Widget _buildTableInput(TextEditingController c, String h, {bool isNum = false}) {
+    return TextField(controller: c, keyboardType: isNum ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: InputDecoration(hintText: h, isDense: true, filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(5), borderSide: BorderSide.none)));
+  }
+}

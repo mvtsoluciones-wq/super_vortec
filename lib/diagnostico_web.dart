@@ -75,7 +75,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     try {
       List<Map<String, dynamic>> presupuestoFinal = _itemsPresupuesto.map((e) {
         double c = double.tryParse(e['cant'].text) ?? 0;
-        double p = double.tryParse(e['precio'].text) ?? 0;
+        double p = double.tryParse(e['precio_unitario']?.text ?? e['precio'].text) ?? 0;
         return {
           'item': e['item'].text.toUpperCase(),
           'descripcion': e['desc'].text.toUpperCase(),
@@ -87,7 +87,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
 
       await FirebaseFirestore.instance.collection('diagnosticos').add({
         'placa_vehiculo': _vehiculoSeleccionado,
-        'modelo_vehiculo': _modeloSeleccionado, // <--- AHORA SE GUARDA EL MODELO CORRECTO
+        'modelo_vehiculo': _modeloSeleccionado, 
         'cliente_id': _clienteSeleccionado,
         'sistema_reparar': _tituloFallaController.text.trim().toUpperCase(),
         'total_reparacion': _calcularTotalFalla(),
@@ -98,13 +98,14 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
         'urgencia': _semaforoSeleccionado,
         'presupuesto_items': presupuestoFinal, 
         'aprobado': false,
+        'finalizado': false, // <--- CLAVE: Se guarda como NO finalizado para que aparezca en Presupuestos APP
         'fecha': FieldValue.serverTimestamp(),
       });
 
       if (!mounted) return;
       Navigator.pop(context);
 
-      _showSnack("✅ DIAGNÓSTICO PUBLICADO EXITOSAMENTE", Colors.green);
+      _showSnack("✅ ENVIADO A PRESUPUESTOS APP", Colors.green);
       _limpiarFormulario();
       
     } catch (e) {
@@ -199,7 +200,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                   style: ElevatedButton.styleFrom(backgroundColor: brandRed, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                   onPressed: _guardarDiagnostico,
                   icon: const Icon(Icons.cloud_upload, color: Colors.white),
-                  label: const Text("GUARDAR DIAGNÓSTICO EN HISTORIAL", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
+                  label: const Text("GUARDAR DIAGNÓSTICO EN PRESUPUESTOS", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
                 ),
               ),
             ],
@@ -231,14 +232,12 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                 stream: FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: _clienteSeleccionado).snapshots(),
                 builder: (context, snapshot) {
                   if (!snapshot.hasData) return const LinearProgressIndicator();
-                  
-                  // Mapeamos los documentos para tener acceso al MODELO y a la PLACA
                   List<DropdownMenuItem<String>> vehicleItems = snapshot.data!.docs.map((doc) {
                     String placa = doc.id;
                     String modelo = doc['modelo'].toString().toUpperCase();
                     return DropdownMenuItem(
                       value: placa, 
-                      onTap: () => _modeloSeleccionado = modelo, // CAPTURA EL MODELO AL TOCAR
+                      onTap: () => _modeloSeleccionado = modelo,
                       child: Text("$placa - $modelo")
                     );
                   }).toList();
@@ -307,7 +306,6 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
   Widget _headerText(String label) => Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold));
   Widget _tableInput(TextEditingController controller, String hint, {bool isNumber = false}) => TextField(controller: controller, keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text, onChanged: (v) => setState(() {}), style: const TextStyle(color: Colors.white, fontSize: 13), decoration: InputDecoration(hintText: hint, hintStyle: const TextStyle(color: Colors.white10), isDense: true, filled: true, fillColor: cardBlack, border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none)));
   Widget _buildDropdownCustom(String label, List<DropdownMenuItem<String>> items, String? currentVal, Function(String?) onChanged) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)), const SizedBox(height: 10), Container(padding: const EdgeInsets.symmetric(horizontal: 15), decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)), child: DropdownButtonHideUnderline(child: DropdownButton<String>(value: currentVal, isExpanded: true, dropdownColor: cardBlack, icon: const Icon(Icons.arrow_drop_down, color: Colors.white), style: const TextStyle(color: Colors.white), items: items, onChanged: onChanged)))]);

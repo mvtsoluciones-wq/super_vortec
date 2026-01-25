@@ -16,6 +16,8 @@ import 'facturacion_web.dart';
 import 'inventario_web.dart';
 import 'config_factura_web.dart'; 
 import 'historial_web.dart';
+import 'presupuesto_app.dart';
+import 'tecnicos_web.dart';
 
 class AdminControlPanel extends StatefulWidget {
   const AdminControlPanel({super.key});
@@ -239,6 +241,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   _sidebarItem(2, Icons.gps_fixed_rounded, "SEGUIMIENTO"),
                   _sidebarItem(3, Icons.person_search_rounded, "CLIENTES"),
                   _sidebarItem(11, Icons.history_edu_rounded, "HISTORIAL"),
+                  _sidebarItem(13, Icons.description_rounded, "PRESUPUESTOS APP"),
                   _buildDivider(),
                   _buildSectionTitle("HERRAMIENTAS"),
                   _sidebarItem(4, Icons.notifications_active_outlined, "NOTIFICACIÓN"),
@@ -251,6 +254,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   _sidebarItem(12, Icons.settings_suggest_rounded, "CONFIG. FISCAL"),
                   _sidebarItem(9, Icons.request_quote_outlined, "PRESUPUESTOS"),
                   _sidebarItem(10, Icons.inventory_2_outlined, "INVENTARIO"),
+                  _sidebarItem(14, Icons.engineering_rounded, "TÉCNICOS"),
                 ],
               ),
             ),
@@ -317,6 +321,9 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       case 9: return const PresupuestoWebModule();
       case 10: return const InventarioWebModule();
       case 11: return const HistorialWebModule();
+      case 13: return const PresupuestoAppModule();
+      case 14: return const TecnicosWebModule();
+     
       default:
         return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
     }
