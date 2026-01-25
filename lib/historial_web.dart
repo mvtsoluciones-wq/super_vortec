@@ -17,6 +17,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
 
   String _filtroTexto = "";
   DateTime? _fechaFiltro;
+  String? _tecnicoSeleccionado;
 
   // --- FUNCIÓN PARA ABRIR VIDEO ---
   Future<void> _abrirVideo(String url) async {
@@ -111,6 +112,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     return Row(
       children: [
         Expanded(
+          flex: 3,
           child: TextField(
             onChanged: (val) => setState(() => _filtroTexto = val.toUpperCase()),
             style: const TextStyle(color: Colors.white, fontSize: 14),
@@ -123,6 +125,36 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
           ),
         ),
         const SizedBox(width: 15),
+        
+        Expanded(
+          flex: 2,
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('mecanicos').orderBy('nombre').snapshots(),
+            builder: (context, snapshot) {
+              List<String> lista = ["TODOS LOS TÉCNICOS"];
+              if (snapshot.hasData) {
+                for (var doc in snapshot.data!.docs) {
+                  lista.add(doc['nombre']);
+                }
+              }
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _tecnicoSeleccionado ?? "TODOS LOS TÉCNICOS",
+                    dropdownColor: cardBlack,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    items: lista.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
+                    onChanged: (val) => setState(() => _tecnicoSeleccionado = (val == "TODOS LOS TÉCNICOS") ? null : val),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 15),
+
         ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
             backgroundColor: _fechaFiltro == null ? inputFill : brandRed,
@@ -143,16 +175,28 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
   }
 
   Widget _buildListaHistorial() {
+    Query query = FirebaseFirestore.instance.collection('historial_web').orderBy('fecha_finalizacion', descending: true);
+    
+    if (_tecnicoSeleccionado != null) {
+      query = query.where('mecanico_asignado', isEqualTo: _tecnicoSeleccionado);
+    }
+
     return Expanded(
       child: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('historial_web').orderBy('fecha_finalizacion', descending: true).snapshots(),
+        stream: query.snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           var docs = snapshot.data!.docs.where((doc) {
             var data = doc.data() as Map<String, dynamic>;
             bool matchTexto = (data['placa_vehiculo'] ?? "").toString().contains(_filtroTexto) || 
                              (data['modelo_vehiculo'] ?? "").toString().toUpperCase().contains(_filtroTexto);
-            return matchTexto;
+            
+            bool matchFecha = true;
+            if (_fechaFiltro != null && data['fecha_finalizacion'] != null) {
+              DateTime f = (data['fecha_finalizacion'] as Timestamp).toDate();
+              matchFecha = f.day == _fechaFiltro!.day && f.month == _fechaFiltro!.month && f.year == _fechaFiltro!.year;
+            }
+            return matchTexto && matchFecha;
           }).toList();
 
           return ListView.builder(
@@ -193,12 +237,12 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                     const SizedBox(height: 20),
                     _buildVideoBtn("VIDEO RECEPCIÓN", data['url_video_recepcion'] ?? "", Icons.videocam),
                     const SizedBox(height: 10),
-                    _buildVideoBtn("VIDEO REPARACIÓN", data['url_evidencia_video'] ?? "", Icons.play_circle_fill),
+                    _buildVideoBtn("VIDEO REPARACIÓN", data['url_evidencia_video'] ?? data['evidencia_youtube'] ?? "", Icons.play_circle_fill),
                   ],
                 ),
               ),
               
-              // COLUMNA 2: DETALLES TÉCNICOS Y GARANTÍAS
+              // COLUMNA 2: DETALLES TÉCNICOS Y GARANTÍAS (AJUSTADA ALTO)
               Expanded(
                 flex: 4,
                 child: Padding(
@@ -206,7 +250,19 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildTextBlock("FALLA DE ENTRADA:", data['falla_reportada'] ?? "No especificada"),
+                      // SECCIÓN SUPERIOR: FALLA Y GARANTÍA RESTANTE ALINEADAS
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _buildTextBlock("FALLA DE ENTRADA:", data['falla_reportada'] ?? "No especificada"),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildInfoRow("GARANTÍA RESTANTE:", "${infoGarantia['restante']} DÍAS", 
+                            color: infoGarantia['vencida'] ? Colors.red : Colors.greenAccent),
+                        ],
+                      ),
                       const SizedBox(height: 15),
                       _buildTextBlock("DETALLE DEL DIAGNÓSTICO:", data['diagnostico_tecnico'] ?? "Sin detalle técnico"),
                       const SizedBox(height: 15),
@@ -214,12 +270,9 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           _buildInfoRow("GARANTÍA TOTAL:", "$diasGarantia DÍAS"),
-                          _buildInfoRow("RESTANTE:", "${infoGarantia['restante']} DÍAS", 
-                            color: infoGarantia['vencida'] ? Colors.red : Colors.greenAccent),
+                          _buildInfoRow("TIEMPO DESDE ENTREGA:", _calcularTiempoDesdeEntrega(fechaFin)),
                         ],
                       ),
-                      const SizedBox(height: 5),
-                      _buildInfoRow("TIEMPO DESDE ENTREGA:", _calcularTiempoDesdeEntrega(fechaFin)),
                     ],
                   ),
                 ),
@@ -279,8 +332,9 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
 
   Widget _buildInfoRow(String label, String value, {Color color = Colors.white70}) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text("$label ", style: const TextStyle(color: Colors.white38, fontSize: 10)),
+        Text("$label ", style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
         Text(value, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
       ],
     );
