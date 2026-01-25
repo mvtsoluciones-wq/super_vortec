@@ -16,9 +16,9 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
   final Color inputFill = const Color(0xFF1E1E1E);
 
   String _filtroTexto = "";
-  String? _tecnicoSeleccionado;
   DateTime? _fechaFiltro;
 
+  // --- FUNCIÓN PARA ABRIR VIDEO ---
   Future<void> _abrirVideo(String url) async {
     if (url.isEmpty) return;
     final Uri uri = Uri.parse(url);
@@ -29,6 +29,50 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
         );
       }
     }
+  }
+
+  // --- LÓGICA DE TIEMPOS Y GARANTÍAS ---
+  String _calcularTiempoDesdeEntrega(DateTime fechaFin) {
+    final diferencia = DateTime.now().difference(fechaFin).inDays;
+    if (diferencia == 0) return "ENTREGADO HOY";
+    return "HACE $diferencia DÍAS";
+  }
+
+  Map<String, dynamic> _calcularGarantia(DateTime fechaFin, int diasGarantia) {
+    final fechaVencimiento = fechaFin.add(Duration(days: diasGarantia));
+    final restante = fechaVencimiento.difference(DateTime.now()).inDays;
+    return {
+      "restante": restante < 0 ? 0 : restante,
+      "vencida": restante < 0,
+    };
+  }
+
+  // --- DIÁLOGO DE DETALLE DE PRESUPUESTO ---
+  void _mostrarPresupuestoDetalle(Map<String, dynamic> data) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBlack,
+        title: Text("DETALLE DE PRESUPUESTO APROBADO", 
+          style: TextStyle(color: brandRed, fontSize: 16, fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("TOTAL APROBADO: \$${data['presupuesto_total'] ?? '0.00'}", 
+              style: const TextStyle(color: Colors.amber, fontSize: 18, fontWeight: FontWeight.w900)),
+            const Divider(color: Colors.white10, height: 20),
+            const Text("OBSERVACIONES COMERCIALES:", style: TextStyle(color: Colors.white38, fontSize: 10)),
+            const SizedBox(height: 5),
+            Text(data['notas_presupuesto'] ?? "Sin notas adicionales.", 
+              style: const TextStyle(color: Colors.white70, fontSize: 13)),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("CERRAR")),
+        ],
+      ),
+    );
   }
 
   @override
@@ -45,7 +89,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
           const SizedBox(height: 20),
           const Divider(color: Colors.white10),
           const SizedBox(height: 10),
-          _buildTablaHistorialClientes(),
+          _buildListaHistorial(),
         ],
       ),
     );
@@ -55,9 +99,9 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("REPORTE INTEGRAL DE SERVICIO", 
+        Text("HISTORIAL DE SERVICIOS Y GARANTÍAS", 
           style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-        Text("Historial completo con evidencias multimedia y diagnósticos técnicos", 
+        Text("Control de post-venta, tiempos de protección y presupuestos", 
           style: TextStyle(color: Colors.white38, fontSize: 13)),
       ],
     );
@@ -67,45 +111,15 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     return Row(
       children: [
         Expanded(
-          flex: 3,
           child: TextField(
             onChanged: (val) => setState(() => _filtroTexto = val.toUpperCase()),
             style: const TextStyle(color: Colors.white, fontSize: 14),
             decoration: InputDecoration(
               hintText: "BUSCAR POR PLACA O MODELO...",
               prefixIcon: const Icon(Icons.search, color: Colors.white54),
-              filled: true,
-              fillColor: inputFill,
+              filled: true, fillColor: inputFill,
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
             ),
-          ),
-        ),
-        const SizedBox(width: 15),
-        Expanded(
-          flex: 2,
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('mecanicos').orderBy('nombre').snapshots(),
-            builder: (context, snapshot) {
-              List<String> lista = ["TODOS LOS TÉCNICOS"];
-              if (snapshot.hasData) {
-                for (var doc in snapshot.data!.docs) {
-                  lista.add(doc['nombre']);
-                }
-              }
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15),
-                decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(10)),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _tecnicoSeleccionado ?? "TODOS LOS TÉCNICOS",
-                    dropdownColor: cardBlack,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    items: lista.map((t) => DropdownMenuItem(value: t, child: Text(t))).toList(),
-                    onChanged: (val) => setState(() => _tecnicoSeleccionado = (val == "TODOS LOS TÉCNICOS") ? null : val),
-                  ),
-                ),
-              );
-            },
           ),
         ),
         const SizedBox(width: 15),
@@ -122,33 +136,23 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
             if (picked != null) setState(() => _fechaFiltro = picked);
           },
           icon: const Icon(Icons.calendar_month, color: Colors.white, size: 18),
-          label: Text(_fechaFiltro == null ? "FECHA" : DateFormat('dd/MM/yyyy').format(_fechaFiltro!)),
+          label: Text(_fechaFiltro == null ? "FILTRAR FECHA" : DateFormat('dd/MM/yyyy').format(_fechaFiltro!)),
         ),
       ],
     );
   }
 
-  Widget _buildTablaHistorialClientes() {
-    Query query = FirebaseFirestore.instance.collection('historial_web').orderBy('fecha_finalizacion', descending: true);
-    if (_tecnicoSeleccionado != null) {
-      query = query.where('tecnico', isEqualTo: _tecnicoSeleccionado);
-    }
-
+  Widget _buildListaHistorial() {
     return Expanded(
       child: StreamBuilder<QuerySnapshot>(
-        stream: query.snapshots(),
+        stream: FirebaseFirestore.instance.collection('historial_web').orderBy('fecha_finalizacion', descending: true).snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
           var docs = snapshot.data!.docs.where((doc) {
             var data = doc.data() as Map<String, dynamic>;
             bool matchTexto = (data['placa_vehiculo'] ?? "").toString().contains(_filtroTexto) || 
                              (data['modelo_vehiculo'] ?? "").toString().toUpperCase().contains(_filtroTexto);
-            bool matchFecha = true;
-            if (_fechaFiltro != null && data['fecha_finalizacion'] != null) {
-              DateTime f = (data['fecha_finalizacion'] as Timestamp).toDate();
-              matchFecha = f.day == _fechaFiltro!.day && f.month == _fechaFiltro!.month && f.year == _fechaFiltro!.year;
-            }
-            return matchTexto && matchFecha;
+            return matchTexto;
           }).toList();
 
           return ListView.builder(
@@ -161,11 +165,12 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
   }
 
   Widget _buildReporteCard(Map<String, dynamic> data) {
-    String? videoRecepcion = data['url_video_recepcion'] ?? "";
-    String? videoReparacion = data['url_evidencia_video'] ?? data['evidencia_youtube'] ?? "";
+    DateTime fechaFin = (data['fecha_finalizacion'] as Timestamp).toDate();
+    int diasGarantia = data['dias_garantia'] ?? 30;
+    var infoGarantia = _calcularGarantia(fechaFin, diasGarantia);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
+      margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(25),
       decoration: BoxDecoration(
         color: cardBlack,
@@ -177,7 +182,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // COLUMNA 1: VEHÍCULO
+              // COLUMNA 1: VEHÍCULO Y VIDEOS
               Expanded(
                 flex: 2,
                 child: Column(
@@ -185,42 +190,72 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                   children: [
                     Text(data['modelo_vehiculo'] ?? "S/D", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
                     Text("PLACA: ${data['placa_vehiculo']}", style: const TextStyle(color: Colors.white38, fontSize: 12)),
-                    const SizedBox(height: 15),
-                    _buildVideoBtn("VIDEO RECEPCIÓN", videoRecepcion!, Icons.input_rounded),
-                    const SizedBox(height: 8),
-                    _buildVideoBtn("VIDEO REPARACIÓN", videoReparacion!, Icons.build_circle_outlined),
+                    const SizedBox(height: 20),
+                    _buildVideoBtn("VIDEO RECEPCIÓN", data['url_video_recepcion'] ?? "", Icons.videocam),
+                    const SizedBox(height: 10),
+                    _buildVideoBtn("VIDEO REPARACIÓN", data['url_evidencia_video'] ?? "", Icons.play_circle_fill),
                   ],
                 ),
               ),
               
-              // COLUMNA 2: DIAGNÓSTICOS
+              // COLUMNA 2: DETALLES TÉCNICOS Y GARANTÍAS
               Expanded(
                 flex: 4,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTextBlock("FALLA REPORTADA (RECEPCIÓN):", data['falla_reportada'] ?? "No descrita"),
-                    const SizedBox(height: 15),
-                    _buildTextBlock("DIAGNÓSTICO TÉCNICO:", data['diagnostico_tecnico'] ?? "Sin diagnóstico registrado"),
-                  ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTextBlock("FALLA DE ENTRADA:", data['falla_reportada'] ?? "No especificada"),
+                      const SizedBox(height: 15),
+                      _buildTextBlock("DETALLE DEL DIAGNÓSTICO:", data['diagnostico_tecnico'] ?? "Sin detalle técnico"),
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildInfoRow("GARANTÍA TOTAL:", "$diasGarantia DÍAS"),
+                          _buildInfoRow("RESTANTE:", "${infoGarantia['restante']} DÍAS", 
+                            color: infoGarantia['vencida'] ? Colors.red : Colors.greenAccent),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      _buildInfoRow("TIEMPO DESDE ENTREGA:", _calcularTiempoDesdeEntrega(fechaFin)),
+                    ],
+                  ),
                 ),
               ),
 
-              // COLUMNA 3: ESTATUS Y FECHA
+              // COLUMNA 3: PRESUPUESTO Y ESTADO
               Expanded(
-                flex: 1,
+                flex: 2,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text(data['fecha_finalizacion'] != null 
-                      ? DateFormat('dd/MM/yyyy').format((data['fecha_finalizacion'] as Timestamp).toDate()) : "",
-                      style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                    const SizedBox(height: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(5)),
-                      child: const Text("ENTREGADO", style: TextStyle(color: Colors.green, fontSize: 9, fontWeight: FontWeight.bold)),
+                    const Text("MONTO APROBADO", style: TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold)),
+                    Text("\$${data['presupuesto_total'] ?? '0.00'}", 
+                      style: const TextStyle(color: Colors.amber, fontSize: 22, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 10),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.05),
+                        foregroundColor: Colors.white70,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        side: const BorderSide(color: Colors.white12)
+                      ),
+                      onPressed: () => _mostrarPresupuestoDetalle(data),
+                      icon: const Icon(Icons.receipt_long, size: 14),
+                      label: const Text("VER PRESUPUESTO", style: TextStyle(fontSize: 10)),
                     ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: infoGarantia['vencida'] ? Colors.red.withValues(alpha: 0.1) : Colors.green.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8)
+                      ),
+                      child: Text(infoGarantia['vencida'] ? "GARANTÍA EXPIRADA" : "PROTECCIÓN ACTIVA", 
+                        style: TextStyle(color: infoGarantia['vencida'] ? Colors.red : Colors.green, fontSize: 9, fontWeight: FontWeight.bold)),
+                    )
                   ],
                 ),
               ),
@@ -235,9 +270,18 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(color: brandRed, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 1)),
+        Text(label, style: TextStyle(color: brandRed, fontSize: 10, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Text(content, style: const TextStyle(color: Colors.white70, fontSize: 12, height: 1.4)),
+      ],
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {Color color = Colors.white70}) {
+    return Row(
+      children: [
+        Text("$label ", style: const TextStyle(color: Colors.white38, fontSize: 10)),
+        Text(value, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
       ],
     );
   }
@@ -249,9 +293,9 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: activo ? Colors.white.withValues(alpha: 0.05) : Colors.transparent,
+          color: activo ? brandRed.withValues(alpha: 0.1) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: activo ? brandRed.withValues(alpha: 0.5) : Colors.white10)
+          border: Border.all(color: activo ? brandRed.withValues(alpha: 0.4) : Colors.white10)
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
