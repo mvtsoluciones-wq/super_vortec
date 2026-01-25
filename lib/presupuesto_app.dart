@@ -56,7 +56,7 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                     i['item'].toString(),
                     i['descripcion'].toString(),
                     i['cantidad'].toString(),
-                    "\$${i['subtotal'].toStringAsFixed(2)}"
+                    "\$${(i['subtotal'] ?? 0).toStringAsFixed(2)}"
                   ])
                 ],
               ),
@@ -72,6 +72,95 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
       ),
     );
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+  }
+
+  // --- FUNCIÓN: DIÁLOGO DE APROBACIÓN Y ASIGNACIÓN (CORREGIDA) ---
+  void _abrirDialogoAprobacion(String docId, Map<String, dynamic> data) {
+    String? mecanicoSeleccionado;
+
+    showDialog(
+      context: context,
+      builder: (diagCtx) => StatefulBuilder(
+        builder: (diagCtx, setDialogState) => AlertDialog(
+          backgroundColor: cardBlack,
+          // CORRECCIÓN AQUÍ: Se usa 'side' en lugar de 'border'
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(15), 
+            side: const BorderSide(color: Colors.white10)
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.verified_user_rounded, color: Colors.white, size: 24),
+              SizedBox(width: 10),
+              Text("APROBAR Y ASIGNAR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Selecciona el técnico que llevará a cabo la reparación:", style: TextStyle(color: Colors.white60, fontSize: 13)),
+              const SizedBox(height: 20),
+              StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance.collection('mecanicos').orderBy('nombre').snapshots(),
+                builder: (context, snapshot) {
+                  if (!snapshot.hasData) return const LinearProgressIndicator(color: Colors.white);
+                  var mecanicos = snapshot.data!.docs;
+                  return Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    decoration: BoxDecoration(
+                      color: inputFill, 
+                      borderRadius: BorderRadius.circular(10), 
+                      border: Border.all(color: Colors.white10)
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: mecanicoSeleccionado,
+                        isExpanded: true,
+                        dropdownColor: cardBlack,
+                        hint: const Text("Seleccionar mecánico", style: TextStyle(color: Colors.white24, fontSize: 14)),
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        items: mecanicos.map((m) => DropdownMenuItem(
+                          value: m['nombre'].toString(),
+                          child: Text(m['nombre'].toString().toUpperCase()),
+                        )).toList(),
+                        onChanged: (val) => setDialogState(() => mecanicoSeleccionado = val),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(diagCtx), child: const Text("CANCELAR", style: TextStyle(color: Colors.white38))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green[700], 
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+              ),
+              onPressed: mecanicoSeleccionado == null ? null : () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(diagCtx);
+                try {
+                  await FirebaseFirestore.instance.collection('diagnosticos').doc(docId).update({
+                    'aprobado': true,
+                    'mecanico_asignado': mecanicoSeleccionado,
+                    'estado_taller': 'EN REPARACIÓN',
+                    'fecha_aprobacion': FieldValue.serverTimestamp(),
+                  });
+                  if (!mounted) return;
+                  navigator.pop();
+                  messenger.showSnackBar(const SnackBar(content: Text("✅ TRABAJO APROBADO Y ASIGNADO"), backgroundColor: Colors.green));
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(content: Text("❌ ERROR: $e")));
+                }
+              },
+              child: const Text("APROBAR AHORA", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            )
+          ],
+        ),
+      ),
+    );
   }
 
   // --- FUNCIÓN EDITAR ---
@@ -122,7 +211,11 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                       ),
                     );
                   }),
-                  TextButton.icon(onPressed: () => setDialogState(() => editItems.add({'item': TextEditingController(), 'descripcion': TextEditingController(), 'cantidad': TextEditingController(text: "1"), 'precio_unitario': TextEditingController()})), icon: const Icon(Icons.add_circle, color: Colors.green), label: const Text("AÑADIR ÍTEM"))
+                  TextButton.icon(
+                    onPressed: () => setDialogState(() => editItems.add({'item': TextEditingController(), 'descripcion': TextEditingController(), 'cantidad': TextEditingController(text: "1"), 'precio_unitario': TextEditingController()})), 
+                    icon: const Icon(Icons.add_circle, color: Colors.green), 
+                    label: const Text("AÑADIR ÍTEM")
+                  )
                 ],
               ),
             ),
@@ -238,7 +331,7 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
       child: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('diagnosticos')
             .where('cliente_id', isEqualTo: _clienteSeleccionadoId)
-            .where('finalizado', isEqualTo: false) // <--- SOLO LOS NO FINALIZADOS
+            .where('finalizado', isEqualTo: false)
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
@@ -257,23 +350,39 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
   }
 
   Widget _buildHistorialCard(String docId, Map<String, dynamic> data) {
-    
+    bool aprobado = data['aprobado'] ?? false;
     String modeloText = data['modelo_vehiculo'] ?? "VEHÍCULO";
+    String mecanicoAsignado = data['mecanico_asignado'] ?? "PENDIENTE";
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+      decoration: BoxDecoration(
+        color: cardBlack, 
+        borderRadius: BorderRadius.circular(12), 
+        border: Border.all(color: Colors.white.withValues(alpha: 0.05))
+      ),
       child: ExpansionTile(
-        iconColor: brandRed,
+        iconColor: Colors.white,
         collapsedIconColor: Colors.white54,
         title: Row(
           children: [
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(modeloText.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-              Text("PLACA: ${data['placa_vehiculo']}", style: const TextStyle(color: Colors.white38, fontSize: 10)),
+              Text(aprobado ? "MECÁNICO: $mecanicoAsignado" : "PLACA: ${data['placa_vehiculo']}", 
+                style: TextStyle(color: aprobado ? Colors.greenAccent : Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
             ]),
             const Spacer(),
-            IconButton(icon: const Icon(Icons.picture_as_pdf, color: Colors.blueAccent, size: 22), onPressed: () => _generarPDF(data)),
+            
+            if (!aprobado)
+              ElevatedButton.icon(
+                onPressed: () => _abrirDialogoAprobacion(docId, data),
+                icon: const Icon(Icons.check_circle_outline, color: Colors.white, size: 16),
+                label: const Text("APROBAR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green[800], padding: const EdgeInsets.symmetric(horizontal: 15)),
+              ),
+            
+            const SizedBox(width: 15),
+            IconButton(icon: const Icon(Icons.picture_as_pdf, color: Colors.white, size: 22), onPressed: () => _generarPDF(data)),
             const SizedBox(width: 10),
             Text("\$${(data['total_reparacion'] ?? 0).toStringAsFixed(2)}", style: TextStyle(color: brandRed, fontWeight: FontWeight.bold, fontSize: 18)),
           ],
@@ -314,6 +423,11 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
   }
 
   Widget _buildTableInput(TextEditingController c, String h, {bool isNum = false}) {
-    return TextField(controller: c, keyboardType: isNum ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text, style: const TextStyle(color: Colors.white, fontSize: 12), decoration: InputDecoration(hintText: h, isDense: true, filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(5), borderSide: BorderSide.none)));
+    return TextField(
+      controller: c, 
+      keyboardType: isNum ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text, 
+      style: const TextStyle(color: Colors.white, fontSize: 12), 
+      decoration: InputDecoration(hintText: h, isDense: true, filled: true, fillColor: inputFill, border: OutlineInputBorder(borderRadius: BorderRadius.circular(5), borderSide: BorderSide.none))
+    );
   }
 }
