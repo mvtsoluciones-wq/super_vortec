@@ -226,15 +226,22 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start, 
                 children: [
+                  // --- SECCIÓN DEL LOGO MODIFICADA ---
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(25, 60, 25, 30),
-                    child: Image.asset(
-                      'assets/weblogo.jpg',
-                      height: 180,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) => Icon(Icons.directions_car, color: brandRed, size: 60),
+                    padding: const EdgeInsets.fromLTRB(25, 80, 25, 50), // Aumentado padding para que respire
+                    child: Center(
+                      child: Transform.scale(
+                        scale: 4.0, // LOGO AGRANDADO (Ajusta este valor según prefieras)
+                        child: Image.asset(
+                          'assets/weblogo.jpg',
+                          height: 100, // Altura base
+                          fit: BoxFit.contain,
+                          errorBuilder: (context, error, stackTrace) => Icon(Icons.directions_car, color: brandRed, size: 60),
+                        ),
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 20), // Espacio extra tras el logo escalado
                   _buildSectionTitle("OPCIONES DEL TALLER"),
                   _sidebarItem(0, Icons.car_repair_rounded, "RECEPCIÓN"),
                   _sidebarItem(1, Icons.analytics_outlined, "DIAGNÓSTICO"),
@@ -350,7 +357,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 const SizedBox(height: 35),
                 Row(
                   children: [
-                    // --- CAMPO CÉDULA CON BOTÓN DE BÚSQUEDA INTEGRADO ---
                     Expanded(
                       child: _buildFormField(
                         "Cédula / ID", 
@@ -381,7 +387,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 
                 const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
                 
-                // --- SECCIÓN VEHÍCULO ---
                 Row(
                   children: [
                     Expanded(child: _buildFormField("Marca", Icons.factory_outlined, controller: _brandController)),
@@ -437,7 +442,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           },
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: Colors.white, size: 20), 
-            suffixIcon: suffix, // INTEGRACIÓN DEL BOTÓN DE BÚSQUEDA
+            suffixIcon: suffix, 
             filled: true,
             fillColor: inputFill,
             errorStyle: const TextStyle(color: Colors.orangeAccent),
