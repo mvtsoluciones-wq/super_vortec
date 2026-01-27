@@ -3,8 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:flutter/services.dart'; // Necesario para cargar el logo
-import 'package:intl/intl.dart'; // Para formatear la fecha
+import 'package:flutter/services.dart'; 
+import 'package:intl/intl.dart'; 
 
 // --- IMPORTACIONES DE CONFIGURACIÓN ---
 import 'config_factura_web.dart'; 
@@ -25,18 +25,17 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // --- FUNCIÓN MEJORADA PARA GENERAR PDF ---
+  // --- FUNCIÓN MEJORADA PARA GENERAR PDF CON LOGO ---
   Future<void> _generarPDF(Map<String, dynamic> data, String docId) async {
     final pdf = pw.Document();
     final List items = data['presupuesto_items'] ?? [];
     
-    // Cargar imagen del logo desde assets
+    // Cargar imagen del logo desde assets (JMendez Performance)
     final ByteData bytes = await rootBundle.load(ConfigFactura.logoPath);
     final Uint8List byteList = bytes.buffer.asUint8List();
     final pw.MemoryImage logoImage = pw.MemoryImage(byteList);
 
-    // Formatear número de presupuesto (00-0001) 
-    // Usamos los últimos 4 caracteres del docId para simular secuencia o puedes pasar un contador
+    // Formatear número de presupuesto y fecha
     String nroPresupuesto = "00-${docId.substring(0, 4).toUpperCase()}";
     String fechaActual = DateFormat('dd/MM/yyyy').format(DateTime.now());
 
@@ -111,10 +110,9 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                 cellStyle: const pw.TextStyle(fontSize: 9),
                 context: context,
                 data: <List<String>>[
-                  <String>['Item', 'Descripción', 'Cant', 'Precio Unit.', 'Subtotal'],
+                  <String>['Item', 'Cant', 'Precio Unit.', 'Subtotal'],
                   ...items.map((i) => [
                     i['item'].toString(),
-                    i['descripcion'].toString(),
                     i['cantidad'].toString(),
                     "\$${(i['precio_unitario'] ?? 0).toStringAsFixed(2)}",
                     "\$${(i['subtotal'] ?? 0).toStringAsFixed(2)}"
@@ -148,7 +146,7 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
               pw.Spacer(),
               pw.Divider(color: PdfColors.grey400),
               pw.Center(
-                child: pw.Text("Gracias por confiar en JMendez Performance - Soporte Técnico Especializado", 
+                child: pw.Text("Gracias por confiar en JMendez Performance - Informática Automotriz", 
                   style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
               ),
             ],
@@ -156,12 +154,10 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
         },
       ),
     );
-    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save(), name: 'Presupuesto_$nroPresupuesto');
   }
 
-  // --- RESTO DEL CÓDIGO (DIÁLOGOS Y BUILDERS) ---
-
-  // Se actualizó la llamada a _generarPDF en el IconButton
+  // --- INTERFAZ DE TARJETA ---
   Widget _buildHistorialCard(String docId, Map<String, dynamic> data) {
     bool aprobado = data['aprobado'] ?? false;
     String modeloText = data['modelo_vehiculo'] ?? "VEHÍCULO";
@@ -185,7 +181,6 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                 style: TextStyle(color: aprobado ? Colors.greenAccent : Colors.white38, fontSize: 10, fontWeight: FontWeight.bold)),
             ]),
             const Spacer(),
-            
             if (!aprobado)
               ElevatedButton.icon(
                 onPressed: () => _abrirDialogoAprobacion(docId, data),
@@ -193,17 +188,15 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                 label: const Text("APROBAR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green[800], padding: const EdgeInsets.symmetric(horizontal: 15)),
               ),
-            
             const SizedBox(width: 15),
             IconButton(
               icon: const Icon(Icons.picture_as_pdf, color: Colors.white, size: 22), 
-              onPressed: () => _generarPDF(data, docId) // Se agregó el docId aquí
+              onPressed: () => _generarPDF(data, docId)
             ),
             const SizedBox(width: 10),
             Text("\$${(data['total_reparacion'] ?? 0).toStringAsFixed(2)}", style: TextStyle(color: brandRed, fontWeight: FontWeight.bold, fontSize: 18)),
           ],
         ),
-        // ... (resto del ExpansionTile se mantiene igual)
         children: [
           Container(
             padding: const EdgeInsets.all(20),
@@ -229,8 +222,6 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
       ),
     );
   }
-
-  // ... (Las funciones _abrirEditorPresupuesto, build, etc., se mantienen igual que en tu archivo original)
 
   @override
   Widget build(BuildContext context) {
@@ -323,7 +314,6 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
     );
   }
 
-  // --- WIDGETS DE APOYO ---
   void _abrirDialogoAprobacion(String docId, Map<String, dynamic> data) {
     String? mecanicoSeleccionado;
     showDialog(
@@ -401,7 +391,13 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
     final TextEditingController editSistema = TextEditingController(text: data['sistema_reparar']);
     final TextEditingController editDesc = TextEditingController(text: data['descripcion_falla']);
     final TextEditingController editGarantia = TextEditingController(text: data['garantia']);
-    List<Map<String, dynamic>> editItems = (data['presupuesto_items'] as List).map((item) => {'item': TextEditingController(text: item['item']), 'descripcion': TextEditingController(text: item['descripcion']), 'cantidad': TextEditingController(text: item['cantidad'].toString()), 'precio_unitario': TextEditingController(text: item['precio_unitario'].toString())}).toList();
+    
+    List<Map<String, dynamic>> editItems = (data['presupuesto_items'] as List).map((item) => {
+      'item': TextEditingController(text: item['item']), 
+      'cantidad': TextEditingController(text: item['cantidad'].toString()), 
+      'precio_unitario': TextEditingController(text: item['precio_unitario'].toString())
+    }).toList();
+
     showDialog(
       context: context,
       builder: (diagCtx) => StatefulBuilder(
@@ -437,7 +433,7 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                       ),
                     );
                   }),
-                  TextButton.icon(onPressed: () => setDialogState(() => editItems.add({'item': TextEditingController(), 'descripcion': TextEditingController(), 'cantidad': TextEditingController(text: "1"), 'precio_unitario': TextEditingController()})), icon: const Icon(Icons.add_circle, color: Colors.green), label: const Text("AÑADIR ÍTEM"))
+                  TextButton.icon(onPressed: () => setDialogState(() => editItems.add({'item': TextEditingController(), 'cantidad': TextEditingController(text: "1"), 'precio_unitario': TextEditingController()})), icon: const Icon(Icons.add_circle, color: Colors.green), label: const Text("AÑADIR ÍTEM"))
                 ],
               ),
             ),
@@ -453,10 +449,16 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                   double c = double.tryParse(e['cantidad'].text) ?? 0;
                   double p = double.tryParse(e['precio_unitario'].text) ?? 0;
                   nuevoTotal += (c * p);
-                  return {'item': e['item'].text.toUpperCase(), 'descripcion': e['descripcion'].text.toUpperCase(), 'cantidad': c, 'precio_unitario': p, 'subtotal': c * p};
+                  return {'item': e['item'].text.toUpperCase(), 'cantidad': c, 'precio_unitario': p, 'subtotal': c * p};
                 }).toList();
                 try {
-                  await FirebaseFirestore.instance.collection('diagnosticos').doc(docId).update({'sistema_reparar': editSistema.text.toUpperCase(), 'descripcion_falla': editDesc.text.toUpperCase(), 'garantia': editGarantia.text.toUpperCase(), 'presupuesto_items': itemsParaSubir, 'total_reparacion': nuevoTotal});
+                  await FirebaseFirestore.instance.collection('diagnosticos').doc(docId).update({
+                    'sistema_reparar': editSistema.text.toUpperCase(), 
+                    'descripcion_falla': editDesc.text.toUpperCase(), 
+                    'garantia': editGarantia.text.toUpperCase(), 
+                    'presupuesto_items': itemsParaSubir, 
+                    'total_reparacion': nuevoTotal
+                  });
                   if (!mounted) return;
                   navigator.pop();
                   messenger.showSnackBar(const SnackBar(content: Text("✅ ACTUALIZADO")));
