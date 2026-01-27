@@ -54,6 +54,26 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   }
 }
 
+// --- 3. FORMATEADOR PARA PRIMERA LETRA MAYÚSCULA (TITLE CASE) ---
+class TitleCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    
+    String text = newValue.text;
+    List<String> words = text.split(' ');
+    String result = words.map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+
+    return newValue.copyWith(
+      text: result,
+      selection: TextSelection.collapsed(offset: result.length),
+    );
+  }
+}
+
 class AdminControlPanel extends StatefulWidget {
   const AdminControlPanel({super.key});
 
@@ -169,9 +189,9 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
 
       await FirebaseFirestore.instance.collection('vehiculos').doc(placa).set({
         'placa': placa,
-        'marca': _brandController.text.trim().toUpperCase(),
-        'modelo': _modelController.text.trim().toUpperCase(),
-        'color': _colorController.text.trim().toUpperCase(),
+        'marca': _brandController.text.trim(),
+        'modelo': _modelController.text.trim(),
+        'color': _colorController.text.trim(), // Guardado con formato Primera Mayúscula
         'anio': _yearController.text.trim(),
         'km': _kmController.text.trim(),
         'observaciones_ingreso': _obsController.text.trim(),
@@ -448,15 +468,27 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
                 Row(
                   children: [
-                    Expanded(child: _buildFormField("Marca", Icons.factory_outlined, controller: _brandController)),
-                    const SizedBox(width: 25),
-                    Expanded(child: _buildFormField("Modelo", Icons.directions_car_filled, controller: _modelController)),
+                    Expanded(
+                      child: _buildFormField(
+                        "Marca", 
+                        Icons.factory_outlined, 
+                        controller: _brandController,
+                        inputFormatters: [TitleCaseTextFormatter()],
+                      )
+                    ),
+                    Expanded(
+                      child: _buildFormField(
+                        "Modelo", 
+                        Icons.directions_car_filled, 
+                        controller: _modelController,
+                        inputFormatters: [TitleCaseTextFormatter()],
+                      )
+                    ),
                   ],
                 ),
                 const SizedBox(height: 25),
                 Row(
                   children: [
-                    // --- MODIFICACIÓN: PLACA SIEMPRE EN MAYÚSCULAS ---
                     Expanded(
                       child: _buildFormField(
                         "Placa / Matrícula", 
@@ -466,7 +498,15 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                       )
                     ),
                     const SizedBox(width: 25),
-                    Expanded(child: _buildFormField("Color", Icons.color_lens_outlined, controller: _colorController)),
+                    // --- MODIFICACIÓN: COLOR CON PRIMERA MAYÚSCULA ---
+                    Expanded(
+                      child: _buildFormField(
+                        "Color", 
+                        Icons.color_lens_outlined, 
+                        controller: _colorController,
+                        inputFormatters: [TitleCaseTextFormatter()],
+                      )
+                    ),
                   ],
                 ),
                 const SizedBox(height: 25),
