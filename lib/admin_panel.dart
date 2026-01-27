@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart'; 
+import 'dart:async';
 
 // --- IMPORTACIONES DE MÓDULOS ---
 import 'diagnostico_web.dart';
@@ -19,6 +21,39 @@ import 'historial_web.dart';
 import 'presupuesto_app.dart';
 import 'tecnicos_web.dart';
 
+// --- 1. FORMATEADOR PARA MAYÚSCULAS ---
+class UpperCaseTextFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    return newValue.copyWith(text: newValue.text.toUpperCase());
+  }
+}
+
+// --- 2. FORMATEADOR PARA KILOMETRAJE (PUNTOS DE MIL) ---
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    String cleanText = newValue.text.replaceAll('.', '');
+    if (!RegExp(r'^\d+$').hasMatch(cleanText)) return oldValue;
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < cleanText.length; i++) {
+      buffer.write(cleanText[i]);
+      int nonInsertedChars = cleanText.length - i - 1;
+      if (nonInsertedChars > 0 && nonInsertedChars % 3 == 0) {
+        buffer.write('.');
+      }
+    }
+
+    String formatted = buffer.toString();
+    return newValue.copyWith(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 class AdminControlPanel extends StatefulWidget {
   const AdminControlPanel({super.key});
 
@@ -29,15 +64,15 @@ class AdminControlPanel extends StatefulWidget {
 class _AdminControlPanelState extends State<AdminControlPanel> {
   int _activeTab = 0;
   final _formKey = GlobalKey<FormState>();
+  
+  Timer? _debounce;
 
-  // --- PALETA DE COLORES ---
   final Color brandRed = const Color(0xFFD50000); 
   final Color deepBlack = const Color(0xFF000000);
   final Color mediumGrey = const Color(0xFF454D55); 
   final Color cardBlack = const Color(0xFF101010);  
   final Color inputFill = const Color(0xFF1E1E1E); 
 
-  // --- CONTROLADORES ---
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _idController = TextEditingController();
@@ -52,16 +87,15 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   final TextEditingController _obsController = TextEditingController();
   final TextEditingController _videoController = TextEditingController();
 
-  // --- NUEVA FUNCIÓN: BUSCADOR DE CLIENTE RECURRENTE ---
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    super.dispose();
+  }
+
   Future<void> _buscarClienteRecurrente() async {
     String cedula = _idController.text.trim();
-    if (cedula.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ INGRESE UNA CÉDULA PARA BUSCAR"), backgroundColor: Colors.orange),
-      );
-      return;
-    }
-
+    if (cedula.isEmpty) return;
     try {
       var doc = await FirebaseFirestore.instance.collection('clientes').doc(cedula).get();
       if (doc.exists) {
@@ -72,19 +106,38 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           _phoneController.text = data['telefono'] ?? "";
           _addressController.text = data['direccion'] ?? "";
         });
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("✅ DATOS DEL CLIENTE RECUPERADOS"), backgroundColor: Colors.blueAccent),
-        );
-      } else {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("ℹ️ CLIENTE NO REGISTRADO (NUEVO)"), backgroundColor: Colors.orange),
-        );
       }
     } catch (e) {
-      debugPrint("Error al buscar cliente: $e");
+      debugPrint("Error: $e");
     }
+  }
+
+  Future<void> _buscarClientePorNombre(String nombre) async {
+    if (nombre.isEmpty || nombre.length < 3) return;
+    try {
+      var query = await FirebaseFirestore.instance
+          .collection('clientes')
+          .where('nombre', isEqualTo: nombre.toUpperCase())
+          .get();
+      if (query.docs.isNotEmpty) {
+        var data = query.docs.first.data();
+        setState(() {
+          _idController.text = data['cedula'] ?? "";
+          _emailController.text = data['email'] ?? "";
+          _phoneController.text = data['telefono'] ?? "";
+          _addressController.text = data['direccion'] ?? "";
+        });
+      }
+    } catch (e) {
+      debugPrint("Error: $e");
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _buscarClientePorNombre(query);
+    });
   }
 
   Future<void> _guardarRegistroEnBaseDeDatos() async {
@@ -105,7 +158,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       String clienteId = _idController.text.trim();
       String placa = _plateController.text.trim().toUpperCase();
 
-      // --- REGISTRO/ACTUALIZACIÓN DE CLIENTE (MERGE: TRUE) ---
       await FirebaseFirestore.instance.collection('clientes').doc(clienteId).set({
         'nombre': _nameController.text.trim().toUpperCase(),
         'email': _emailController.text.trim().toLowerCase(),
@@ -115,7 +167,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         'ultima_visita': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      // --- REGISTRO DEL VEHÍCULO ---
       await FirebaseFirestore.instance.collection('vehiculos').doc(placa).set({
         'placa': placa,
         'marca': _brandController.text.trim().toUpperCase(),
@@ -132,12 +183,10 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
 
       if (!mounted) return;
       Navigator.pop(context); 
-
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("✅ VEHÍCULO VINCULADO AL CLIENTE"), backgroundColor: Colors.green),
       );
 
-      // Limpieza selectiva: se limpian datos del vehículo, pero se mantienen los del cliente
       _plateController.clear();
       _brandController.clear();
       _modelController.clear();
@@ -161,9 +210,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     try {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("No se pudo abrir YouTube Studio")),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo abrir YouTube Studio")));
       }
     } catch (e) {
       if (!mounted) return;
@@ -226,22 +273,21 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start, 
                 children: [
-                  // --- SECCIÓN DEL LOGO MODIFICADA ---
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(25, 80, 25, 50), // Aumentado padding para que respire
+                    padding: const EdgeInsets.fromLTRB(25, 80, 25, 50), 
                     child: Center(
                       child: Transform.scale(
-                        scale: 4.0, // LOGO AGRANDADO (Ajusta este valor según prefieras)
+                        scale: 4.0, 
                         child: Image.asset(
                           'assets/weblogo.jpg',
-                          height: 100, // Altura base
+                          height: 100, 
                           fit: BoxFit.contain,
                           errorBuilder: (context, error, stackTrace) => Icon(Icons.directions_car, color: brandRed, size: 60),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20), // Espacio extra tras el logo escalado
+                  const SizedBox(height: 20),
                   _buildSectionTitle("OPCIONES DEL TALLER"),
                   _sidebarItem(0, Icons.car_repair_rounded, "RECEPCIÓN"),
                   _sidebarItem(1, Icons.analytics_outlined, "DIAGNÓSTICO"),
@@ -330,9 +376,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       case 11: return const HistorialWebModule();
       case 13: return const PresupuestoAppModule();
       case 14: return const TecnicosWebModule ();
-     
-      default:
-        return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
+      default: return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
     }
   }
 
@@ -363,15 +407,32 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                         Icons.badge_outlined, 
                         isNumber: true, 
                         controller: _idController,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(8),
+                        ],
                         suffix: IconButton(
                           icon: const Icon(Icons.search, color: Colors.blueAccent),
                           onPressed: _buscarClienteRecurrente,
-                          tooltip: "Buscar Cliente",
+                          tooltip: "Buscar por Cédula",
                         )
                       )
                     ),
                     const SizedBox(width: 25),
-                    Expanded(child: _buildFormField("Propietario", Icons.person_outline, controller: _nameController)),
+                    Expanded(
+                      child: _buildFormField(
+                        "Propietario", 
+                        Icons.person_outline, 
+                        controller: _nameController,
+                        onChanged: _onSearchChanged,
+                        inputFormatters: [UpperCaseTextFormatter()],
+                        suffix: IconButton(
+                          icon: const Icon(Icons.search, color: Colors.blueAccent),
+                          onPressed: () => _buscarClientePorNombre(_nameController.text), 
+                          tooltip: "Buscar por Nombre",
+                        )
+                      )
+                    ),
                   ],
                 ),
                 const SizedBox(height: 25),
@@ -384,9 +445,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 ),
                 const SizedBox(height: 25),
                 _buildFormField("Dirección de Habitación", Icons.location_on_outlined, controller: _addressController),
-                
                 const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
-                
                 Row(
                   children: [
                     Expanded(child: _buildFormField("Marca", Icons.factory_outlined, controller: _brandController)),
@@ -397,7 +456,15 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 const SizedBox(height: 25),
                 Row(
                   children: [
-                    Expanded(child: _buildFormField("Placa / Matrícula", Icons.tag, controller: _plateController)),
+                    // --- MODIFICACIÓN: PLACA SIEMPRE EN MAYÚSCULAS ---
+                    Expanded(
+                      child: _buildFormField(
+                        "Placa / Matrícula", 
+                        Icons.tag, 
+                        controller: _plateController,
+                        inputFormatters: [UpperCaseTextFormatter()],
+                      )
+                    ),
                     const SizedBox(width: 25),
                     Expanded(child: _buildFormField("Color", Icons.color_lens_outlined, controller: _colorController)),
                   ],
@@ -405,9 +472,27 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                 const SizedBox(height: 25),
                 Row(
                   children: [
-                    Expanded(child: _buildFormField("Año", Icons.event_note_rounded, isNumber: true, controller: _yearController)),
+                    Expanded(
+                      child: _buildFormField(
+                        "Año", 
+                        Icons.event_note_rounded, 
+                        isNumber: true, 
+                        controller: _yearController,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(4),
+                        ],
+                      )
+                    ),
                     const SizedBox(width: 25),
-                    Expanded(child: _buildFormField("Kilometraje (Km)", Icons.speed_rounded, isNumber: true, controller: _kmController)),
+                    Expanded(
+                      child: _buildFormField(
+                        "Kilometraje (Km)", 
+                        Icons.speed_rounded, 
+                        controller: _kmController,
+                        inputFormatters: [ThousandsSeparatorInputFormatter()],
+                      )
+                    ),
                   ],
                 ),
                 const SizedBox(height: 25),
@@ -424,7 +509,14 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     );
   }
 
-  Widget _buildFormField(String label, IconData icon, {bool isNumber = false, int maxLines = 1, TextEditingController? controller, Widget? suffix}) {
+  Widget _buildFormField(String label, IconData icon, {
+    bool isNumber = false, 
+    int maxLines = 1, 
+    TextEditingController? controller, 
+    Widget? suffix, 
+    Function(String)? onChanged,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -433,6 +525,8 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         TextFormField(
           controller: controller,
           maxLines: maxLines,
+          onChanged: onChanged,
+          inputFormatters: inputFormatters,
           keyboardType: isNumber ? TextInputType.number : TextInputType.text,
           style: const TextStyle(color: Colors.white, fontSize: 15),
           textInputAction: TextInputAction.next,
