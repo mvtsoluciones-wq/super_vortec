@@ -1,18 +1,27 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'dart:math'; // Necesario para el número de control aleatorio
+import 'dart:convert'; 
+import 'package:cloud_firestore/cloud_firestore.dart'; 
+
+import 'config_factura_web.dart'; 
 
 // --- MODELOS DE DATOS ---
-
 class ClientePrueba {
   final String nombre;
   final String id;
   final String telefono;
+  final String vehiculo; 
+  final String placa;
 
-  ClientePrueba({required this.nombre, required this.id, required this.telefono});
+  ClientePrueba({
+    required this.nombre, 
+    required this.id, 
+    required this.telefono,
+    this.vehiculo = "RENAULT KOLEOS", 
+    this.placa = "123-TYU",
+  });
 }
 
 class ItemPresupuesto {
@@ -39,13 +48,12 @@ class PresupuestoWebModule extends StatefulWidget {
 }
 
 class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
-  // --- VARIABLES DE ESTADO ---
   final List<ItemPresupuesto> _itemsAgregados = [];
   int _cantidadActual = 1;
   ClientePrueba? _clienteSeleccionado;
-  String _numeroControl = ""; // Variable para el ID único
+  String _numeroControl = "00-DR1U"; 
+  bool _cargandoConfig = true; 
 
-  // --- CONFIGURACIÓN VISUAL ---
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
@@ -53,17 +61,38 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
   @override
   void initState() {
     super.initState();
-    _generarNumeroControl();
+    _cargarConfiguracionBaseDeDatos(); 
   }
 
-  // --- LÓGICA DE CONTROL Y GUARDADO ---
+  // --- FUNCIÓN SINCRONIZADA CON TU BASE DE DATOS (factura) ---
+  Future<void> _cargarConfiguracionBaseDeDatos() async {
+    try {
+      // Ajustado a la ruta: configuracion -> factura
+      var doc = await FirebaseFirestore.instance
+          .collection('configuracion')
+          .doc('factura')
+          .get();
 
-  void _generarNumeroControl() {
-    final now = DateTime.now();
-    final random = Random().nextInt(999).toString().padLeft(3, '0');
-    setState(() {
-      _numeroControl = "SV-${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}-$random";
-    });
+      if (doc.exists) {
+        var data = doc.data()!;
+        setState(() {
+          // Mapeo de campos según los nombres en tu consola de Firebase
+          ConfigFactura.nombreEmpresa = data['nombreEmpresa'] ?? ConfigFactura.nombreEmpresa;
+          ConfigFactura.rifEmpresa = data['rifEmpresa'] ?? ConfigFactura.rifEmpresa;
+          ConfigFactura.direccionEmpresa = data['direccion'] ?? ConfigFactura.direccionEmpresa;
+          ConfigFactura.telefonoEmpresa = data['telefono'] ?? ConfigFactura.telefonoEmpresa;
+          ConfigFactura.correoEmpresa = data['email'] ?? ConfigFactura.correoEmpresa;
+          ConfigFactura.ivaPorcentaje = data['iva'] ?? ConfigFactura.ivaPorcentaje;
+          ConfigFactura.logoBase64 = data['logoBase64']; 
+          _cargandoConfig = false;
+        });
+      } else {
+        setState(() => _cargandoConfig = false);
+      }
+    } catch (e) {
+      debugPrint("Error al cargar configuración desde DB: $e");
+      setState(() => _cargandoConfig = false);
+    }
   }
 
   void _guardarPresupuesto() {
@@ -75,8 +104,6 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
       _notificar("Error: Agregue al menos un repuesto o servicio", Colors.red);
       return;
     }
-
-    // Aquí iría la lógica para enviar a Firebase en el futuro
     _notificar("Éxito: Presupuesto $_numeroControl guardado", Colors.green);
   }
 
@@ -86,11 +113,9 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     );
   }
 
-  // --- DATOS DE PRUEBA ---
   final List<ClientePrueba> _listaClientes = [
-    ClientePrueba(nombre: "Juan Pérez", id: "V-12.345.678", telefono: "0414-1234567"),
+    ClientePrueba(nombre: "NATHALY VILLEGAS", id: "V-12.345.678", telefono: "0414-1234567"),
     ClientePrueba(nombre: "Talleres Mecánicos C.A.", id: "J-30987654-2", telefono: "0212-5554433"),
-    ClientePrueba(nombre: "María Rodríguez", id: "V-9.876.543", telefono: "0424-9998877"),
   ];
 
   final Map<String, double> _inventarioRepuestos = {
@@ -107,74 +132,101 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     'Limpieza de Inyectores': 60.0,
   };
 
-  // --- CÁLCULOS ---
   double get _subtotal => _itemsAgregados.fold(0, (sum, item) => sum + item.totalLinea);
-  double get _iva => _subtotal * 0.16;
+  double get _iva => _subtotal * (double.tryParse(ConfigFactura.ivaPorcentaje) ?? 16.0) / 100;
   double get _total => _subtotal + _iva;
 
-  // --- LÓGICA DE PDF ---
   Future<void> _generatePdf() async {
-    if (_clienteSeleccionado == null || _itemsAgregados.isEmpty) {
-      _notificar("Seleccione cliente e ingrese ítems", brandRed);
-      return;
-    }
+    if (_clienteSeleccionado == null || _itemsAgregados.isEmpty) return;
 
     final pdf = pw.Document();
     pw.MemoryImage? logo;
+
     try {
-      final ByteData bytes = await rootBundle.load('assets/logo_vortec.png');
-      logo = pw.MemoryImage(bytes.buffer.asUint8List());
+      if (ConfigFactura.logoBase64 != null) {
+        logo = pw.MemoryImage(base64Decode(ConfigFactura.logoBase64!));
+      }
     } catch (e) {
-      debugPrint("Logo no encontrado");
+      debugPrint("Error decodificando logo: $e");
     }
 
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(32),
+        margin: const pw.EdgeInsets.all(40),
         build: (pw.Context context) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
+                  if (logo != null) pw.Container(width: 180, child: pw.Image(logo)),
                   pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text("SUPER VORTEC 5.3", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColor.fromInt(brandRed.toARGB32()))),
-                      pw.Text("N° Control: $_numeroControl", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
-                      pw.Text("Fecha: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}"),
+                      pw.Text(ConfigFactura.nombreEmpresa, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 10)),
+                      pw.Text("RIF: ${ConfigFactura.rifEmpresa}", style: const pw.TextStyle(fontSize: 9)),
+                      pw.Text(ConfigFactura.direccionEmpresa, style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.right),
+                      pw.Text("Tel: ${ConfigFactura.telefonoEmpresa}", style: const pw.TextStyle(fontSize: 9)),
                     ],
                   ),
-                  if (logo != null) pw.Image(logo, width: 80),
                 ],
               ),
-              pw.SizedBox(height: 20),
-              pw.Divider(thickness: 1, color: PdfColors.grey300),
-              pw.SizedBox(height: 10),
-              pw.Text("CLIENTE: ${_clienteSeleccionado!.nombre}"),
-              pw.Text("ID/RIF: ${_clienteSeleccionado!.id}"),
+              pw.SizedBox(height: 25),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text("PRESUPUESTO", style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold, color: PdfColors.red900)),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text("NRO: $_numeroControl", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text("FECHA: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}"),
+                    ],
+                  ),
+                ],
+              ),
+              pw.SizedBox(height: 15),
+              pw.Container(
+                width: double.infinity,
+                padding: const pw.EdgeInsets.all(8),
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400, width: 0.5)),
+                child: pw.Column(
+                  children: [
+                    _pdfDataRow("CLIENTE:", _clienteSeleccionado!.nombre),
+                    pw.SizedBox(height: 4),
+                    _pdfDataRow("VEHÍCULO:", "${_clienteSeleccionado!.vehiculo} - PLACA: ${_clienteSeleccionado!.placa}"),
+                  ],
+                ),
+              ),
               pw.SizedBox(height: 20),
               pw.TableHelper.fromTextArray(
                 context: context,
-                headerStyle: pw.TextStyle(color: PdfColors.white, fontWeight: pw.FontWeight.bold),
-                headerDecoration: pw.BoxDecoration(color: PdfColor.fromInt(brandRed.toARGB32())),
+                border: pw.TableBorder.all(color: PdfColors.grey400, width: 0.5),
+                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9),
+                cellStyle: const pw.TextStyle(fontSize: 9),
+                headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
                 data: <List<String>>[
-                  ['Concepto', 'Cant.', 'P. Unitario', 'Total'],
-                  ..._itemsAgregados.map((i) => [i.nombre, i.cantidad.toString(), "\$${i.precioUnitario}", "\$${i.totalLinea}"])
+                  ['Descripción', 'Cant.', 'Precio Unit.', 'Subtotal'],
+                  ..._itemsAgregados.map((i) => [i.nombre, i.cantidad.toString(), "\$${i.precioUnitario.toStringAsFixed(2)}", "\$${i.totalLinea.toStringAsFixed(2)}"])
+                ],
+              ),
+              pw.SizedBox(height: 15),
+              pw.Row(
+                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                children: [
+                  pw.Text("TIEMPO DE GARANTÍA: ________________", style: const pw.TextStyle(fontSize: 8)),
+                  pw.Container(
+                    padding: const pw.EdgeInsets.all(10),
+                    color: PdfColors.grey100,
+                    child: pw.Text("TOTAL A PAGAR: \$${_total.toStringAsFixed(2)}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.red900)),
+                  ),
                 ],
               ),
               pw.Spacer(),
-              pw.Align(
-                alignment: pw.Alignment.centerRight,
-                child: pw.Column(children: [
-                  pw.Text("Subtotal: \$${_subtotal.toStringAsFixed(2)}"),
-                  pw.Text("IVA (16%): \$${_iva.toStringAsFixed(2)}"),
-                  pw.Divider(),
-                  pw.Text("TOTAL: \$${_total.toStringAsFixed(2)}", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16, color: PdfColor.fromInt(brandRed.toARGB32()))),
-                ]),
-              ),
+              pw.Center(child: pw.Text("Gracias por confiar en JMendez Performance", style: pw.TextStyle(fontSize: 8, fontStyle: pw.FontStyle.italic))),
             ],
           );
         },
@@ -183,27 +235,38 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     await Printing.layoutPdf(onLayout: (format) async => pdf.save());
   }
 
-  // --- INTERFAZ ---
+  pw.Widget _pdfDataRow(String label, String value) {
+    return pw.Row(
+      children: [
+        pw.SizedBox(width: 75, child: pw.Text(label, style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 9))),
+        pw.Text(value, style: const pw.TextStyle(fontSize: 9)),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildTopHeader(),
-          const SizedBox(height: 20),
-          _buildControlBadge(),
-          const SizedBox(height: 20),
-          _buildClientImporter(),
-          const SizedBox(height: 30),
-          _buildSelectionArea(),
-          const SizedBox(height: 30),
-          _buildItemsTable(),
-          const SizedBox(height: 30),
-          _buildBottomSummaryAndSave(),
-        ],
+    if (_cargandoConfig) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFD50000)));
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(40),
+        child: Column(
+          children: [
+            _buildTopHeader(),
+            const SizedBox(height: 30),
+            _buildClientImporter(),
+            const SizedBox(height: 30),
+            _buildSelectionArea(),
+            const SizedBox(height: 30),
+            _buildItemsTable(),
+            const SizedBox(height: 30),
+            _buildBottomSummaryAndSave(),
+          ],
+        ),
       ),
     );
   }
@@ -216,12 +279,12 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text("SISTEMA DE PRESUPUESTOS", style: TextStyle(color: brandRed, fontWeight: FontWeight.w900, fontSize: 18)),
-            const Text("SUPER VORTEC - PANEL ADMINISTRATIVO", style: TextStyle(color: Colors.white24, fontSize: 10)),
+            const Text("SINCRONIZADO CON LA NUBE", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
           ],
         ),
         ElevatedButton.icon(
           onPressed: _generatePdf,
-          icon: const Icon(Icons.picture_as_pdf, size: 18),
+          icon: const Icon(Icons.picture_as_pdf),
           label: const Text("DESCARGAR PDF"),
           style: ElevatedButton.styleFrom(backgroundColor: brandRed, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15)),
         ),
@@ -229,18 +292,10 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     );
   }
 
-  Widget _buildControlBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(color: brandRed.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8), border: Border.all(color: brandRed.withValues(alpha: 0.3))),
-      child: Text("CONTROL ID: $_numeroControl", style: TextStyle(color: brandRed, fontWeight: FontWeight.bold, fontSize: 12)),
-    );
-  }
-
   Widget _buildClientImporter() {
     return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
       child: Row(
         children: [
           const Icon(Icons.person_search, color: Colors.white24),
@@ -249,19 +304,13 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
             child: DropdownButtonHideUnderline(
               child: DropdownButton<ClientePrueba>(
                 dropdownColor: cardBlack,
-                hint: const Text("Importar datos del cliente...", style: TextStyle(color: Colors.white24)),
+                hint: const Text("Seleccionar cliente...", style: TextStyle(color: Colors.white24)),
                 value: _clienteSeleccionado,
                 items: _listaClientes.map((c) => DropdownMenuItem(value: c, child: Text(c.nombre, style: const TextStyle(color: Colors.white)))).toList(),
                 onChanged: (val) => setState(() => _clienteSeleccionado = val),
               ),
             ),
           ),
-          if (_clienteSeleccionado != null) ...[
-            const VerticalDivider(color: Colors.white10),
-            _infoChip("ID", _clienteSeleccionado!.id),
-            const SizedBox(width: 20),
-            _infoChip("TEL", _clienteSeleccionado!.telefono),
-          ]
         ],
       ),
     );
@@ -281,22 +330,16 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
   }
 
   Widget _buildQtyCounter() {
-    return Column(
-      children: [
-        const Text("CANT.", style: TextStyle(color: Colors.white24, fontSize: 9, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Container(
-          height: 45,
-          decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8)),
-          child: Row(
-            children: [
-              IconButton(icon: const Icon(Icons.remove, color: Colors.white, size: 14), onPressed: () => setState(() => _cantidadActual > 1 ? _cantidadActual-- : null)),
-              Text("$_cantidadActual", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              IconButton(icon: const Icon(Icons.add, color: Colors.white, size: 14), onPressed: () => setState(() => _cantidadActual++)),
-            ],
-          ),
-        ),
-      ],
+    return Container(
+      height: 45,
+      decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8)),
+      child: Row(
+        children: [
+          IconButton(icon: const Icon(Icons.remove, color: Colors.white), onPressed: () => setState(() => _cantidadActual > 1 ? _cantidadActual-- : null)),
+          Text("$_cantidadActual", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          IconButton(icon: const Icon(Icons.add, color: Colors.white), onPressed: () => setState(() => _cantidadActual++)),
+        ],
+      ),
     );
   }
 
@@ -304,7 +347,7 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: Colors.white24, fontSize: 9, fontWeight: FontWeight.bold)),
+        Text(label.toUpperCase(), style: const TextStyle(color: Colors.white24, fontSize: 9)),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -313,7 +356,6 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
             child: DropdownButton<String>(
               isExpanded: true,
               dropdownColor: cardBlack,
-              hint: const Text("Seleccionar...", style: TextStyle(color: Colors.white24, fontSize: 12)),
               items: fuente.keys.map((k) => DropdownMenuItem(value: k, child: Text(k, style: const TextStyle(color: Colors.white)))).toList(),
               onChanged: (val) {
                 if (val != null) {
@@ -333,22 +375,19 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
   Widget _buildItemsTable() {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+      decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white10)),
       child: DataTable(
-        headingRowColor: WidgetStateProperty.all(Colors.white.withValues(alpha: 0.02)),
         columns: const [
-          DataColumn(label: Text("CONCEPTO", style: TextStyle(color: Colors.white38, fontSize: 10))),
-          DataColumn(label: Text("CANT.", style: TextStyle(color: Colors.white38, fontSize: 10))),
-          DataColumn(label: Text("UNITARIO", style: TextStyle(color: Colors.white38, fontSize: 10))),
-          DataColumn(label: Text("TOTAL", style: TextStyle(color: Colors.white38, fontSize: 10))),
+          DataColumn(label: Text("CONCEPTO", style: TextStyle(color: Colors.white38))),
+          DataColumn(label: Text("CANT.", style: TextStyle(color: Colors.white38))),
+          DataColumn(label: Text("TOTAL", style: TextStyle(color: Colors.white38))),
           DataColumn(label: Text("", style: TextStyle(color: Colors.white38))),
         ],
         rows: _itemsAgregados.asMap().entries.map((e) => DataRow(cells: [
-          DataCell(Text(e.value.nombre, style: const TextStyle(color: Colors.white, fontSize: 13))),
+          DataCell(Text(e.value.nombre, style: const TextStyle(color: Colors.white))),
           DataCell(Text("${e.value.cantidad}", style: const TextStyle(color: Colors.white70))),
-          DataCell(Text("\$${e.value.precioUnitario.toStringAsFixed(2)}", style: const TextStyle(color: Colors.white70))),
           DataCell(Text("\$${e.value.totalLinea.toStringAsFixed(2)}", style: TextStyle(color: brandRed, fontWeight: FontWeight.bold))),
-          DataCell(IconButton(icon: const Icon(Icons.close, color: Colors.white10, size: 16), onPressed: () => setState(() => _itemsAgregados.removeAt(e.key)))),
+          DataCell(IconButton(icon: const Icon(Icons.close, color: Colors.white10), onPressed: () => setState(() => _itemsAgregados.removeAt(e.key)))),
         ])).toList(),
       ),
     );
@@ -357,25 +396,23 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
   Widget _buildBottomSummaryAndSave() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         ElevatedButton.icon(
           onPressed: _guardarPresupuesto,
           icon: const Icon(Icons.save),
-          label: const Text("GUARDAR EN SISTEMA", style: TextStyle(fontWeight: FontWeight.bold)),
-          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
+          label: const Text("GUARDAR PRESUPUESTO"),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white, padding: const EdgeInsets.all(20)),
         ),
         Container(
           width: 300,
-          padding: const EdgeInsets.all(25),
-          decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(12), border: Border.all(color: brandRed.withValues(alpha: 0.2))),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(12)),
           child: Column(
             children: [
               _summaryRow("SUBTOTAL", "\$${_subtotal.toStringAsFixed(2)}"),
-              const SizedBox(height: 10),
-              _summaryRow("IVA (16%)", "\$${_iva.toStringAsFixed(2)}"),
-              const Divider(color: Colors.white10, height: 30),
-              _summaryRow("TOTAL ESTIMADO", "\$${_total.toStringAsFixed(2)}", isBold: true),
+              _summaryRow("IVA (${ConfigFactura.ivaPorcentaje}%)", "\$${_iva.toStringAsFixed(2)}"),
+              const Divider(color: Colors.white10),
+              _summaryRow("TOTAL", "\$${_total.toStringAsFixed(2)}", isBold: true),
             ],
           ),
         ),
@@ -387,14 +424,9 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(l, style: TextStyle(color: isBold ? Colors.white : Colors.white38, fontSize: isBold ? 14 : 11, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+        Text(l, style: TextStyle(color: isBold ? Colors.white : Colors.white38)),
         Text(v, style: TextStyle(color: isBold ? brandRed : Colors.white, fontWeight: FontWeight.bold, fontSize: isBold ? 18 : 14)),
       ],
     );
   }
-
-  Widget _infoChip(String l, String v) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(l, style: const TextStyle(color: Colors.white24, fontSize: 9)),
-    Text(v, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-  ]);
 }

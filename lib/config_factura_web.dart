@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
+import 'dart:convert';
+import 'dart:io'; // Necesario para manejo de archivos locales
 import 'package:file_picker/file_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:path_provider/path_provider.dart'; // Librería de almacenamiento local
 
 // --- CLASE DE DATOS GLOBAL ---
 class ConfigFactura {
@@ -10,9 +14,9 @@ class ConfigFactura {
   static String telefonoEmpresa = "(0212) 639.04.57";
   static String correoEmpresa = "mvtsoluciones@gmail.com";
   static String ivaPorcentaje = "16";
-  static String logoPath = "assets/weblogo.jpg"; // Ruta por defecto para assets
+  static String logoPath = "assets/weblogo.jpg";
   
-  // Variable para almacenar los bytes del logo cargado dinámicamente
+  static String? logoBase64; 
   static Uint8List? logoBytes; 
 }
 
@@ -36,6 +40,7 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
   late TextEditingController _ctrlIva;
   
   Uint8List? _logoBytesSeleccionado;
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -47,72 +52,172 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
     _ctrlCorreo = TextEditingController(text: ConfigFactura.correoEmpresa);
     _ctrlIva = TextEditingController(text: ConfigFactura.ivaPorcentaje);
     _logoBytesSeleccionado = ConfigFactura.logoBytes;
+
+    _cargarConfiguracionDesdeDB(); 
   }
 
-  // --- FUNCIÓN PARA CARGAR EL LOGO ---
+  // --- NUEVA FUNCIÓN: GUARDAR FÍSICAMENTE EN EL DISCO DURO ---
+  Future<void> _guardarLogoLocalmente(Uint8List bytes) async {
+    try {
+      final directorio = await getApplicationDocumentsDirectory();
+      final archivoLocal = File('${directorio.path}/logo_taller_vortec.png');
+      await archivoLocal.writeAsBytes(bytes);
+      debugPrint("Caché local actualizado en: ${archivoLocal.path}");
+    } catch (e) {
+      debugPrint("Error guardando caché local: $e");
+    }
+  }
+
+  // --- NUEVA FUNCIÓN: BUSCAR LOGO EN EL DISCO DURO ANTES QUE EN LA NUBE ---
+  Future<void> _intentarCargarLogoLocal() async {
+    try {
+      final directorio = await getApplicationDocumentsDirectory();
+      final archivoLocal = File('${directorio.path}/logo_taller_vortec.png');
+      if (await archivoLocal.exists()) {
+        final bytes = await archivoLocal.readAsBytes();
+        setState(() {
+          _logoBytesSeleccionado = bytes;
+          ConfigFactura.logoBytes = bytes;
+          ConfigFactura.logoBase64 = base64Encode(bytes);
+        });
+        debugPrint("Logo cargado desde memoria local (Instantáneo)");
+      }
+    } catch (e) {
+      debugPrint("Error cargando caché local: $e");
+    }
+  }
+
+  Future<void> _cargarConfiguracionDesdeDB() async {
+    // Primero intentamos la carga rápida local
+    await _intentarCargarLogoLocal();
+
+    try {
+      var doc = await FirebaseFirestore.instance.collection('configuracion').doc('factura').get();
+      if (doc.exists) {
+        var data = doc.data()!;
+        setState(() {
+          _ctrlNombreEmpresa.text = data['nombreEmpresa'] ?? ConfigFactura.nombreEmpresa;
+          _ctrlRifEmpresa.text = data['rifEmpresa'] ?? ConfigFactura.rifEmpresa;
+          _ctrlDireccion.text = data['direccion'] ?? ConfigFactura.direccionEmpresa;
+          _ctrlTelefono.text = data['telefono'] ?? ConfigFactura.telefonoEmpresa;
+          _ctrlCorreo.text = data['email'] ?? ConfigFactura.correoEmpresa;
+          _ctrlIva.text = data['iva'] ?? ConfigFactura.ivaPorcentaje;
+          
+          if (data['logoBase64'] != null) {
+            ConfigFactura.logoBase64 = data['logoBase64'];
+            Uint8List bytesDecodificados = base64Decode(data['logoBase64']);
+            _logoBytesSeleccionado = bytesDecodificados;
+            ConfigFactura.logoBytes = bytesDecodificados;
+            
+            // Actualizamos la copia local para que la próxima vez sea instantáneo
+            _guardarLogoLocalmente(bytesDecodificados);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint("Error al cargar config: $e");
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _seleccionarLogo() async {
-    // NOTA: Asegúrate de que 'file_picker' esté correctamente instalado y configurado.
-    // En web, esto debería abrir el diálogo de selección del navegador sin problemas.
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: false,
     );
 
     if (result != null && result.files.first.bytes != null) {
+      if (result.files.first.size > 2000000) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("⚠️ LA IMAGEN ES MUY PESADA. USA EL LOGO REDIMENSIONADO."), backgroundColor: Colors.orange),
+        );
+      }
       setState(() {
-        // En web, usamos los 'bytes' del archivo seleccionado
         _logoBytesSeleccionado = result.files.first.bytes;
       });
     }
   }
 
-  void _guardarConfiguracion() {
-    setState(() {
-      ConfigFactura.nombreEmpresa = _ctrlNombreEmpresa.text;
-      ConfigFactura.rifEmpresa = _ctrlRifEmpresa.text;
-      ConfigFactura.direccionEmpresa = _ctrlDireccion.text;
-      ConfigFactura.telefonoEmpresa = _ctrlTelefono.text;
-      ConfigFactura.correoEmpresa = _ctrlCorreo.text;
-      ConfigFactura.ivaPorcentaje = _ctrlIva.text;
-      ConfigFactura.logoBytes = _logoBytesSeleccionado; // Guardamos la selección en la config global
-    });
+  void _guardarConfiguracion() async {
+    String? base64Image;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("CONFIGURACIÓN Y LOGO ACTUALIZADOS"),
-        backgroundColor: Colors.green,
-      ),
-    );
+    if (_logoBytesSeleccionado != null) {
+      String tempBase64 = base64Encode(_logoBytesSeleccionado!);
+      
+      if (tempBase64.length > 1000000) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("❌ ERROR: LOGO MUY GRANDE PARA LA NUBE."), backgroundColor: Colors.red),
+        );
+        return; 
+      }
+      base64Image = tempBase64;
+      // Guardamos localmente para velocidad instantánea
+      await _guardarLogoLocalmente(_logoBytesSeleccionado!);
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('configuracion').doc('factura').set({
+        'nombreEmpresa': _ctrlNombreEmpresa.text,
+        'rifEmpresa': _ctrlRifEmpresa.text,
+        'direccion': _ctrlDireccion.text,
+        'telefono': _ctrlTelefono.text,
+        'email': _ctrlCorreo.text,
+        'iva': _ctrlIva.text,
+        'logoBase64': base64Image, 
+      }, SetOptions(merge: true));
+
+      setState(() {
+        ConfigFactura.nombreEmpresa = _ctrlNombreEmpresa.text;
+        ConfigFactura.logoBytes = _logoBytesSeleccionado;
+        ConfigFactura.logoBase64 = base64Image;
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("✅ DATOS SINCRONIZADOS (NUBE Y LOCAL)"), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("❌ ERROR AL GUARDAR: $e"), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFFD50000)));
+    }
+
     return Padding(
       padding: const EdgeInsets.all(40),
       child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 850),
-          // Se eliminó el padding interno fijo para manejarlo dentro del scroll si es necesario
           decoration: BoxDecoration(
             color: cardBlack,
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.white10),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5), 
+                color: Colors.black.withValues(alpha: 0.5),
                 blurRadius: 30,
                 offset: const Offset(0, 15),
               )
             ]
           ),
-          // SOLUCIÓN AL OVERFLOW: Usar SingleChildScrollView para permitir el desplazamiento
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(40), // Padding aplicado dentro del scroll
+            padding: const EdgeInsets.all(40),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Encabezado sin la previsualización pequeña antigua
                 const Row(
                   children: [
                     Icon(Icons.settings_suggest, color: Colors.white, size: 32),
@@ -125,84 +230,50 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  "Los cambios realizados aquí se reflejarán en el módulo de Facturación y en los PDFs.",
+                  "Los cambios se guardan localmente para carga rápida de PDFs y en la nube para respaldo.",
                   style: TextStyle(color: Colors.white38, fontSize: 13),
                 ),
                 const Padding(padding: EdgeInsets.symmetric(vertical: 25), child: Divider(color: Colors.white10)),
 
-                // --- NUEVA SECCIÓN DE CARGA DE LOGO REDISEÑADA ---
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 1. Área de visualización (Cuadrícula)
                     Container(
-                      width: 150,
-                      height: 150,
+                      width: 150, height: 150,
                       decoration: BoxDecoration(
                         color: inputFill,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: Colors.white10),
                         image: _logoBytesSeleccionado != null
-                            ? DecorationImage(
-                                image: MemoryImage(_logoBytesSeleccionado!),
-                                fit: BoxFit.contain, // Ajusta la imagen dentro del cuadro
-                              )
+                            ? DecorationImage(image: MemoryImage(_logoBytesSeleccionado!), fit: BoxFit.contain)
                             : null,
                       ),
                       child: _logoBytesSeleccionado == null
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_photo_alternate_outlined, color: Colors.white24, size: 40),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  "Sin Logo",
-                                  style: TextStyle(color: Colors.white24, fontSize: 12),
-                                ),
-                              ],
-                            )
+                          ? const Icon(Icons.add_photo_alternate_outlined, color: Colors.white24, size: 40)
                           : null,
                     ),
                     const SizedBox(width: 30),
-                    // 2. Información y Botón de Carga
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            "LOGO DEL DOCUMENTO",
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
+                          const Text("LOGO DEL TALLER", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 10),
-                          const Text(
-                            "Este logo se utilizará en el encabezado de los presupuestos, órdenes de trabajo y facturas generadas por el sistema.",
-                            style: TextStyle(color: Colors.white54, fontSize: 13),
-                          ),
-                          const SizedBox(height: 5),
-                          const Text(
-                            "Formatos permitidos: PNG, JPG.",
-                            style: TextStyle(color: Colors.white24, fontSize: 12),
-                          ),
+                          const Text("Se guardará una copia en esta PC para que los presupuestos carguen al instante.", style: TextStyle(color: Colors.white54, fontSize: 13)),
                           const SizedBox(height: 20),
                           ElevatedButton.icon(
                             onPressed: _seleccionarLogo,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: brandRed,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
+                            style: ElevatedButton.styleFrom(backgroundColor: brandRed, foregroundColor: Colors.white),
                             icon: const Icon(Icons.upload_file),
-                            label: const Text("SUBIR IMAGEN", style: TextStyle(fontWeight: FontWeight.bold)),
+                            label: const Text("SUBIR IMAGEN"),
                           ),
                         ],
                       ),
                     ),
                   ],
                 ),
-                // --------------------------------------------------
 
-                const SizedBox(height: 35), // Espacio aumentado
+                const SizedBox(height: 35),
 
                 Row(
                   children: [
@@ -224,14 +295,12 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
                   ],
                 ),
                 const SizedBox(height: 40),
-                // Botón inferior sin overflow
                 SizedBox(
-                  width: double.infinity,
-                  height: 60,
+                  width: double.infinity, height: 60,
                   child: ElevatedButton.icon(
                     onPressed: _guardarConfiguracion,
                     style: ElevatedButton.styleFrom(backgroundColor: brandRed, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                    icon: const Icon(Icons.save_as_rounded),
+                    icon: const Icon(Icons.cloud_sync),
                     label: const Text("GUARDAR Y SINCRONIZAR DATOS", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                 ),
@@ -250,8 +319,7 @@ class _ConfigFacturaWebState extends State<ConfigFacturaWeb> {
         Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         TextField(
-          controller: controller,
-          maxLines: maxLines,
+          controller: controller, maxLines: maxLines,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: Colors.white70, size: 20),

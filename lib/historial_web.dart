@@ -19,7 +19,6 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
   DateTime? _fechaFiltro;
   String? _tecnicoSeleccionado;
 
-  // EFECTO DE BORDE NEGRO PARA TÍTULOS (Stroke effect)
   final List<Shadow> _bordeNegro = [
     const Shadow(offset: Offset(-1.5, -1.5), color: Colors.black),
     const Shadow(offset: Offset(1.5, -1.5), color: Colors.black),
@@ -45,6 +44,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     return "HACE $diferencia DÍAS";
   }
 
+  // --- FUNCIÓN ACTUALIZADA: DESCUENTO AUTOMÁTICO DÍA A DÍA ---
   Map<String, dynamic> _calcularGarantia(DateTime fechaFin, dynamic garantiaData) {
     int diasTotales = 30; 
     String totalTexto = "30 DÍAS";
@@ -60,7 +60,8 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
             int meses = int.tryParse(raw.split(' ')[0]) ?? 1;
             diasTotales = meses * 30;
           } else {
-            diasTotales = int.tryParse(raw.split(' ')[0]) ?? 30;
+            // Extrae solo el número si viene como "90 DÍAS"
+            diasTotales = int.tryParse(raw.replaceAll(RegExp(r'[^0-9]'), '')) ?? 30;
           }
         }
       }
@@ -68,11 +69,22 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
       diasTotales = 30;
     }
 
+    // Cálculo dinámico comparando con la fecha actual del sistema
     final fechaVencimiento = fechaFin.add(Duration(days: diasTotales));
-    final restante = fechaVencimiento.difference(DateTime.now()).inDays;
+    final diferenciaActual = fechaVencimiento.difference(DateTime.now());
+    
+    // Convertimos a días completos restantes
+    int diasRestantes = diferenciaActual.inDays;
+    
+    // Si la diferencia es positiva pero menor a 24h, inDays da 0, 
+    // pero técnicamente aún queda tiempo hoy.
+    if (!diferenciaActual.isNegative && diferenciaActual.inHours > 0 && diasRestantes == 0) {
+      diasRestantes = 1; 
+    }
+
     return {
-      "restante": restante < 0 ? 0 : restante,
-      "vencida": restante < 0,
+      "restante": diasRestantes < 0 ? 0 : diasRestantes,
+      "vencida": diferenciaActual.isNegative,
       "total_db": totalTexto
     };
   }
@@ -255,7 +267,6 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // COLUMNA 1: VEHÍCULO Y VIDEOS
               Expanded(
                 flex: 2,
                 child: Column(
@@ -264,8 +275,6 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                     Text(data['modelo_vehiculo'] ?? "S/D", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18, shadows: _bordeNegro)),
                     Text("PLACA: $placa", style: const TextStyle(color: Colors.white38, fontSize: 12)),
                     const SizedBox(height: 20),
-                    
-                    // --- MODIFICACIÓN: VIDEO RECEPCIÓN DESDE COLECCIÓN VEHICULOS ---
                     FutureBuilder<DocumentSnapshot>(
                       future: FirebaseFirestore.instance.collection('vehiculos').doc(placa).get(),
                       builder: (context, snapshot) {
@@ -281,8 +290,6 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                   ],
                 ),
               ),
-              
-              // COLUMNA 2: DETALLES TÉCNICOS Y GARANTÍA ALINEADA
               Expanded(
                 flex: 4,
                 child: Padding(
@@ -329,8 +336,6 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                   ),
                 ),
               ),
-
-              // COLUMNA 3: PRESUPUESTO
               Expanded(
                 flex: 2,
                 child: Column(
