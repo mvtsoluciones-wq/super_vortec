@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'admin_panel.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; // <--- 1. IMPORTAR ESTO PARA DETECTAR WEB
+
+import 'admin_panel.dart'; // Panel del dueño
+import 'main.dart'; // <--- 2. IMPORTAR ESTO PARA ACCEDER A 'ClientHomeScreen'
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _passController.text.trim(),
       );
 
-      // 2. Verificación de Rol en Firestore
+      // 2. Verificación de Rol en Firestore (Opcional, pero visual)
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
           .collection('usuarios')
           .doc(userCredential.user!.uid)
@@ -47,11 +50,21 @@ class _LoginScreenState extends State<LoginScreen> {
         _showSnackBar("Bienvenido, acceso como $rol concedido", Colors.green);
       }
 
-      // 3. NAVEGACIÓN (Línea 58 corregida)
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AdminControlPanel()),
-      );
+      // --- 3. LÓGICA DE TRÁFICO (AQUÍ ESTÁ LA SOLUCIÓN) ---
+      if (kIsWeb) {
+        // SI ES WEB -> VA AL PANEL ADMINISTRATIVO
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AdminControlPanel()),
+        );
+      } else {
+        // SI ES APP (MÓVIL) -> VA A LA PANTALLA PRINCIPAL DE CLIENTES
+        // ClientHomeScreen está definida en main.dart
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ClientHomeScreen()), 
+        );
+      }
       
     } on FirebaseAuthException catch (e) {
       String mensaje = "Error de autenticación";

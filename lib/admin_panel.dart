@@ -191,7 +191,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         'placa': placa,
         'marca': _brandController.text.trim(),
         'modelo': _modelController.text.trim(),
-        'color': _colorController.text.trim(), // Guardado con formato Primera Mayúscula
+        'color': _colorController.text.trim(),
         'anio': _yearController.text.trim(),
         'km': _kmController.text.trim(),
         'observaciones_ingreso': _obsController.text.trim(),
@@ -240,13 +240,9 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
 
   @override
   Widget build(BuildContext context) {
-    double screenWidth = MediaQuery.of(context).size.width;
-    if (screenWidth < 800) {
-      return Scaffold(
-        backgroundColor: deepBlack,
-        body: const Center(child: Text("ACCESO SOLO PC", style: TextStyle(color: Colors.white))),
-      );
-    }
+    // --- CORRECCIÓN: ELIMINADO EL BLOQUEO DE PANTALLA ---
+    // Ya no hay "if (screenWidth < 800) return Scaffold... Acceso solo PC"
+    // El código entra directamente al panel principal.
 
     return Scaffold(
       backgroundColor: mediumGrey,
@@ -498,7 +494,6 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                       )
                     ),
                     const SizedBox(width: 25),
-                    // --- MODIFICACIÓN: COLOR CON PRIMERA MAYÚSCULA ---
                     Expanded(
                       child: _buildFormField(
                         "Color", 
