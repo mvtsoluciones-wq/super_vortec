@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 import 'dart:async';
 
 // --- IMPORTACIONES DE MÓDULOS ---
@@ -16,7 +16,7 @@ import 'ofertas_web.dart';
 import 'market_web.dart';
 import 'facturacion_web.dart';
 import 'inventario_web.dart';
-import 'config_factura_web.dart'; 
+import 'config_factura_web.dart';
 import 'historial_web.dart';
 import 'presupuesto_app.dart';
 import 'tecnicos_web.dart';
@@ -24,7 +24,10 @@ import 'tecnicos_web.dart';
 // --- 1. FORMATEADOR PARA MAYÚSCULAS ---
 class UpperCaseTextFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     return newValue.copyWith(text: newValue.text.toUpperCase());
   }
 }
@@ -32,7 +35,10 @@ class UpperCaseTextFormatter extends TextInputFormatter {
 // --- 2. FORMATEADOR PARA KILOMETRAJE (PUNTOS DE MIL) ---
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     if (newValue.text.isEmpty) return newValue;
     String cleanText = newValue.text.replaceAll('.', '');
     if (!RegExp(r'^\d+$').hasMatch(cleanText)) return oldValue;
@@ -57,15 +63,20 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
 // --- 3. FORMATEADOR PARA PRIMERA LETRA MAYÚSCULA (TITLE CASE) ---
 class TitleCaseTextFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     if (newValue.text.isEmpty) return newValue;
-    
+
     String text = newValue.text;
     List<String> words = text.split(' ');
-    String result = words.map((word) {
-      if (word.isEmpty) return '';
-      return word[0].toUpperCase() + word.substring(1).toLowerCase();
-    }).join(' ');
+    String result = words
+        .map((word) {
+          if (word.isEmpty) return '';
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
 
     return newValue.copyWith(
       text: result,
@@ -84,22 +95,22 @@ class AdminControlPanel extends StatefulWidget {
 class _AdminControlPanelState extends State<AdminControlPanel> {
   int _activeTab = 0;
   final _formKey = GlobalKey<FormState>();
-  
+
   Timer? _debounce;
 
-  final Color brandRed = const Color(0xFFD50000); 
+  final Color brandRed = const Color(0xFFD50000);
   final Color deepBlack = const Color(0xFF000000);
-  final Color mediumGrey = const Color(0xFF454D55); 
-  final Color cardBlack = const Color(0xFF101010);  
-  final Color inputFill = const Color(0xFF1E1E1E); 
+  final Color mediumGrey = const Color(0xFF454D55);
+  final Color cardBlack = const Color(0xFF101010);
+  final Color inputFill = const Color(0xFF1E1E1E);
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _idController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController(); 
-  final TextEditingController _brandController = TextEditingController(); 
-  final TextEditingController _modelController = TextEditingController(); 
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _brandController = TextEditingController();
+  final TextEditingController _modelController = TextEditingController();
   final TextEditingController _plateController = TextEditingController();
   final TextEditingController _colorController = TextEditingController();
   final TextEditingController _yearController = TextEditingController();
@@ -117,7 +128,10 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     String cedula = _idController.text.trim();
     if (cedula.isEmpty) return;
     try {
-      var doc = await FirebaseFirestore.instance.collection('clientes').doc(cedula).get();
+      var doc = await FirebaseFirestore.instance
+          .collection('clientes')
+          .doc(cedula)
+          .get();
       if (doc.exists) {
         var data = doc.data()!;
         setState(() {
@@ -163,7 +177,10 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
   Future<void> _guardarRegistroEnBaseDeDatos() async {
     if (!_formKey.currentState!.validate()) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ ERROR: TODOS LOS CAMPOS SON OBLIGATORIOS"), backgroundColor: Colors.orange),
+        const SnackBar(
+          content: Text("⚠️ ERROR: TODOS LOS CAMPOS SON OBLIGATORIOS"),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -171,40 +188,57 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator(color: Color(0xFFD50000))),
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Color(0xFFD50000)),
+      ),
     );
 
     try {
       String clienteId = _idController.text.trim();
-      String placa = _plateController.text.trim().toUpperCase();
+      String placaId = _plateController.text.trim().toUpperCase();
 
-      await FirebaseFirestore.instance.collection('clientes').doc(clienteId).set({
-        'nombre': _nameController.text.trim().toUpperCase(),
-        'email': _emailController.text.trim().toLowerCase(),
-        'telefono': _phoneController.text.trim(),
-        'cedula': clienteId,
-        'direccion': _addressController.text.trim().toUpperCase(),
-        'ultima_visita': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      // 1. Guardar o Actualizar Cliente con ROL habilitado
+      await FirebaseFirestore.instance
+          .collection('clientes')
+          .doc(clienteId)
+          .set({
+            'nombre': _nameController.text.trim().toUpperCase(),
+            'email': _emailController.text.trim().toLowerCase(),
+            'telefono': _phoneController.text.trim(),
+            'cedula': clienteId,
+            'direccion': _addressController.text.trim().toUpperCase(),
+            'rol': 'cliente',
+            'ultima_visita': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
 
-      await FirebaseFirestore.instance.collection('vehiculos').doc(placa).set({
-        'placa': placa,
-        'marca': _brandController.text.trim(),
-        'modelo': _modelController.text.trim(),
-        'color': _colorController.text.trim(),
-        'anio': _yearController.text.trim(),
-        'km': _kmController.text.trim(),
-        'observaciones_ingreso': _obsController.text.trim(),
-        'video_recepcion': _videoController.text.trim(),
-        'propietario_id': clienteId,
-        'en_taller': true,
-        'fecha_ingreso': FieldValue.serverTimestamp(),
-      });
+      // 2. Guardar Datos del Vehículo vinculado al Cliente
+      await FirebaseFirestore.instance
+          .collection('vehiculos')
+          .doc(placaId)
+          .set({
+            'placa': placaId,
+            'marca': _brandController.text.trim().toUpperCase(),
+            'modelo': _modelController.text.trim().toUpperCase(),
+            'color': _colorController.text.trim().toUpperCase(),
+            'anio': _yearController.text.trim(),
+            'km': _kmController.text.trim(),
+            'observaciones_ingreso': _obsController.text.trim(),
+            'video_recepcion': _videoController.text.trim(),
+            'propietario_id': clienteId,
+            'en_taller': true,
+            'fecha_ingreso': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
 
-      if (!mounted) return;
-      Navigator.pop(context); 
+      if (!mounted) {
+        return;
+      }
+
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("✅ VEHÍCULO VINCULADO AL CLIENTE"), backgroundColor: Colors.green),
+        const SnackBar(
+          content: Text("✅ REGISTRO TÉCNICO COMPLETO"),
+          backgroundColor: Colors.green,
+        ),
       );
 
       _plateController.clear();
@@ -215,12 +249,16 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       _kmController.clear();
       _obsController.clear();
       _videoController.clear();
-      
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("❌ ERROR DE CONEXIÓN: $e"), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text("❌ ERROR DE CONEXIÓN: $e"),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -229,21 +267,25 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     final Uri url = Uri.parse('https://studio.youtube.com/');
     try {
       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo abrir YouTube Studio")));
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("No se pudo abrir YouTube Studio")),
+        );
       }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // --- CORRECCIÓN: ELIMINADO EL BLOQUEO DE PANTALLA ---
-    // Ya no hay "if (screenWidth < 800) return Scaffold... Acceso solo PC"
-    // El código entra directamente al panel principal.
-
     return Scaffold(
       backgroundColor: mediumGrey,
       body: Row(
@@ -255,7 +297,7 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(), 
+                  _buildHeader(),
                   const SizedBox(height: 30),
                   Expanded(
                     child: Align(
@@ -287,18 +329,22 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           Expanded(
             child: SingleChildScrollView(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start, 
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(25, 80, 25, 50), 
+                    padding: const EdgeInsets.fromLTRB(25, 80, 25, 50),
                     child: Center(
                       child: Transform.scale(
-                        scale: 4.0, 
+                        scale: 4.0,
                         child: Image.asset(
                           'assets/weblogo.jpg',
-                          height: 100, 
+                          height: 100,
                           fit: BoxFit.contain,
-                          errorBuilder: (context, error, stackTrace) => Icon(Icons.directions_car, color: brandRed, size: 60),
+                          errorBuilder: (context, error, stackTrace) => Icon(
+                            Icons.directions_car,
+                            color: brandRed,
+                            size: 60,
+                          ),
                         ),
                       ),
                     ),
@@ -310,17 +356,37 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   _sidebarItem(2, Icons.gps_fixed_rounded, "SEGUIMIENTO"),
                   _sidebarItem(3, Icons.person_search_rounded, "CLIENTES"),
                   _sidebarItem(11, Icons.history_edu_rounded, "HISTORIAL"),
-                  _sidebarItem(13, Icons.description_rounded, "PRESUPUESTOS APP"),
+                  _sidebarItem(
+                    13,
+                    Icons.description_rounded,
+                    "PRESUPUESTOS APP",
+                  ),
                   _buildDivider(),
                   _buildSectionTitle("HERRAMIENTAS"),
-                  _sidebarItem(4, Icons.notifications_active_outlined, "NOTIFICACIÓN"),
+                  _sidebarItem(
+                    4,
+                    Icons.notifications_active_outlined,
+                    "NOTIFICACIÓN",
+                  ),
                   _sidebarItem(5, Icons.storefront_rounded, "TIENDA"),
-                  _sidebarItem(6, Icons.local_fire_department_rounded, "OFERTAS"),
+                  _sidebarItem(
+                    6,
+                    Icons.local_fire_department_rounded,
+                    "OFERTAS",
+                  ),
                   _sidebarItem(7, Icons.hub_outlined, "MARKET"),
                   _buildDivider(),
                   _buildSectionTitle("ADMINISTRACIÓN"),
-                  _sidebarItem(8, Icons.account_balance_wallet_outlined, "FACTURACIÓN"),
-                  _sidebarItem(12, Icons.settings_suggest_rounded, "CONFIG. FISCAL"),
+                  _sidebarItem(
+                    8,
+                    Icons.account_balance_wallet_outlined,
+                    "FACTURACIÓN",
+                  ),
+                  _sidebarItem(
+                    12,
+                    Icons.settings_suggest_rounded,
+                    "CONFIG. FISCAL",
+                  ),
                   _sidebarItem(9, Icons.request_quote_outlined, "PRESUPUESTOS"),
                   _sidebarItem(10, Icons.inventory_2_outlined, "INVENTARIO"),
                   _sidebarItem(14, Icons.engineering_rounded, "TÉCNICOS"),
@@ -331,9 +397,23 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           _buildDivider(),
           ListTile(
             onTap: () async => await FirebaseAuth.instance.signOut(),
-            leading: const Icon(Icons.logout_rounded, color: Colors.redAccent, size: 20),
-            title: const Text("CERRAR SESIÓN", style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+            leading: const Icon(
+              Icons.logout_rounded,
+              color: Colors.redAccent,
+              size: 20,
+            ),
+            title: const Text(
+              "CERRAR SESIÓN",
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 25,
+              vertical: 10,
+            ),
           ),
           const SizedBox(height: 20),
         ],
@@ -345,8 +425,19 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     bool isSelected = _activeTab == index;
     return ListTile(
       onTap: () => setState(() => _activeTab = index),
-      leading: Icon(icon, color: isSelected ? Colors.white : Colors.white38, size: 20),
-      title: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.white38, fontSize: 13, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      leading: Icon(
+        icon,
+        color: isSelected ? Colors.white : Colors.white38,
+        size: 20,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.white38,
+          fontSize: 13,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
       selected: isSelected,
       selectedTileColor: brandRed.withValues(alpha: 0.15),
       contentPadding: const EdgeInsets.symmetric(horizontal: 25),
@@ -357,18 +448,45 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("JMendez Performance", style: TextStyle(color: Colors.white24, fontSize: 12, letterSpacing: 4, fontWeight: FontWeight.bold)),
+        const Text(
+          "JMendez Performance",
+          style: TextStyle(
+            color: Colors.white24,
+            fontSize: 12,
+            letterSpacing: 4,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 5),
         Row(
           children: [
             const Text(
               "SISTEMA DE CONTROL",
-              style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900, letterSpacing: 1),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1,
+              ),
             ),
             const SizedBox(width: 15),
-            Container(width: 10, height: 10, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+            Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                color: Colors.green,
+                shape: BoxShape.circle,
+              ),
+            ),
             const SizedBox(width: 5),
-            const Text("ONLINE", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+            const Text(
+              "ONLINE",
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
       ],
@@ -377,22 +495,44 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
 
   Widget _buildCurrentModule() {
     switch (_activeTab) {
-      case 0: return _moduleRecepcionVehiculo();
-      case 1: return const DiagnosticoWebModule();
-      case 2: return const SeguimientoWebModule();
-      case 3: return const ClientesWebModule();
-      case 4: return const NotificacionesWebModule();
-      case 5: return const TiendaWebModule();
-      case 6: return const OfertasWebModule();
-      case 7: return const MarketWebModule();
-      case 8: return const FacturacionWebModule();
-      case 12: return const ConfigFacturaWeb(); 
-      case 9: return const PresupuestoWebModule();
-      case 10: return const InventarioWebModule();
-      case 11: return const HistorialWebModule();
-      case 13: return const PresupuestoAppModule();
-      case 14: return const TecnicosWebModule ();
-      default: return const Center(child: Icon(Icons.construction_rounded, color: Colors.white10, size: 150));
+      case 0:
+        return _moduleRecepcionVehiculo();
+      case 1:
+        return const DiagnosticoWebModule();
+      case 2:
+        return const SeguimientoWebModule();
+      case 3:
+        return const ClientesWebModule();
+      case 4:
+        return const NotificacionesWebModule();
+      case 5:
+        return const TiendaWebModule();
+      case 6:
+        return const OfertasWebModule();
+      case 7:
+        return const MarketWebModule();
+      case 8:
+        return const FacturacionWebModule();
+      case 12:
+        return const ConfigFacturaWeb();
+      case 9:
+        return const PresupuestoWebModule();
+      case 10:
+        return const InventarioWebModule();
+      case 11:
+        return const HistorialWebModule();
+      case 13:
+        return const PresupuestoAppModule();
+      case 14:
+        return const TecnicosWebModule();
+      default:
+        return const Center(
+          child: Icon(
+            Icons.construction_rounded,
+            color: Colors.white10,
+            size: 150,
+          ),
+        );
     }
   }
 
@@ -405,80 +545,121 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           child: Container(
             padding: const EdgeInsets.all(40),
             decoration: BoxDecoration(
-              color: cardBlack, 
+              color: cardBlack,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: const [BoxShadow(color: Colors.black54, blurRadius: 30, offset: Offset(0, 15))],
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black54,
+                  blurRadius: 30,
+                  offset: Offset(0, 15),
+                ),
+              ],
               border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("REGISTRO DE INGRESO TÉCNICO", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                const Text(
+                  "REGISTRO DE INGRESO TÉCNICO",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1.5,
+                  ),
+                ),
                 const SizedBox(height: 35),
                 Row(
                   children: [
                     Expanded(
                       child: _buildFormField(
-                        "Cédula / ID", 
-                        Icons.badge_outlined, 
-                        isNumber: true, 
+                        "Cédula / ID",
+                        Icons.badge_outlined,
+                        isNumber: true,
                         controller: _idController,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(8),
                         ],
                         suffix: IconButton(
-                          icon: const Icon(Icons.search, color: Colors.blueAccent),
+                          icon: const Icon(
+                            Icons.search,
+                            color: Colors.blueAccent,
+                          ),
                           onPressed: _buscarClienteRecurrente,
                           tooltip: "Buscar por Cédula",
-                        )
-                      )
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 25),
                     Expanded(
                       child: _buildFormField(
-                        "Propietario", 
-                        Icons.person_outline, 
+                        "Propietario",
+                        Icons.person_outline,
                         controller: _nameController,
                         onChanged: _onSearchChanged,
                         inputFormatters: [UpperCaseTextFormatter()],
                         suffix: IconButton(
-                          icon: const Icon(Icons.search, color: Colors.blueAccent),
-                          onPressed: () => _buscarClientePorNombre(_nameController.text), 
+                          icon: const Icon(
+                            Icons.search,
+                            color: Colors.blueAccent,
+                          ),
+                          onPressed: () =>
+                              _buscarClientePorNombre(_nameController.text),
                           tooltip: "Buscar por Nombre",
-                        )
-                      )
+                        ),
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 25),
                 Row(
                   children: [
-                    Expanded(child: _buildFormField("E-mail", Icons.alternate_email_rounded, controller: _emailController)),
+                    Expanded(
+                      child: _buildFormField(
+                        "E-mail",
+                        Icons.alternate_email_rounded,
+                        controller: _emailController,
+                      ),
+                    ),
                     const SizedBox(width: 25),
-                    Expanded(child: _buildFormField("Teléfono Móvil", Icons.smartphone_rounded, isNumber: true, controller: _phoneController)),
+                    Expanded(
+                      child: _buildFormField(
+                        "Teléfono Móvil",
+                        Icons.smartphone_rounded,
+                        isNumber: true,
+                        controller: _phoneController,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 25),
-                _buildFormField("Dirección de Habitación", Icons.location_on_outlined, controller: _addressController),
-                const Padding(padding: EdgeInsets.symmetric(vertical: 30), child: Divider(color: Colors.white10)),
+                _buildFormField(
+                  "Dirección de Habitación",
+                  Icons.location_on_outlined,
+                  controller: _addressController,
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 30),
+                  child: Divider(color: Colors.white10),
+                ),
                 Row(
                   children: [
                     Expanded(
                       child: _buildFormField(
-                        "Marca", 
-                        Icons.factory_outlined, 
+                        "Marca",
+                        Icons.factory_outlined,
                         controller: _brandController,
                         inputFormatters: [TitleCaseTextFormatter()],
-                      )
+                      ),
                     ),
                     Expanded(
                       child: _buildFormField(
-                        "Modelo", 
-                        Icons.directions_car_filled, 
+                        "Modelo",
+                        Icons.directions_car_filled,
                         controller: _modelController,
                         inputFormatters: [TitleCaseTextFormatter()],
-                      )
+                      ),
                     ),
                   ],
                 ),
@@ -487,20 +668,20 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   children: [
                     Expanded(
                       child: _buildFormField(
-                        "Placa / Matrícula", 
-                        Icons.tag, 
+                        "Placa / Matrícula",
+                        Icons.tag,
                         controller: _plateController,
                         inputFormatters: [UpperCaseTextFormatter()],
-                      )
+                      ),
                     ),
                     const SizedBox(width: 25),
                     Expanded(
                       child: _buildFormField(
-                        "Color", 
-                        Icons.color_lens_outlined, 
+                        "Color",
+                        Icons.color_lens_outlined,
                         controller: _colorController,
                         inputFormatters: [TitleCaseTextFormatter()],
-                      )
+                      ),
                     ),
                   ],
                 ),
@@ -509,29 +690,34 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   children: [
                     Expanded(
                       child: _buildFormField(
-                        "Año", 
-                        Icons.event_note_rounded, 
-                        isNumber: true, 
+                        "Año",
+                        Icons.event_note_rounded,
+                        isNumber: true,
                         controller: _yearController,
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly,
                           LengthLimitingTextInputFormatter(4),
                         ],
-                      )
+                      ),
                     ),
                     const SizedBox(width: 25),
                     Expanded(
                       child: _buildFormField(
-                        "Kilometraje (Km)", 
-                        Icons.speed_rounded, 
+                        "Kilometraje (Km)",
+                        Icons.speed_rounded,
                         controller: _kmController,
                         inputFormatters: [ThousandsSeparatorInputFormatter()],
-                      )
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 25),
-                _buildFormField("Descripcion de falla", Icons.edit_note_rounded, maxLines: 3, controller: _obsController),
+                _buildFormField(
+                  "Descripcion de falla",
+                  Icons.edit_note_rounded,
+                  maxLines: 3,
+                  controller: _obsController,
+                ),
                 const SizedBox(height: 35),
                 _buildVideoCard(),
                 const SizedBox(height: 40),
@@ -544,18 +730,27 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
     );
   }
 
-  Widget _buildFormField(String label, IconData icon, {
-    bool isNumber = false, 
-    int maxLines = 1, 
-    TextEditingController? controller, 
-    Widget? suffix, 
+  Widget _buildFormField(
+    String label,
+    IconData icon, {
+    bool isNumber = false,
+    int maxLines = 1,
+    TextEditingController? controller,
+    Widget? suffix,
     Function(String)? onChanged,
     List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+        Text(
+          label.toUpperCase(),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         const SizedBox(height: 10),
         TextFormField(
           controller: controller,
@@ -566,18 +761,32 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
           style: const TextStyle(color: Colors.white, fontSize: 15),
           textInputAction: TextInputAction.next,
           validator: (val) {
-            if (val == null || val.trim().isEmpty) return "Falta llenar: $label";
+            if (val == null || val.trim().isEmpty) {
+              return "Falta llenar: $label";
+            }
             return null;
           },
           decoration: InputDecoration(
-            prefixIcon: Icon(icon, color: Colors.white, size: 20), 
-            suffixIcon: suffix, 
+            prefixIcon: Icon(icon, color: Colors.white, size: 20),
+            suffixIcon: suffix,
             filled: true,
             fillColor: inputFill,
             errorStyle: const TextStyle(color: Colors.orangeAccent),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: brandRed, width: 1.5)),
-            errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Colors.orangeAccent, width: 1)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: brandRed, width: 1.5),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(
+                color: Colors.orangeAccent,
+                width: 1,
+              ),
+            ),
           ),
         ),
       ],
@@ -596,16 +805,30 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         children: [
           Row(
             children: [
-              const Icon(Icons.video_library_rounded, color: Colors.white, size: 20),
+              const Icon(
+                Icons.video_library_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
               const SizedBox(width: 12),
-              const Text("VIDEO RECEPCION DEL VEHICULO", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              const Text(
+                "VIDEO RECEPCION DEL VEHICULO",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const Spacer(),
               ElevatedButton.icon(
                 onPressed: _launchYouTubeStudio,
                 icon: const Icon(Icons.upload_rounded, size: 14),
                 label: const Text("YOUTUBE STUDIO"),
-                style: ElevatedButton.styleFrom(backgroundColor: brandRed, foregroundColor: Colors.white),
-              )
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: brandRed,
+                  foregroundColor: Colors.white,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 15),
@@ -613,8 +836,10 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
             controller: _videoController,
             style: const TextStyle(color: Colors.white, fontSize: 13),
             validator: (val) {
-               if (val == null || val.trim().isEmpty) return "⚠️ Agregue link de video de recepción";
-               return null;
+              if (val == null || val.trim().isEmpty) {
+                return "⚠️ Agregue link de video de recepción";
+              }
+              return null;
             },
             decoration: InputDecoration(
               hintText: "URL de YouTube (OBLIGATORIO)",
@@ -622,8 +847,17 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
               filled: true,
               fillColor: deepBlack,
               errorStyle: const TextStyle(color: Colors.orangeAccent),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-              errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Colors.orangeAccent, width: 1)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              errorBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Colors.orangeAccent,
+                  width: 1,
+                ),
+              ),
             ),
           ),
         ],
@@ -637,21 +871,37 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
       height: 60,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: brandRed, 
+          backgroundColor: brandRed,
           foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           elevation: 10,
         ),
         onPressed: _guardarRegistroEnBaseDeDatos,
-        child: const Text("GUARDAR REGISTRO TÉCNICO", style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+        child: const Text(
+          "GUARDAR REGISTRO TÉCNICO",
+          style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+        ),
       ),
     );
   }
 
-  Widget _buildDivider() => const Padding(padding: EdgeInsets.symmetric(vertical: 10), child: Divider(color: Colors.white10, indent: 20, endIndent: 20));
-  
+  Widget _buildDivider() => const Padding(
+    padding: EdgeInsets.symmetric(vertical: 10),
+    child: Divider(color: Colors.white10, indent: 20, endIndent: 20),
+  );
+
   Widget _buildSectionTitle(String title) => Padding(
-    padding: const EdgeInsets.fromLTRB(25, 15, 20, 10), 
-    child: Text(title, style: const TextStyle(color: Colors.white30, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5))
+    padding: const EdgeInsets.fromLTRB(25, 15, 20, 10),
+    child: Text(
+      title,
+      style: const TextStyle(
+        color: Colors.white30,
+        fontSize: 10,
+        fontWeight: FontWeight.w900,
+        letterSpacing: 1.5,
+      ),
+    ),
   );
 }

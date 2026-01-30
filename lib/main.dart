@@ -1,28 +1,25 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; 
+import 'package:flutter/services.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart'; // <--- AGREGADO: Faltaba esta importación
 import 'firebase_options.dart';
 
 // --- IMPORTACIONES DE TUS PANTALLAS ---
-import 'admin_panel.dart'; 
+import 'admin_panel.dart';
 import 'citas.dart';
 import 'diagnostico.dart';
 import 'notificaciones.dart';
 import 'tienda.dart';
 import 'ofertas.dart';
-import 'market.dart'; 
+import 'market.dart';
 import 'login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
-  
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -45,11 +42,11 @@ class SuperVortecApp extends StatelessWidget {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Mi Garaje',
-          themeMode: mode, 
+          themeMode: mode,
           theme: ThemeData(
             brightness: Brightness.light,
-            primaryColor: const Color(0xFFD50000), 
-            scaffoldBackgroundColor: const Color(0xFFF5F5F5), 
+            primaryColor: const Color(0xFFD50000),
+            scaffoldBackgroundColor: const Color(0xFFF5F5F5),
             useMaterial3: true,
           ),
           darkTheme: ThemeData(
@@ -58,7 +55,7 @@ class SuperVortecApp extends StatelessWidget {
             scaffoldBackgroundColor: Colors.black,
             useMaterial3: true,
           ),
-          home: const LoginScreen(), // Ahora sí encontrará la clase de abajo
+          home: const AuthWrapper(), // Ahora sí encontrará la clase de abajo
         );
       },
     );
@@ -76,7 +73,11 @@ class AuthWrapper extends StatelessWidget {
       builder: (context, snapshot) {
         // 1. Cargando
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD50000))));
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(color: Color(0xFFD50000)),
+            ),
+          );
         }
         // 2. Usuario Logueado -> Verificar Plataforma
         if (snapshot.hasData) {
@@ -101,7 +102,7 @@ class PlatformGuard extends StatelessWidget {
       if (screenWidth > 1000) {
         // NOTA: Asegúrate que en admin_panel.dart la clase se llame 'AdminControlPanel'
         // Si se llama 'AdminPanel', cambia la línea de abajo por: return const AdminPanel();
-        return const AdminControlPanel(); 
+        return const AdminControlPanel();
       }
       return const WebBlockedScreen();
     }
@@ -124,12 +125,21 @@ class WebBlockedScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.phonelink_lock, color: Color(0xFFD50000), size: 100),
+              const Icon(
+                Icons.phonelink_lock,
+                color: Color(0xFFD50000),
+                size: 100,
+              ),
               const SizedBox(height: 30),
               const Text(
                 "APP NO DISPONIBLE EN WEB",
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 1),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1,
+                ),
               ),
               const SizedBox(height: 15),
               const Text(
@@ -141,7 +151,10 @@ class WebBlockedScreen extends StatelessWidget {
               // Botón de emergencia para cerrar sesión si quedaste atrapado en web móvil
               TextButton(
                 onPressed: () => FirebaseAuth.instance.signOut(),
-                child: const Text("Cerrar Sesión", style: TextStyle(color: Colors.white54)),
+                child: const Text(
+                  "Cerrar Sesión",
+                  style: TextStyle(color: Colors.white54),
+                ),
               ),
             ],
           ),
@@ -176,19 +189,21 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "date": "17 Ene 2026",
           "status": "En Proceso",
           "isCompleted": false,
-          "warranty": "Pendiente", 
+          "warranty": "Pendiente",
           "daysLeft": "-",
           "elapsed": "En curso",
-          "complaint": "El cliente reporta tembladera en mínimo y pérdida de potencia al acelerar a fondo.",
-          "diagnosis": "Se detectó código P0303. La bobina del cilindro 3 tiene resistencia infinita (quemada) y la bujía está carbonizada.",
-          "videoReception": "https://www.youtube.com/watch?v=wblL1YIDu-A", 
-          "videoRepair": "https://www.youtube.com/watch?v=YuUtjWC2y0s", 
+          "complaint":
+              "El cliente reporta tembladera en mínimo y pérdida de potencia al acelerar a fondo.",
+          "diagnosis":
+              "Se detectó código P0303. La bobina del cilindro 3 tiene resistencia infinita (quemada) y la bujía está carbonizada.",
+          "videoReception": "https://www.youtube.com/watch?v=wblL1YIDu-A",
+          "videoRepair": "https://www.youtube.com/watch?v=YuUtjWC2y0s",
           "budget": [
             {"item": "Bobina AC Delco Original", "price": 45.00},
             {"item": "Bujía Iridium (x1)", "price": 12.00},
             {"item": "Mano de Obra Diagnóstico", "price": 30.00},
             {"item": "Mano de Obra Reemplazo", "price": 15.00},
-          ]
+          ],
         },
         {
           "title": "Cambio de Aceite y Filtro",
@@ -206,9 +221,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             {"item": "Aceite 5W30 Dexos (5L)", "price": 60.00},
             {"item": "Filtro de Aceite", "price": 8.00},
             {"item": "Servicio de Cambio", "price": 15.00},
-          ]
+          ],
         },
-      ]
+      ],
     },
     {
       "brand": "CHEVROLET",
@@ -228,25 +243,26 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           "daysLeft": "110 Días",
           "elapsed": "2 Meses",
           "complaint": "Ruido metálico al frenar.",
-          "diagnosis": "Pastillas delanteras al 10% de vida. Discos requieren rectificación.",
+          "diagnosis":
+              "Pastillas delanteras al 10% de vida. Discos requieren rectificación.",
           "videoReception": "https://www.youtube.com/watch?v=3XoBQPC-1vM",
           "videoRepair": "https://www.youtube.com/watch?v=3XoBQPC-1vM",
           "budget": [
             {"item": "Juego Pastillas Delanteras", "price": 55.00},
             {"item": "Rectificación Discos (x2)", "price": 40.00},
             {"item": "Mano de Obra", "price": 35.00},
-          ]
+          ],
         },
-      ]
+      ],
     },
   ];
 
-  int _currentPage = 0; 
+  int _currentPage = 0;
 
   @override
   Widget build(BuildContext context) {
     const Color brandRed = Color(0xFFD50000);
-    final currentHistory = myVehicles.isNotEmpty 
+    final currentHistory = myVehicles.isNotEmpty
         ? (myVehicles[_currentPage]['history'] as List<Map<String, dynamic>>)
         : <Map<String, dynamic>>[];
 
@@ -261,22 +277,22 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: textColor), 
+        iconTheme: IconThemeData(color: textColor),
         title: Text(
-          'MI GARAJE', 
+          'MI GARAJE',
           style: TextStyle(
-            fontWeight: FontWeight.bold, 
+            fontWeight: FontWeight.bold,
             letterSpacing: 3.0,
             fontSize: 18,
-            color: textColor
-          )
+            color: textColor,
+          ),
         ),
         actions: [
           IconButton(
             icon: Icon(
-              isDark ? Icons.light_mode : Icons.dark_mode, 
-              color: isDark ? Colors.amber : Colors.indigo
-            ), 
+              isDark ? Icons.light_mode : Icons.dark_mode,
+              color: isDark ? Colors.amber : Colors.indigo,
+            ),
             onPressed: () {
               themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
             },
@@ -289,21 +305,21 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             height: double.infinity,
             width: double.infinity,
             decoration: BoxDecoration(
-              gradient: isDark 
-                ? const RadialGradient(
-                    center: Alignment(0, -0.3),
-                    radius: 1.2,
-                    colors: [Color(0xFF252525), Colors.black],
-                  )
-                : const LinearGradient( 
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.white, Color(0xFFEEEEEE)],
-                  ),
+              gradient: isDark
+                  ? const RadialGradient(
+                      center: Alignment(0, -0.3),
+                      radius: 1.2,
+                      colors: [Color(0xFF252525), Colors.black],
+                    )
+                  : const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.white, Color(0xFFEEEEEE)],
+                    ),
             ),
           ),
           SingleChildScrollView(
-            padding: const EdgeInsets.only(top: 100), 
+            padding: const EdgeInsets.only(top: 100),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -313,38 +329,114 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     children: [
-                      _buildSliderItem(context, Icons.calendar_month, "CITAS", brandRed, isDark,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))
+                      _buildSliderItem(
+                        context,
+                        Icons.calendar_month,
+                        "CITAS",
+                        brandRed,
+                        isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => const AppointmentsScreen(),
+                          ),
+                        ),
                       ),
-                      _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber, isDark,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const NotificationScreen()))
+                      _buildSliderItem(
+                        context,
+                        Icons.notifications,
+                        "NOTIFIC.",
+                        Colors.amber,
+                        isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => const NotificationScreen(),
+                          ),
+                        ),
                       ),
-                      _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DiagnosticScreen()))),
-                      _buildSliderItem(context, Icons.storefront, "TIENDA", const Color(0xFFD50000), isDark,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))
+                      _buildSliderItem(
+                        context,
+                        Icons.monitor_heart,
+                        "DIAGNÓSTICO",
+                        isDark ? Colors.white : Colors.black,
+                        isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => const DiagnosticScreen(),
+                          ),
+                        ),
                       ),
-                      _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange, isDark,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))
+                      _buildSliderItem(
+                        context,
+                        Icons.storefront,
+                        "TIENDA",
+                        const Color(0xFFD50000),
+                        isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => const StoreScreen(),
+                          ),
+                        ),
                       ),
-                       _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent, isDark,
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))
+                      _buildSliderItem(
+                        context,
+                        Icons.local_offer,
+                        "OFERTAS",
+                        Colors.orange,
+                        isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => const OfferScreen(),
+                          ),
+                        ),
+                      ),
+                      _buildSliderItem(
+                        context,
+                        Icons.directions_car,
+                        "MARKET",
+                        Colors.blueAccent,
+                        isDark,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (c) => const MarketplaceScreen(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 20),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 25,
+                    vertical: 5,
+                  ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("VEHÍCULO ACTIVO", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 2.5, fontWeight: FontWeight.bold)),
-                      Text("${_currentPage + 1}/${myVehicles.length}", style: TextStyle(color: subTextColor, fontSize: 10))
+                      const Text(
+                        "VEHÍCULO ACTIVO",
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontSize: 10,
+                          letterSpacing: 2.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        "${_currentPage + 1}/${myVehicles.length}",
+                        style: TextStyle(color: subTextColor, fontSize: 10),
+                      ),
                     ],
                   ),
                 ),
                 SizedBox(
-                  height: 220, 
+                  height: 220,
                   child: PageView.builder(
                     itemCount: myVehicles.length,
                     onPageChanged: (int index) {
@@ -370,7 +462,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                       height: 5,
                       width: _currentPage == index ? 20 : 5,
                       decoration: BoxDecoration(
-                        color: _currentPage == index ? brandRed : Colors.grey[800],
+                        color: _currentPage == index
+                            ? brandRed
+                            : Colors.grey[800],
                         borderRadius: BorderRadius.circular(3),
                       ),
                     );
@@ -379,18 +473,30 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 const SizedBox(height: 30),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-                  child: Text("HISTORIAL DE SERVICIOS", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 2.5, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    "HISTORIAL DE SERVICIOS",
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: 10,
+                      letterSpacing: 2.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  shrinkWrap: true, 
-                  physics: const NeverScrollableScrollPhysics(), 
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: currentHistory.length,
                   itemBuilder: (context, index) {
-                    return _buildHistoryCard(context, currentHistory[index], isDark);
+                    return _buildHistoryCard(
+                      context,
+                      currentHistory[index],
+                      isDark,
+                    );
                   },
                 ),
-                const SizedBox(height: 50), 
+                const SizedBox(height: 50),
               ],
             ),
           ),
@@ -400,7 +506,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   // --- MÉTODOS DE APOYO (Mantenidos sin cambios) ---
-  Widget _buildHistoryCard(BuildContext context, Map<String, dynamic> historyItem, bool isDark) {
+  Widget _buildHistoryCard(
+    BuildContext context,
+    Map<String, dynamic> historyItem,
+    bool isDark,
+  ) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
     Color cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
@@ -412,7 +522,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => RepairDetailScreen(historyItem: historyItem, isDark: isDark),
+            builder: (context) =>
+                RepairDetailScreen(historyItem: historyItem, isDark: isDark),
           ),
         );
       },
@@ -420,7 +531,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          color: cardBg, 
+          color: cardBg,
           borderRadius: BorderRadius.circular(15),
           border: Border.all(color: borderColor),
           boxShadow: [
@@ -428,8 +539,8 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, 5),
-            )
-          ]
+            ),
+          ],
         ),
         child: Column(
           children: [
@@ -471,7 +582,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                     ],
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 12),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.grey,
+                  size: 12,
+                ),
               ],
             ),
             if (isCompleted) ...[
@@ -481,20 +596,42 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildHistoryStat(Icons.verified_user_outlined, "Garantía", historyItem['warranty'], isDark),
-                  _buildHistoryStat(Icons.hourglass_bottom, "Restan", historyItem['daysLeft'], isDark, isHighlighted: true),
-                  _buildHistoryStat(Icons.history, "Tiempo Transcurrido", historyItem['elapsed'], isDark),
+                  _buildHistoryStat(
+                    Icons.verified_user_outlined,
+                    "Garantía",
+                    historyItem['warranty'],
+                    isDark,
+                  ),
+                  _buildHistoryStat(
+                    Icons.hourglass_bottom,
+                    "Restan",
+                    historyItem['daysLeft'],
+                    isDark,
+                    isHighlighted: true,
+                  ),
+                  _buildHistoryStat(
+                    Icons.history,
+                    "Tiempo Transcurrido",
+                    historyItem['elapsed'],
+                    isDark,
+                  ),
                 ],
               ),
-            ]
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHistoryStat(IconData icon, String label, String value, bool isDark, {bool isHighlighted = false}) {
-    Color valColor = isHighlighted 
+  Widget _buildHistoryStat(
+    IconData icon,
+    String label,
+    String value,
+    bool isDark, {
+    bool isHighlighted = false,
+  }) {
+    Color valColor = isHighlighted
         ? (isDark ? Colors.greenAccent : Colors.green[700]!)
         : (isDark ? Colors.white : Colors.black87);
 
@@ -505,17 +642,20 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           children: [
             Icon(icon, size: 12, color: Colors.grey),
             const SizedBox(width: 4),
-            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9)),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.grey, fontSize: 9),
+            ),
           ],
         ),
         const SizedBox(height: 4),
         Text(
-          value, 
+          value,
           style: TextStyle(
-            color: valColor, 
-            fontSize: 11, 
-            fontWeight: FontWeight.bold
-          )
+            color: valColor,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
@@ -525,19 +665,23 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     bool isInWorkshop = vehicleData['isInWorkshop'];
     Color cardBg = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white;
     Color textColor = isDark ? Colors.white : Colors.black;
-    Color borderColor = isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey[300]!;
+    Color borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.1)
+        : Colors.grey[300]!;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(15), 
+      padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: cardBg, 
+        color: cardBg,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0 : 0.05), blurRadius: 10)],
-        border: Border.all(
-          color: borderColor, 
-          width: 1
-        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0 : 0.05),
+            blurRadius: 10,
+          ),
+        ],
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -551,35 +695,74 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   color: const Color(0xFFD50000).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.directions_car, color: Color(0xFFD50000), size: 22),
+                child: const Icon(
+                  Icons.directions_car,
+                  color: Color(0xFFD50000),
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(vehicleData['brand'], style: TextStyle(color: textColor, fontSize: 14, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
+                    Text(
+                      vehicleData['brand'],
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 14,
+                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 2),
-                    Text(vehicleData['model'], style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: textColor, letterSpacing: 0.5)),
-                    Text(vehicleData['year'], style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+                    Text(
+                      vehicleData['model'],
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 20,
+                        color: textColor,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      vehicleData['year'],
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
                   ],
                 ),
               ),
               if (isInWorkshop)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black,
                     borderRadius: BorderRadius.circular(30),
                     border: Border.all(color: const Color(0xFFD50000)),
                   ),
-                  child: const Text("EN TALLER", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 8, letterSpacing: 0.5)),
+                  child: const Text(
+                    "EN TALLER",
+                    style: TextStyle(
+                      color: Color(0xFFD50000),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 8,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
             ],
           ),
           const Spacer(),
           Divider(color: borderColor, height: 1),
-          const Spacer(), 
+          const Spacer(),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -598,14 +781,36 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   Widget _buildTechInfo(String label, String value, bool isDark) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 8, letterSpacing: 1.0)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.grey,
+            fontSize: 8,
+            letterSpacing: 1.0,
+          ),
+        ),
         const SizedBox(height: 3),
-        Text(value, style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
+        Text(
+          value,
+          style: TextStyle(
+            color: isDark ? Colors.white : Colors.black,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+            letterSpacing: 0.5,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildSliderItem(BuildContext context, IconData icon, String label, Color iconColor, bool isDark, {VoidCallback? onTap}) {
+  Widget _buildSliderItem(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Color iconColor,
+    bool isDark, {
+    VoidCallback? onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -621,18 +826,38 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: isDark 
-                    ? [const Color(0xFF2C2C2C), Colors.black.withValues(alpha: 0.8)]
-                    : [Colors.white, Colors.grey[200]!],
+                  colors: isDark
+                      ? [
+                          const Color(0xFF2C2C2C),
+                          Colors.black.withValues(alpha: 0.8),
+                        ]
+                      : [Colors.white, Colors.grey[200]!],
                 ),
                 shape: BoxShape.circle,
-                border: Border.all(color: isDark ? Colors.white12 : Colors.grey[300]!),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.1), blurRadius: 10, offset: const Offset(0, 5))]
+                border: Border.all(
+                  color: isDark ? Colors.white12 : Colors.grey[300]!,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
               child: Icon(icon, color: iconColor, size: 24),
             ),
             const SizedBox(height: 10),
-            Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: isDark ? Colors.white70 : Colors.black54, fontWeight: FontWeight.bold, letterSpacing: 1.0))
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 10,
+                color: isDark ? Colors.white70 : Colors.black54,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.0,
+              ),
+            ),
           ],
         ),
       ),
@@ -647,14 +872,31 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         children: [
           Container(
             padding: const EdgeInsets.only(top: 60, bottom: 30, left: 20),
-            decoration: BoxDecoration(color: isDark ? const Color(0xFF111111) : Colors.grey[200]),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF111111) : Colors.grey[200],
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(backgroundColor: Color(0xFFD50000), radius: 30, child: Icon(Icons.person, color: Colors.white, size: 30)),
+                const CircleAvatar(
+                  backgroundColor: Color(0xFFD50000),
+                  radius: 30,
+                  child: Icon(Icons.person, color: Colors.white, size: 30),
+                ),
                 const SizedBox(height: 15),
-                Text("MVTSOLUCIONES", style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
-                const Text("Usuario Premium", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(
+                  "MVTSOLUCIONES",
+                  style: TextStyle(
+                    color: isDark ? Colors.white : Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    letterSpacing: 1,
+                  ),
+                ),
+                const Text(
+                  "Usuario Premium",
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -667,7 +909,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   Widget _buildDrawerItem(IconData icon, String title, bool isDark) {
     Color color = isDark ? Colors.white : Colors.black87;
-    return ListTile(leading: Icon(icon, color: color), title: Text(title, style: TextStyle(color: color, letterSpacing: 1)), onTap: () {});
+    return ListTile(
+      leading: Icon(icon, color: color),
+      title: Text(title, style: TextStyle(color: color, letterSpacing: 1)),
+      onTap: () {},
+    );
   }
 }
 
@@ -675,17 +921,26 @@ class RepairDetailScreen extends StatelessWidget {
   final Map<String, dynamic> historyItem;
   final bool isDark;
 
-  const RepairDetailScreen({super.key, required this.historyItem, required this.isDark});
+  const RepairDetailScreen({
+    super.key,
+    required this.historyItem,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
     bool isCompleted = historyItem['isCompleted'];
     Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
     List budgetList = historyItem['budget'] ?? [];
-    double totalBudget = budgetList.fold(0, (sum, item) => sum + (item['price'] as double));
+    double totalBudget = budgetList.fold(
+      0,
+      (sum, item) => sum + (item['price'] as double),
+    );
 
     Color textColor = isDark ? Colors.white : Colors.black;
-    Color cardColor = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white;
+    Color cardColor = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.white;
     Color borderColor = isDark ? Colors.white10 : Colors.grey[300]!;
 
     return Scaffold(
@@ -693,7 +948,15 @@ class RepairDetailScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text("INFORME DE SERVICIO", style: TextStyle(fontSize: 14, letterSpacing: 2, fontWeight: FontWeight.bold, color: textColor)),
+        title: Text(
+          "INFORME DE SERVICIO",
+          style: TextStyle(
+            fontSize: 14,
+            letterSpacing: 2,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+        ),
         centerTitle: true,
         iconTheme: IconThemeData(color: textColor),
       ),
@@ -703,17 +966,17 @@ class RepairDetailScreen extends StatelessWidget {
             height: double.infinity,
             width: double.infinity,
             decoration: BoxDecoration(
-              gradient: isDark 
-                ? const RadialGradient(
-                    center: Alignment(0, -0.3),
-                    radius: 1.2,
-                    colors: [Color(0xFF252525), Colors.black],
-                  )
-                : const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.white, Color(0xFFEEEEEE)],
-                  ),
+              gradient: isDark
+                  ? const RadialGradient(
+                      center: Alignment(0, -0.3),
+                      radius: 1.2,
+                      colors: [Color(0xFF252525), Colors.black],
+                    )
+                  : const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.white, Color(0xFFEEEEEE)],
+                    ),
             ),
           ),
           SingleChildScrollView(
@@ -722,7 +985,10 @@ class RepairDetailScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
@@ -730,24 +996,49 @@ class RepairDetailScreen extends StatelessWidget {
                   ),
                   child: Text(
                     historyItem['status'].toUpperCase(),
-                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.5),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
                   historyItem['title'],
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textColor, height: 1.2),
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w900,
+                    color: textColor,
+                    height: 1.2,
+                  ),
                 ),
                 const SizedBox(height: 10),
-                Text(historyItem['date'], style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                
+                Text(
+                  historyItem['date'],
+                  style: const TextStyle(color: Colors.grey, fontSize: 14),
+                ),
+
                 const SizedBox(height: 40),
-                
+
                 _buildSectionTitle("REPORTE TÉCNICO"),
                 const SizedBox(height: 15),
-                _buildInfoBlock("Falla Reportada", historyItem['complaint'], textColor, cardColor, borderColor),
+                _buildInfoBlock(
+                  "Falla Reportada",
+                  historyItem['complaint'],
+                  textColor,
+                  cardColor,
+                  borderColor,
+                ),
                 const SizedBox(height: 10),
-                _buildInfoBlock("Diagnóstico Técnico", historyItem['diagnosis'], textColor, cardColor, borderColor),
+                _buildInfoBlock(
+                  "Diagnóstico Técnico",
+                  historyItem['diagnosis'],
+                  textColor,
+                  cardColor,
+                  borderColor,
+                ),
 
                 const SizedBox(height: 30),
 
@@ -755,23 +1046,28 @@ class RepairDetailScreen extends StatelessWidget {
                 const SizedBox(height: 15),
                 Row(
                   children: [
-                    Expanded(child: _buildVideoCard(
-                      context, 
-                      "Recepción", 
-                      historyItem['videoReception'], 
-                      title: "Recepción del vehículo.",
-                      desc: "Este video muestra el estado del vehículo al llegar al taller.",
-                      isDark: isDark
-                    )),
+                    Expanded(
+                      child: _buildVideoCard(
+                        context,
+                        "Recepción",
+                        historyItem['videoReception'],
+                        title: "Recepción del vehículo.",
+                        desc:
+                            "Este video muestra el estado del vehículo al llegar al taller.",
+                        isDark: isDark,
+                      ),
+                    ),
                     const SizedBox(width: 15),
-                    Expanded(child: _buildVideoCard(
-                      context, 
-                      "Reparación", 
-                      historyItem['videoRepair'],
-                      title: "Reparación: ${historyItem['title']}",
-                      desc: historyItem['diagnosis'],
-                      isDark: isDark
-                    )),
+                    Expanded(
+                      child: _buildVideoCard(
+                        context,
+                        "Reparación",
+                        historyItem['videoRepair'],
+                        title: "Reparación: ${historyItem['title']}",
+                        desc: historyItem['diagnosis'],
+                        isDark: isDark,
+                      ),
+                    ),
                   ],
                 ),
 
@@ -789,33 +1085,65 @@ class RepairDetailScreen extends StatelessWidget {
                   ),
                   child: Column(
                     children: [
-                      ...budgetList.map((item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(child: Text(item['item'], style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 13))),
-                            Text("\$${item['price'].toStringAsFixed(2)}", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
-                          ],
+                      ...budgetList.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item['item'],
+                                  style: TextStyle(
+                                    color: isDark
+                                        ? Colors.white70
+                                        : Colors.black54,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                "\$${item['price'].toStringAsFixed(2)}",
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      )),
+                      ),
                       Divider(color: borderColor),
                       const SizedBox(height: 5),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text("TOTAL", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text("\$${totalBudget.toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
+                          const Text(
+                            "TOTAL",
+                            style: TextStyle(
+                              color: Color(0xFFD50000),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Text(
+                            "\$${totalBudget.toStringAsFixed(2)}",
+                            style: const TextStyle(
+                              color: Color(0xFFD50000),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(height: 50),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
@@ -824,12 +1152,23 @@ class RepairDetailScreen extends StatelessWidget {
   // --- MÉTODOS DE APOYO (Mantenidos sin cambios) ---
   Widget _buildSectionTitle(String title) {
     return Text(
-      title, 
-      style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)
+      title,
+      style: const TextStyle(
+        color: Colors.grey,
+        fontSize: 10,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 2,
+      ),
     );
   }
 
-  Widget _buildInfoBlock(String label, String? content, Color textColor, Color bgColor, Color borderColor) {
+  Widget _buildInfoBlock(
+    String label,
+    String? content,
+    Color textColor,
+    Color bgColor,
+    Color borderColor,
+  ) {
     const double fontSize = 16;
     const FontWeight fontWeight = FontWeight.bold;
 
@@ -854,7 +1193,7 @@ class RepairDetailScreen extends StatelessWidget {
                   foreground: Paint()
                     ..style = PaintingStyle.stroke
                     ..strokeWidth = 2.0
-                    ..color = Colors.black, 
+                    ..color = Colors.black,
                 ),
               ),
               Text(
@@ -868,18 +1207,32 @@ class RepairDetailScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 5),
-          Text(content ?? "Pendiente...", style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 13, height: 1.4)),
+          Text(
+            content ?? "Pendiente...",
+            style: TextStyle(
+              color: textColor.withValues(alpha: 0.7),
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildVideoCard(BuildContext context, String label, String? videoUrl, {required String title, required String? desc, required bool isDark}) {
+  Widget _buildVideoCard(
+    BuildContext context,
+    String label,
+    String? videoUrl, {
+    required String title,
+    required String? desc,
+    required bool isDark,
+  }) {
     bool hasVideo = videoUrl != null && videoUrl.isNotEmpty;
     String? thumbnailUrl;
 
     if (hasVideo) {
-      String? videoId = YoutubePlayer.convertUrlToId(videoUrl); 
+      String? videoId = YoutubePlayer.convertUrlToId(videoUrl);
       if (videoId != null) {
         thumbnailUrl = "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
       }
@@ -892,16 +1245,16 @@ class RepairDetailScreen extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => InAppVideoPlayerScreen(
-                videoUrl: videoUrl, 
+                videoUrl: videoUrl,
                 videoTitle: title,
                 videoDescription: desc ?? "Sin detalles adicionales.",
               ),
             ),
           );
         } else {
-             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("No hay video disponible"))
-            );
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("No hay video disponible")),
+          );
         }
       },
       child: Container(
@@ -909,34 +1262,41 @@ class RepairDetailScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.black,
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: isDark ? Colors.white24 : Colors.grey[400]!),
-          image: thumbnailUrl != null 
-            ? DecorationImage(
-                image: NetworkImage(thumbnailUrl), 
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.4), BlendMode.darken)
-              ) 
-            : null,
+          border: Border.all(
+            color: isDark ? Colors.white24 : Colors.grey[400]!,
+          ),
+          image: thumbnailUrl != null
+              ? DecorationImage(
+                  image: NetworkImage(thumbnailUrl),
+                  fit: BoxFit.cover,
+                  colorFilter: ColorFilter.mode(
+                    Colors.black.withValues(alpha: 0.4),
+                    BlendMode.darken,
+                  ),
+                )
+              : null,
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
             Icon(
-              Icons.play_circle_fill, 
-              color: hasVideo ? const Color(0xFFD50000) : Colors.grey.withValues(alpha: 0.3), 
-              size: 40
+              Icons.play_circle_fill,
+              color: hasVideo
+                  ? const Color(0xFFD50000)
+                  : Colors.grey.withValues(alpha: 0.3),
+              size: 40,
             ),
             Positioned(
               bottom: 10,
               child: Text(
-                label, 
+                label,
                 style: const TextStyle(
-                  color: Colors.white, 
+                  color: Colors.white,
                   fontWeight: FontWeight.bold,
-                  shadows: [Shadow(color: Colors.black, blurRadius: 4)]
-                )
+                  shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                ),
               ),
-            )
+            ),
           ],
         ),
       ),
@@ -950,7 +1310,7 @@ class InAppVideoPlayerScreen extends StatefulWidget {
   final String videoDescription;
 
   const InAppVideoPlayerScreen({
-    super.key, 
+    super.key,
     required this.videoUrl,
     required this.videoTitle,
     required this.videoDescription,
@@ -967,7 +1327,7 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
   void initState() {
     super.initState();
     final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
-    
+
     _controller = YoutubePlayerController(
       initialVideoId: videoId ?? "",
       flags: const YoutubePlayerFlags(
@@ -1001,25 +1361,36 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
         return Scaffold(
           extendBodyBehindAppBar: true,
           body: Container(
-            decoration: const BoxDecoration(
-              color: Colors.black
-            ),
+            decoration: const BoxDecoration(color: Colors.black),
             child: Column(
               children: [
                 SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 10,
+                    ),
                     child: Row(
                       children: [
                         CircleAvatar(
                           backgroundColor: Colors.black.withValues(alpha: 0.5),
                           child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white),
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                            ),
                             onPressed: () => Navigator.pop(context),
                           ),
                         ),
                         const Spacer(),
-                        const Text("EVIDENCIA DIGITAL", style: TextStyle(color: Colors.white70, fontSize: 12, letterSpacing: 2)),
+                        const Text(
+                          "EVIDENCIA DIGITAL",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            letterSpacing: 2,
+                          ),
+                        ),
                         const Spacer(),
                         const SizedBox(width: 40),
                       ],
@@ -1031,9 +1402,13 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 20),
                   decoration: BoxDecoration(
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 20, offset: const Offset(0, 10))
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.8),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
                     ],
-                    borderRadius: BorderRadius.circular(10)
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: player,
                 ),
@@ -1048,40 +1423,68 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
                         topLeft: Radius.circular(30),
                         topRight: Radius.circular(30),
                       ),
-                      border: const Border(top: BorderSide(color: Colors.white10))
+                      border: const Border(
+                        top: BorderSide(color: Colors.white10),
+                      ),
                     ),
                     child: SingleChildScrollView(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFD50000),
-                              borderRadius: BorderRadius.circular(5)
+                              borderRadius: BorderRadius.circular(5),
                             ),
-                            child: const Text("VIDEO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                            child: const Text(
+                              "VIDEO",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 15),
                           Text(
                             widget.videoTitle,
-                            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                           const SizedBox(height: 15),
                           const Divider(color: Colors.white10),
                           const SizedBox(height: 15),
-                          const Text("DETALLES", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
+                          const Text(
+                            "DETALLES",
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: 12,
+                              letterSpacing: 1.5,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           const SizedBox(height: 10),
                           Text(
                             widget.videoDescription,
-                            style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                              height: 1.5,
+                            ),
                           ),
                           const SizedBox(height: 40),
                         ],
                       ),
                     ),
                   ),
-                )
+                ),
               ],
             ),
           ),

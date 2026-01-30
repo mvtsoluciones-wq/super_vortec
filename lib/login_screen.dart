@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show kIsWeb; // <--- 1. IMPORTAR ESTO PARA DETECTAR WEB
 
-import 'admin_panel.dart'; // Panel del dueño
-import 'main.dart'; // <--- 2. IMPORTAR ESTO PARA ACCEDER A 'ClientHomeScreen'
+// TUS PANTALLAS DE DESTINO
+import 'admin_panel.dart'; // La pantalla del dueño
+import 'main.dart'; // La pantalla principal de la App (Cliente)
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,52 +31,71 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // 1. Autenticación con Firebase
-      UserCredential userCredential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passController.text.trim(),
-      );
+      // PASO 1: Validar credenciales (Email y Contraseña) en Firebase Auth
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: _emailController.text.trim(),
+            password: _passController.text.trim(),
+          );
 
-      // 2. Verificación de Rol en Firestore (Opcional, pero visual)
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(userCredential.user!.uid)
-          .get();
+      User? user = userCredential.user;
 
-      if (!mounted) return;
+      if (user != null) {
+        // PASO 2: EL PORTERO (Consultar vinculación por correo en Firestore)
+        // Buscamos en la colección 'clientes' el documento que tenga ese email
+        var userQuery = await FirebaseFirestore.instance
+            .collection('clientes')
+            .where(
+              'email',
+              isEqualTo: _emailController.text.trim().toLowerCase(),
+            )
+            .get();
 
-      if (userDoc.exists) {
-        String rol = userDoc['rol'] ?? 'cliente';
-        _showSnackBar("Bienvenido, acceso como $rol concedido", Colors.green);
+        if (userQuery.docs.isNotEmpty) {
+          // Extraemos los datos del primer documento encontrado
+          var userData = userQuery.docs.first.data();
+          String rol = userData['rol'] ?? 'cliente';
+
+          if (!mounted) return;
+
+          // PASO 3: REDIRECCIÓN INTELIGENTE
+          if (rol == 'admin') {
+            debugPrint("Acceso Admin detectado");
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const AdminControlPanel(),
+              ),
+            );
+          } else {
+            debugPrint("Acceso Cliente detectado");
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const ClientHomeScreen()),
+            );
+          }
+        } else {
+          // CASO: El usuario existe en Auth pero no está registrado/habilitado en la colección 'clientes'
+          if (!mounted) return;
+          _showSnackBar(
+            "Tu cuenta no ha sido habilitada por el Taller.",
+            Colors.redAccent,
+          );
+          await FirebaseAuth.instance
+              .signOut(); // Seguridad: cerrar sesión si no está en la DB
+        }
       }
-
-      // --- 3. LÓGICA DE TRÁFICO (AQUÍ ESTÁ LA SOLUCIÓN) ---
-      if (kIsWeb) {
-        // SI ES WEB -> VA AL PANEL ADMINISTRATIVO
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const AdminControlPanel()),
-        );
-      } else {
-        // SI ES APP (MÓVIL) -> VA A LA PANTALLA PRINCIPAL DE CLIENTES
-        // ClientHomeScreen está definida en main.dart
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const ClientHomeScreen()), 
-        );
-      }
-      
     } on FirebaseAuthException catch (e) {
-      String mensaje = "Error de autenticación";
+      String mensaje = "Error de acceso";
       if (e.code == 'user-not-found') mensaje = "Usuario no registrado";
       if (e.code == 'wrong-password') mensaje = "Contraseña incorrecta";
-      if (e.code == 'network-request-failed') mensaje = "Sin conexión a internet";
-      
+      if (e.code == 'network-request-failed')
+        mensaje = "Sin conexión a internet";
       if (!mounted) return;
       _showSnackBar(mensaje, brandRed);
     } catch (e) {
       if (!mounted) return;
-      _showSnackBar("ERROR TÉCNICO: $e", Colors.purple); 
+      _showSnackBar("Error técnico: $e", Colors.purple);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -85,9 +104,11 @@ class _LoginScreenState extends State<LoginScreen> {
   void _showSnackBar(String mensaje, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(mensaje, style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(
+          mensaje,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -96,109 +117,90 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgDark,
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [brandRed.withValues(alpha: 0.1), bgDark],
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(30.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                'assets/weblogo.jpg',
+                height: 150,
+                errorBuilder: (_, __, ___) =>
+                    Icon(Icons.bolt, size: 100, color: brandRed),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
-            child: Center(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Image.asset(
-                      'assets/weblogo.jpg', 
-                      height: 180, 
-                      errorBuilder: (context, error, stackTrace) => 
-                      Icon(Icons.bolt, color: brandRed, size: 100)
-                    ),
-                    const SizedBox(height: 50),
-                    const Text(
-                      "ACCESO EXCLUSIVO",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                    _buildTextField(
-                      controller: _emailController,
-                      hint: "Correo Electrónico",
-                      icon: Icons.alternate_email_rounded,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildTextField(
-                      controller: _passController,
-                      hint: "Contraseña",
-                      icon: Icons.lock_outline_rounded,
-                      isPassword: true,
-                    ),
-                    const SizedBox(height: 30),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 60,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: brandRed,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                        ),
-                        onPressed: _isLoading ? null : _handleLogin,
-                        child: _isLoading 
-                          ? const CircularProgressIndicator(color: Colors.white)
-                          : const Text(
-                              "INICIAR SESIÓN",
-                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                            ),
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: 40),
+              const Text(
+                "JM PERFORMANCE",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+              const SizedBox(height: 40),
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hint,
-    required IconData icon,
-    bool isPassword = false,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextField(
-      controller: controller,
-      obscureText: isPassword ? _obscureText : false,
-      keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: Colors.white24),
-        prefixIcon: Icon(icon, color: brandRed),
-        suffixIcon: isPassword 
-          ? IconButton(
-              icon: Icon(_obscureText ? Icons.visibility_off : Icons.visibility, color: Colors.white38),
-              onPressed: () => setState(() => _obscureText = !_obscureText),
-            )
-          : null,
-        filled: true,
-        fillColor: const Color(0xFF1A1A1A),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide.none,
+              TextField(
+                controller: _emailController,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "Correo",
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  prefixIcon: Icon(Icons.email, color: brandRed),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              TextField(
+                controller: _passController,
+                obscureText: _obscureText,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: "Contraseña",
+                  hintStyle: const TextStyle(color: Colors.grey),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  prefixIcon: Icon(Icons.lock, color: brandRed),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureText ? Icons.visibility : Icons.visibility_off,
+                      color: Colors.grey,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscureText = !_obscureText),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: brandRed),
+                  onPressed: _isLoading ? null : _handleLogin,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          "ENTRAR",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
