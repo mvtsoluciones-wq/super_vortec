@@ -58,7 +58,7 @@ class SuperVortecApp extends StatelessWidget {
             scaffoldBackgroundColor: Colors.black,
             useMaterial3: true,
           ),
-          home: const AuthWrapper(), // Ahora sí encontrará la clase de abajo
+          home: const LoginScreen(), // Ahora sí encontrará la clase de abajo
         );
       },
     );
