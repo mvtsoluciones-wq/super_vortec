@@ -4,6 +4,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'dart:convert'; 
 import 'package:cloud_firestore/cloud_firestore.dart'; 
+import 'package:intl/intl.dart'; // Asegúrate de tener esta importación para las fechas
 
 import 'config_factura_web.dart'; 
 
@@ -51,7 +52,8 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
   final List<ItemPresupuesto> _itemsAgregados = [];
   int _cantidadActual = 1;
   ClientePrueba? _clienteSeleccionado;
-  String _numeroControl = "00-DR1U"; 
+  
+  // Nota: _numeroControl ya no es fijo, se genera dinámicamente en el PDF
   bool _cargandoConfig = true; 
 
   final Color brandRed = const Color(0xFFD50000);
@@ -67,7 +69,6 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
   // --- FUNCIÓN SINCRONIZADA CON TU BASE DE DATOS (factura) ---
   Future<void> _cargarConfiguracionBaseDeDatos() async {
     try {
-      // Ajustado a la ruta: configuracion -> factura
       var doc = await FirebaseFirestore.instance
           .collection('configuracion')
           .doc('factura')
@@ -76,7 +77,6 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
       if (doc.exists) {
         var data = doc.data()!;
         setState(() {
-          // Mapeo de campos según los nombres en tu consola de Firebase
           ConfigFactura.nombreEmpresa = data['nombreEmpresa'] ?? ConfigFactura.nombreEmpresa;
           ConfigFactura.rifEmpresa = data['rifEmpresa'] ?? ConfigFactura.rifEmpresa;
           ConfigFactura.direccionEmpresa = data['direccion'] ?? ConfigFactura.direccionEmpresa;
@@ -104,7 +104,8 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
       _notificar("Error: Agregue al menos un repuesto o servicio", Colors.red);
       return;
     }
-    _notificar("Éxito: Presupuesto $_numeroControl guardado", Colors.green);
+    // Nota: El número real se genera al crear el PDF/Guardar en DB
+    _notificar("Éxito: Presupuesto listo para generar", Colors.green);
   }
 
   void _notificar(String msj, Color color) {
@@ -132,23 +133,38 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
     'Limpieza de Inyectores': 60.0,
   };
 
-  double get _subtotal => _itemsAgregados.fold(0, (sum, item) => sum + item.totalLinea);
+  double get _subtotal => _itemsAgregados.fold(0.0, (total, item) => total + item.totalLinea);
   double get _iva => _subtotal * (double.tryParse(ConfigFactura.ivaPorcentaje) ?? 16.0) / 100;
   double get _total => _subtotal + _iva;
 
+  // --- FUNCIÓN MODIFICADA: LOGO DB, NUMERACIÓN SECUENCIAL Y CÉDULA ---
   Future<void> _generatePdf() async {
     if (_clienteSeleccionado == null || _itemsAgregados.isEmpty) return;
 
     final pdf = pw.Document();
-    pw.MemoryImage? logo;
+    
+    // 1. Obtener configuración actualizada desde Firestore (Logo y Correlativo)
+    var configDoc = await FirebaseFirestore.instance.collection('configuracion').doc('factura').get();
+    pw.MemoryImage? logoImage;
+    int nroCorrelativo = 1;
 
-    try {
-      if (ConfigFactura.logoBase64 != null) {
-        logo = pw.MemoryImage(base64Decode(ConfigFactura.logoBase64!));
+    if (configDoc.exists) {
+      // Decodificar Logo
+      String? base64Logo = configDoc.data()?['logoBase64'];
+      if (base64Logo != null && base64Logo.isNotEmpty) {
+        try {
+          logoImage = pw.MemoryImage(base64Decode(base64Logo));
+        } catch (e) {
+          debugPrint("Error decodificando logo: $e");
+        }
       }
-    } catch (e) {
-      debugPrint("Error decodificando logo: $e");
+      // Obtener último número
+      nroCorrelativo = configDoc.data()?['ultimo_nro'] ?? 1;
     }
+
+    // Formatear número y fecha
+    String nroPresupuestoFormateado = "00-${nroCorrelativo.toString().padLeft(4, '0')}";
+    String fechaActual = DateFormat('dd/MM/yyyy').format(DateTime.now());
 
     pdf.addPage(
       pw.Page(
@@ -162,7 +178,7 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: [
-                  if (logo != null) pw.Container(width: 180, child: pw.Image(logo)),
+                  if (logoImage != null) pw.Container(width: 180, child: pw.Image(logoImage)),
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
@@ -182,8 +198,9 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.end,
                     children: [
-                      pw.Text("NRO: $_numeroControl", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                      pw.Text("FECHA: ${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}"),
+                      // Usamos el número formateado dinámico
+                      pw.Text("NRO: $nroPresupuestoFormateado", style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Text("FECHA: $fechaActual", style: const pw.TextStyle(fontSize: 10)),
                     ],
                   ),
                 ],
@@ -194,8 +211,14 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
                 padding: const pw.EdgeInsets.all(8),
                 decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400, width: 0.5)),
                 child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
                     _pdfDataRow("CLIENTE:", _clienteSeleccionado!.nombre),
+                    // Agregamos la Cédula/ID debajo del nombre
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.only(left: 75), // Alineado con el valor del nombre
+                      child: pw.Text("ID: ${_clienteSeleccionado!.id}", style: const pw.TextStyle(fontSize: 9)),
+                    ),
                     pw.SizedBox(height: 4),
                     _pdfDataRow("VEHÍCULO:", "${_clienteSeleccionado!.vehiculo} - PLACA: ${_clienteSeleccionado!.placa}"),
                   ],
@@ -232,7 +255,13 @@ class _PresupuestoWebModuleState extends State<PresupuestoWebModule> {
         },
       ),
     );
-    await Printing.layoutPdf(onLayout: (format) async => pdf.save());
+
+    // 2. Actualizar el correlativo en Firebase para el próximo presupuesto
+    await FirebaseFirestore.instance.collection('configuracion').doc('factura').update({
+      'ultimo_nro': nroCorrelativo + 1
+    });
+
+    await Printing.layoutPdf(onLayout: (format) async => pdf.save(), name: 'Presupuesto_$nroPresupuestoFormateado');
   }
 
   pw.Widget _pdfDataRow(String label, String value) {

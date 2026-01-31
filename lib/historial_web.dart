@@ -39,12 +39,11 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
   }
 
   String _calcularTiempoDesdeEntrega(DateTime fechaFin) {
-    final diferencia = DateTime.now().difference(fechaFin).inDays;
-    if (diferencia == 0) return "ENTREGADO HOY";
-    return "HACE $diferencia DÍAS";
+    final diasPasados = DateTime.now().difference(fechaFin).inDays;
+    if (diasPasados < 1) return "ENTREGADO HOY";
+    return "HACE $diasPasados ${diasPasados == 1 ? 'DÍA' : 'DÍAS'}";
   }
 
-  // --- FUNCIÓN ACTUALIZADA: DESCUENTO AUTOMÁTICO DÍA A DÍA ---
   Map<String, dynamic> _calcularGarantia(DateTime fechaFin, dynamic garantiaData) {
     int diasTotales = 30; 
     String totalTexto = "30 DÍAS";
@@ -60,7 +59,6 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
             int meses = int.tryParse(raw.split(' ')[0]) ?? 1;
             diasTotales = meses * 30;
           } else {
-            // Extrae solo el número si viene como "90 DÍAS"
             diasTotales = int.tryParse(raw.replaceAll(RegExp(r'[^0-9]'), '')) ?? 30;
           }
         }
@@ -69,22 +67,13 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
       diasTotales = 30;
     }
 
-    // Cálculo dinámico comparando con la fecha actual del sistema
-    final fechaVencimiento = fechaFin.add(Duration(days: diasTotales));
-    final diferenciaActual = fechaVencimiento.difference(DateTime.now());
-    
-    // Convertimos a días completos restantes
-    int diasRestantes = diferenciaActual.inDays;
-    
-    // Si la diferencia es positiva pero menor a 24h, inDays da 0, 
-    // pero técnicamente aún queda tiempo hoy.
-    if (!diferenciaActual.isNegative && diferenciaActual.inHours > 0 && diasRestantes == 0) {
-      diasRestantes = 1; 
-    }
+    final diasPasados = DateTime.now().difference(fechaFin).inDays;
+    int diasRestantes = diasTotales - diasPasados;
+    bool estaVencida = diasRestantes <= 0;
 
     return {
-      "restante": diasRestantes < 0 ? 0 : diasRestantes,
-      "vencida": diferenciaActual.isNegative,
+      "restante": estaVencida ? 0 : diasRestantes,
+      "vencida": estaVencida,
       "total_db": totalTexto
     };
   }
@@ -325,6 +314,10 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                       const SizedBox(height: 15),
                       _buildTextBlock("SISTEMA A REPARAR:", data['sistema_reparar'] ?? "Sin sistema asignado"),
                       const SizedBox(height: 15),
+                      // --- NUEVO CAMPO: TÉCNICO RESPONSABLE ---
+                      _buildTextBlock("TÉCNICO RESPONSABLE:", data['mecanico_asignado'] ?? "No registrado"),
+                      const SizedBox(height: 15),
+                      // ----------------------------------------
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [

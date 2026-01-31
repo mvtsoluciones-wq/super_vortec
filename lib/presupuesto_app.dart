@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:flutter/services.dart'; 
+import 'dart:convert'; 
 import 'package:intl/intl.dart'; 
 
 // --- IMPORTACIONES DE CONFIGURACIÓN ---
@@ -25,18 +25,56 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
-  // --- FUNCIÓN MEJORADA PARA GENERAR PDF CON LOGO ---
+  // --- FUNCIÓN PDF CON DATOS REALES DE FIREBASE ---
   Future<void> _generarPDF(Map<String, dynamic> data, String docId) async {
     final pdf = pw.Document();
     final List items = data['presupuesto_items'] ?? [];
     
-    // Cargar imagen del logo desde assets (JMendez Performance)
-    final ByteData bytes = await rootBundle.load(ConfigFactura.logoPath);
-    final Uint8List byteList = bytes.buffer.asUint8List();
-    final pw.MemoryImage logoImage = pw.MemoryImage(byteList);
+    // 1. OBTENER CONFIGURACIÓN DE LA EMPRESA (Logo, Nombre, RIF)
+    var configSnap = await FirebaseFirestore.instance.collection('configuracion').doc('factura').get();
+    var configData = configSnap.data() ?? {};
+    
+    pw.MemoryImage? logoImage;
+    if (configData['logoBase64'] != null && configData['logoBase64'].toString().isNotEmpty) {
+      try {
+        logoImage = pw.MemoryImage(base64Decode(configData['logoBase64']));
+      } catch (e) {
+        debugPrint("Error decodificando logo de DB: $e");
+      }
+    }
 
-    // Formatear número de presupuesto y fecha
-    String nroPresupuesto = "00-${docId.substring(0, 4).toUpperCase()}";
+    // 2. BUSCAR CÉDULA DEL CLIENTE
+    String cedulaCliente = "S/D";
+    if (data['cliente_id'] != null) {
+      try {
+        var clienteSnap = await FirebaseFirestore.instance.collection('clientes').doc(data['cliente_id']).get();
+        if (clienteSnap.exists) {
+          var cData = clienteSnap.data();
+          cedulaCliente = cData?['cedula'] ?? cData?['id'] ?? "S/D";
+        }
+      } catch (e) {
+        debugPrint("Error buscando cliente: $e");
+      }
+    }
+
+    // 3. GESTIÓN DEL NÚMERO SECUENCIAL
+    String nroPresupuesto = data['numero_presupuesto'] ?? "";
+    
+    if (nroPresupuesto.isEmpty) {
+      int ultimoNro = configData['ultimo_nro'] ?? 1;
+      nroPresupuesto = "00-${ultimoNro.toString().padLeft(4, '0')}";
+      
+      // Actualizamos contador global
+      await FirebaseFirestore.instance.collection('configuracion').doc('factura').update({
+        'ultimo_nro': ultimoNro + 1
+      });
+      
+      // Guardamos el número en el diagnóstico
+      await FirebaseFirestore.instance.collection('diagnosticos').doc(docId).update({
+        'numero_presupuesto': nroPresupuesto
+      });
+    }
+
     String fechaActual = DateFormat('dd/MM/yyyy').format(DateTime.now());
 
     pdf.addPage(
@@ -47,7 +85,7 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // --- ENCABEZADO: LOGO Y DATOS EMPRESA ---
+              // --- ENCABEZADO ---
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -55,12 +93,12 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                   pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Image(logoImage, width: 120),
+                      if (logoImage != null) pw.Image(logoImage, width: 120),
                       pw.SizedBox(height: 10),
-                      pw.Text(ConfigFactura.nombreEmpresa, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
-                      pw.Text("RIF: ${ConfigFactura.rifEmpresa}", style: const pw.TextStyle(fontSize: 9)),
-                      pw.Text(ConfigFactura.direccionEmpresa, style: const pw.TextStyle(fontSize: 8)),
-                      pw.Text("Tel: ${ConfigFactura.telefonoEmpresa}", style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text(configData['nombreEmpresa'] ?? ConfigFactura.nombreEmpresa, style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                      pw.Text("RIF: ${configData['rifEmpresa'] ?? ConfigFactura.rifEmpresa}", style: const pw.TextStyle(fontSize: 9)),
+                      pw.Text(configData['direccion'] ?? ConfigFactura.direccionEmpresa, style: const pw.TextStyle(fontSize: 8)),
+                      pw.Text("Tel: ${configData['telefono'] ?? ConfigFactura.telefonoEmpresa}", style: const pw.TextStyle(fontSize: 8)),
                     ],
                   ),
                   pw.Column(
@@ -78,7 +116,7 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
               pw.Divider(thickness: 2, color: PdfColors.red900),
               pw.SizedBox(height: 15),
 
-              // --- DATOS DEL CLIENTE Y VEHÍCULO ---
+              // --- DATOS DEL CLIENTE ---
               pw.Row(
                 mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                 children: [
@@ -86,7 +124,8 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
                       pw.Text("CLIENTE:", style: pw.TextStyle(fontSize: 9, fontWeight: pw.FontWeight.bold, color: PdfColors.grey700)),
-                      pw.Text(_clienteSeleccionadoNombre?.toUpperCase() ?? "N/A", style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                      pw.Text(_clienteSeleccionadoNombre?.toUpperCase() ?? "CLIENTE", style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold)),
+                      pw.Text("ID/CÉDULA: $cedulaCliente", style: const pw.TextStyle(fontSize: 9)),
                     ],
                   ),
                   pw.Column(
@@ -146,7 +185,7 @@ class _PresupuestoAppModuleState extends State<PresupuestoAppModule> {
               pw.Spacer(),
               pw.Divider(color: PdfColors.grey400),
               pw.Center(
-                child: pw.Text("Gracias por confiar en JMendez Performance - Informática Automotriz", 
+                child: pw.Text("Gracias por confiar en ${configData['nombreEmpresa'] ?? 'Nosotros'} - Informática Automotriz", 
                   style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
               ),
             ],

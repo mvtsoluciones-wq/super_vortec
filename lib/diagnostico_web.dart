@@ -24,11 +24,13 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   String? _modeloSeleccionado;   // Guarda el nombre del Modelo (Ej: RENAULT)
 
   // --- LÓGICA DE PRESUPUESTO DINÁMICO ---
+  // Se agregó el controlador 'costo' para calcular ganancias
   List<Map<String, dynamic>> _itemsPresupuesto = [
     {
       'item': TextEditingController(),
       'desc': TextEditingController(),
       'cant': TextEditingController(text: "1"),
+      'costo': TextEditingController(), // NUEVO CAMPO
       'precio': TextEditingController(),
     }
   ];
@@ -37,6 +39,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
 
+  // Calcula el precio de venta total al cliente
   double _calcularTotalFalla() {
     double total = 0;
     for (var item in _itemsPresupuesto) {
@@ -47,12 +50,29 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     return total;
   }
 
+  // Calcula el costo operativo total
+  double _calcularTotalCosto() {
+    double total = 0;
+    for (var item in _itemsPresupuesto) {
+      double c = double.tryParse(item['cant'].text) ?? 0;
+      double costo = double.tryParse(item['costo'].text) ?? 0;
+      total += (c * costo);
+    }
+    return total;
+  }
+
+  // Calcula la ganancia neta (Venta - Costo)
+  double _calcularGanancia() {
+    return _calcularTotalFalla() - _calcularTotalCosto();
+  }
+
   void _agregarFilaPresupuesto() {
     setState(() {
       _itemsPresupuesto.add({
         'item': TextEditingController(),
         'desc': TextEditingController(),
         'cant': TextEditingController(text: "1"),
+        'costo': TextEditingController(), // NUEVO CAMPO
         'precio': TextEditingController(),
       });
     });
@@ -76,10 +96,13 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
       List<Map<String, dynamic>> presupuestoFinal = _itemsPresupuesto.map((e) {
         double c = double.tryParse(e['cant'].text) ?? 0;
         double p = double.tryParse(e['precio_unitario']?.text ?? e['precio'].text) ?? 0;
+        double costo = double.tryParse(e['costo'].text) ?? 0;
+        
         return {
           'item': e['item'].text.toUpperCase(),
           'descripcion': e['desc'].text.toUpperCase(),
           'cantidad': c,
+          'costo_unitario': costo, // Se guarda el costo interno
           'precio_unitario': p,
           'subtotal': c * p,
         };
@@ -91,6 +114,8 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
         'cliente_id': _clienteSeleccionado,
         'sistema_reparar': _tituloFallaController.text.trim().toUpperCase(),
         'total_reparacion': _calcularTotalFalla(),
+        'total_costo': _calcularTotalCosto(), // Guardamos métricas internas
+        'ganancia_estimada': _calcularGanancia(), // Guardamos métricas internas
         'garantia': _garantiaController.text.trim().toUpperCase(),
         'link_escanner': _scannerController.text.trim(),
         'link_video': _videoController.text.trim(),
@@ -98,7 +123,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
         'urgencia': _semaforoSeleccionado,
         'presupuesto_items': presupuestoFinal, 
         'aprobado': false,
-        'finalizado': false, // <--- CLAVE: Se guarda como NO finalizado para que aparezca en Presupuestos APP
+        'finalizado': false, 
         'fecha': FieldValue.serverTimestamp(),
       });
 
@@ -123,7 +148,13 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     _scannerController.clear();
     setState(() {
       _itemsPresupuesto = [
-        {'item': TextEditingController(), 'desc': TextEditingController(), 'cant': TextEditingController(text: "1"), 'precio': TextEditingController()}
+        {
+          'item': TextEditingController(), 
+          'desc': TextEditingController(), 
+          'cant': TextEditingController(text: "1"), 
+          'costo': TextEditingController(),
+          'precio': TextEditingController()
+        }
       ];
       _vehiculoSeleccionado = null;
       _modeloSeleccionado = null;
@@ -184,11 +215,24 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
               _buildPresupuestoTable(),
               
               const SizedBox(height: 20),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  "TOTAL: \$${_calcularTotalFalla().toStringAsFixed(2)}", 
-                  style: TextStyle(color: brandRed, fontSize: 22, fontWeight: FontWeight.bold)
+              
+              // --- SECCIÓN DE TOTALES Y GANANCIAS ---
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: inputFill,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white12)
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _buildTotalItem("TOTAL VENTA", _calcularTotalFalla(), brandRed),
+                    const SizedBox(width: 30),
+                    _buildTotalItem("TOTAL COSTO", _calcularTotalCosto(), Colors.orange),
+                    const SizedBox(width: 30),
+                    _buildTotalItem("GANANCIA", _calcularGanancia(), Colors.green, isBig: true),
+                  ],
                 ),
               ),
 
@@ -207,6 +251,19 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTotalItem(String label, double amount, Color color, {bool isBig = false}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
+        Text(
+          "\$${amount.toStringAsFixed(2)}", 
+          style: TextStyle(color: color, fontSize: isBig ? 24 : 16, fontWeight: FontWeight.bold)
+        ),
+      ],
     );
   }
 
@@ -263,12 +320,14 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
               children: [
                 Expanded(flex: 2, child: _headerText("ITEM")),
                 const SizedBox(width: 10),
-                Expanded(flex: 4, child: _headerText("DESCRIPCIÓN")),
+                Expanded(flex: 3, child: _headerText("DESCRIPCIÓN")), // Reducido para dar espacio
                 const SizedBox(width: 10),
                 Expanded(flex: 1, child: _headerText("CANT")),
                 const SizedBox(width: 10),
-                Expanded(flex: 2, child: _headerText("PRECIO \$")),
-                const SizedBox(width: 40),
+                Expanded(flex: 2, child: _headerText("COSTO UNIT.")), // Nueva Columna
+                const SizedBox(width: 10),
+                Expanded(flex: 2, child: _headerText("PRECIO VENTA")),
+                const SizedBox(width: 40), // Espacio para botón borrar
               ],
             ),
           ),
@@ -282,9 +341,12 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                 children: [
                   Expanded(flex: 2, child: _tableInput(row['item'], "Item")),
                   const SizedBox(width: 10),
-                  Expanded(flex: 4, child: _tableInput(row['desc'], "Descripción")),
+                  Expanded(flex: 3, child: _tableInput(row['desc'], "Descripción")),
                   const SizedBox(width: 10),
                   Expanded(flex: 1, child: _tableInput(row['cant'], "1", isNumber: true)),
+                  const SizedBox(width: 10),
+                  // Input de Costo
+                  Expanded(flex: 2, child: _tableInput(row['costo'], "0.00", isNumber: true)),
                   const SizedBox(width: 10),
                   Expanded(flex: 2, child: _tableInput(row['precio'], "0.00", isNumber: true)),
                   IconButton(

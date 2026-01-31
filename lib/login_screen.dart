@@ -42,7 +42,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (user != null) {
         // PASO 2: EL PORTERO (Consultar vinculación por correo en Firestore)
-        // Buscamos en la colección 'clientes' el documento que tenga ese email
         var userQuery = await FirebaseFirestore.instance
             .collection('clientes')
             .where(
@@ -52,7 +51,6 @@ class _LoginScreenState extends State<LoginScreen> {
             .get();
 
         if (userQuery.docs.isNotEmpty) {
-          // Extraemos los datos del primer documento encontrado
           var userData = userQuery.docs.first.data();
           String rol = userData['rol'] ?? 'cliente';
 
@@ -75,22 +73,25 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
         } else {
-          // CASO: El usuario existe en Auth pero no está registrado/habilitado en la colección 'clientes'
           if (!mounted) return;
           _showSnackBar(
             "Tu cuenta no ha sido habilitada por el Taller.",
             Colors.redAccent,
           );
-          await FirebaseAuth.instance
-              .signOut(); // Seguridad: cerrar sesión si no está en la DB
+          await FirebaseAuth.instance.signOut();
         }
       }
     } on FirebaseAuthException catch (e) {
       String mensaje = "Error de acceso";
-      if (e.code == 'user-not-found') mensaje = "Usuario no registrado";
-      if (e.code == 'wrong-password') mensaje = "Contraseña incorrecta";
-      if (e.code == 'network-request-failed')
+      if (e.code == 'user-not-found') {
+        mensaje = "Usuario no registrado";
+      }
+      if (e.code == 'wrong-password') {
+        mensaje = "Contraseña incorrecta";
+      }
+      if (e.code == 'network-request-failed') {
         mensaje = "Sin conexión a internet";
+      }
       if (!mounted) return;
       _showSnackBar(mensaje, brandRed);
     } catch (e) {
@@ -126,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Image.asset(
                 'assets/weblogo.jpg',
                 height: 150,
-                errorBuilder: (_, __, ___) =>
+                errorBuilder: (_, _, _) =>
                     Icon(Icons.bolt, size: 100, color: brandRed),
               ),
               const SizedBox(height: 40),
