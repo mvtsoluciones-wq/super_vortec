@@ -38,6 +38,90 @@ class _VentasWebModuleState extends State<VentasWebModule> {
     }
   }
 
+  // --- NUEVA FUNCIÓN: ELIMINAR VENTA ---
+  Future<void> _eliminarVenta(String docId) async {
+    bool confirmar = await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBlack,
+        title: const Text("¿Eliminar Venta?", style: TextStyle(color: Colors.white)),
+        content: const Text(
+          "Esta acción eliminará el registro financiero permanentemente.", 
+          style: TextStyle(color: Colors.white70)
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCELAR")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true), 
+            child: const Text("ELIMINAR", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
+          ),
+        ],
+      )
+    ) ?? false;
+
+    if (confirmar) {
+      try {
+        await FirebaseFirestore.instance.collection('ventas').doc(docId).delete();
+        if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("🗑️ Venta eliminada")));
+      } catch (e) {
+        debugPrint("Error: $e");
+      }
+    }
+  }
+
+  // --- NUEVA FUNCIÓN: EDITAR VENTA (Método y Notas) ---
+  Future<void> _editarVenta(String docId, Map<String, dynamic> data) async {
+    String metodoEdit = data['metodo_pago'] ?? "Transferencia";
+    TextEditingController notasEdit = TextEditingController(text: data['notas_venta'] ?? "");
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateModal) {
+          return AlertDialog(
+            backgroundColor: cardBlack,
+            title: const Text("Editar Datos de Venta", style: TextStyle(color: Colors.white)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: metodoEdit,
+                  dropdownColor: inputFill,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(labelText: "Método de Pago", labelStyle: TextStyle(color: Colors.white54)),
+                  items: ["Efectivo", "Transferencia", "Zelle", "Pago Móvil", "Tarjeta", "Binance"]
+                      .map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                  onChanged: (v) => setStateModal(() => metodoEdit = v!),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: notasEdit,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(labelText: "Notas / Referencia", labelStyle: TextStyle(color: Colors.white54)),
+                )
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("CANCELAR")),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                onPressed: () async {
+                  await FirebaseFirestore.instance.collection('ventas').doc(docId).update({
+                    'metodo_pago': metodoEdit,
+                    'notas_venta': notasEdit.text,
+                  });
+                  Navigator.pop(ctx);
+                  if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("✅ Venta actualizada")));
+                }, 
+                child: const Text("GUARDAR", style: TextStyle(color: Colors.white))
+              ),
+            ],
+          );
+        }
+      )
+    );
+  }
+
   // ==========================================
   // VISTA 1: DASHBOARD HISTORIAL DE VENTAS
   // ==========================================
@@ -188,6 +272,7 @@ class _VentasWebModuleState extends State<VentasWebModule> {
                             _headerCell("MÉTODO", flex: 2),
                             _headerCell("TOTAL", flex: 2, align: TextAlign.right),
                             _headerCell("GANANCIA", flex: 2, align: TextAlign.right),
+                            _headerCell("ACCIONES", flex: 2, align: TextAlign.center), // NUEVA COLUMNA
                           ],
                         ),
                       ),
@@ -200,7 +285,8 @@ class _VentasWebModuleState extends State<VentasWebModule> {
                           separatorBuilder: (c, i) => const SizedBox(height: 8),
                           itemBuilder: (context, index) {
                             var data = docsFiltrados[index].data() as Map<String, dynamic>;
-                            return _buildVentaRow(data);
+                            // Pasamos el ID del documento para poder editar/borrar
+                            return _buildVentaRow(docsFiltrados[index].id, data); 
                           },
                         ),
                       ),
@@ -471,7 +557,7 @@ class _VentasWebModuleState extends State<VentasWebModule> {
     );
   }
 
-  Widget _buildVentaRow(Map<String, dynamic> data) {
+  Widget _buildVentaRow(String docId, Map<String, dynamic> data) {
     DateTime fecha = data['fecha_venta'] != null ? (data['fecha_venta'] as Timestamp).toDate() : DateTime.now();
     double total = (data['total_reparacion'] ?? 0).toDouble();
     double ganancia = (data['ganancia_estimada'] ?? 0).toDouble();
@@ -482,15 +568,33 @@ class _VentasWebModuleState extends State<VentasWebModule> {
       child: Row(children: [
         Expanded(flex: 2, child: Text(DateFormat('dd/MM HH:mm').format(fecha), style: const TextStyle(color: Colors.white54, fontSize: 12))),
         
-        // COLUMNA NOMBRE CLIENTE (Nueva lógica para ver el nombre real)
+        // COLUMNA NOMBRE CLIENTE
         Expanded(flex: 3, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _NombreClienteWidget(clienteId: data['cliente_id']), // Widget de nombre
+          _NombreClienteWidget(clienteId: data['cliente_id']),
           Text("${data['modelo_vehiculo']} - ${data['placa_vehiculo']}", style: const TextStyle(color: Colors.white38, fontSize: 10)),
         ])),
         
         Expanded(flex: 2, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(5)), child: Text(data['metodo_pago'] ?? "N/A", textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 11)))),
         Expanded(flex: 2, child: Text("\$${total.toStringAsFixed(2)}", textAlign: TextAlign.right, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
         Expanded(flex: 2, child: Text("\$${ganancia.toStringAsFixed(2)}", textAlign: TextAlign.right, style: const TextStyle(color: Colors.purpleAccent, fontWeight: FontWeight.bold))),
+        
+        // COLUMNA ACCIONES (Editar y Eliminar)
+        Expanded(flex: 2, child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.edit, color: Colors.blueAccent, size: 18), 
+              onPressed: () => _editarVenta(docId, data),
+              tooltip: "Editar Datos",
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.redAccent, size: 18), 
+              onPressed: () => _eliminarVenta(docId),
+              tooltip: "Eliminar Venta",
+            ),
+          ],
+        )),
       ]),
     );
   }
@@ -535,7 +639,6 @@ class _NombreClienteWidget extends StatelessWidget {
           String nombre = snapshot.data!.get('nombre') ?? "Cliente";
           return Text(nombre.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold));
         }
-        // Fallback: Muestra ID si no encuentra nombre
         return Text(clienteId!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold));
       },
     );

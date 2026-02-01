@@ -35,6 +35,34 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
     );
   }
 
+  // --- NUEVA FUNCIÓN: ELIMINAR RECIBO ---
+  Future<void> _eliminarRecibo(String docId) async {
+    bool confirmar = await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: cardBlack,
+        title: const Text("¿Eliminar Recibo?", style: TextStyle(color: Colors.white)),
+        content: const Text("Esta acción borrará el registro permanentemente de la base de datos.", style: TextStyle(color: Colors.white70)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCELAR")),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true), 
+            child: const Text("ELIMINAR", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))
+          ),
+        ],
+      )
+    ) ?? false;
+
+    if (confirmar) {
+      try {
+        await FirebaseFirestore.instance.collection('recibos').doc(docId).delete();
+        _notificar("🗑️ Recibo eliminado correctamente", Colors.orange);
+      } catch (e) {
+        _notificar("Error al eliminar: $e", Colors.red);
+      }
+    }
+  }
+
   // --- GENERAR PDF ---
   Future<void> _generarPDFRecibo(Map<String, dynamic> data, String docId) async {
     final pdf = pw.Document();
@@ -60,11 +88,9 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
     List items = data['presupuesto_items'] ?? [];
     double totalPagar = (data['total_reparacion'] ?? 0).toDouble();
 
-    // Obtener nombre del cliente para el PDF
     String nombreClientePDF = "Cliente";
     if (data['cliente_id'] != null) {
        var docC = await FirebaseFirestore.instance.collection('clientes').doc(data['cliente_id']).get();
-       // Intento secundario si el ID directo falla
        if (!docC.exists) {
           var q = await FirebaseFirestore.instance.collection('clientes').where('cedula', isEqualTo: data['cliente_id']).limit(1).get();
           if (q.docs.isNotEmpty) docC = q.docs.first;
@@ -230,18 +256,18 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
           ),
           const SizedBox(height: 30),
           
-          // Encabezados Modificados
+          // Encabezados
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
             decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(8)),
             child: Row(
               children: [
-                _headerCell("CLIENTE / FECHA", flex: 3), // CAMBIO: CLIENTE COMO PRINCIPAL
+                _headerCell("CLIENTE / FECHA", flex: 3),
                 _headerCell("VEHÍCULO", flex: 2),
-                _headerCell("NRO RECIBO", flex: 2),      // CAMBIO: ID REEMPLAZADO POR NRO RECIBO
+                _headerCell("NRO RECIBO", flex: 2),
                 _headerCell("TOTAL", flex: 2, align: TextAlign.right),
                 _headerCell("ESTATUS", flex: 2, align: TextAlign.center),
-                _headerCell("ACCIONES", flex: 4, align: TextAlign.center),
+                _headerCell("ACCIONES", flex: 5, align: TextAlign.center),
               ],
             ),
           ),
@@ -299,13 +325,12 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
       ),
       child: Row(
         children: [
-          // Columna 1: Cliente (Nombre Real)
+          // Columna 1: Cliente
           Expanded(
             flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Usamos el widget para mostrar el nombre del cliente
                 _NombreClienteWidget(clienteId: data['cliente_id']),
                 Text(DateFormat('dd/MM HH:mm').format(fecha), style: const TextStyle(color: Colors.white38, fontSize: 10)),
               ],
@@ -349,19 +374,22 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
           ),
           // Columna 6: Acciones
           Expanded(
-            flex: 4,
+            flex: 5, // Aumenté un poco el espacio para el nuevo botón
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _actionIcon(Icons.picture_as_pdf, Colors.redAccent, "PDF", () => _generarPDFRecibo(data, docId)),
-                const SizedBox(width: 8),
+                const SizedBox(width: 5),
                 _actionIcon(Icons.wechat, Colors.green, "WhatsApp", () => _enviarWhatsapp(data)),
-                const SizedBox(width: 8),
+                const SizedBox(width: 5),
                 _actionIcon(Icons.monetization_on, Colors.purpleAccent, "Venta", () => _irAVentas(data, docId)),
-                const SizedBox(width: 8),
+                const SizedBox(width: 5),
                 _actionIcon(Icons.cloud_upload, Colors.blue, "Facturar", () => _enviarAFacturacion(docId, data)),
-                const SizedBox(width: 8),
+                const SizedBox(width: 5),
                 _actionIcon(Icons.send_to_mobile, enviadoApp ? Colors.grey : Colors.orange, "App", () => _enviarAClienteApp(docId)),
+                const SizedBox(width: 5),
+                // --- BOTÓN DE BORRAR AGREGADO ---
+                _actionIcon(Icons.delete_outline, Colors.grey, "Borrar Recibo", () => _eliminarRecibo(docId)),
               ],
             ),
           ),
@@ -403,13 +431,10 @@ class _NombreClienteWidget extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1));
         
-        // Estrategia doble: Busca por ID Doc o consulta por campo 'cedula'
         if (snapshot.hasData && snapshot.data!.exists) {
           String nombre = snapshot.data!.get('nombre') ?? "Cliente";
           return Text(nombre.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold));
         } else {
-          // Fallback: Si no encuentra por ID, intentar buscar por campo (puede requerir un FutureBuilder anidado o mejor manejo en la lógica principal, 
-          // pero para visualización simple mostramos el ID como respaldo si no se encuentra)
           return Text(clienteId!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold));
         }
       },
