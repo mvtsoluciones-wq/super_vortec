@@ -20,6 +20,8 @@ import 'config_factura_web.dart';
 import 'historial_web.dart';
 import 'presupuesto_app.dart';
 import 'tecnicos_web.dart';
+import 'recibos_web.dart';
+import 'ventas_web.dart';
 
 // --- 1. FORMATEADOR PARA MAYÚSCULAS ---
 class UpperCaseTextFormatter extends TextInputFormatter {
@@ -377,6 +379,17 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   _sidebarItem(7, Icons.hub_outlined, "MARKET"),
                   _buildDivider(),
                   _buildSectionTitle("ADMINISTRACIÓN"),
+                  
+                  _sidebarItem(
+                    16,
+                    Icons.description_rounded,
+                    "VENTAS",
+                  ),
+                  _sidebarItem(
+                    15,
+                    Icons.description_rounded,
+                    "RECIBOS",
+                  ),
                   _sidebarItem(
                     8,
                     Icons.account_balance_wallet_outlined,
@@ -525,6 +538,11 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         return const PresupuestoAppModule();
       case 14:
         return const TecnicosWebModule();
+      case 15:
+        return const RecibosWebModule();
+      case 16:
+        return const VentasWebModule();
+
       default:
         return const Center(
           child: Icon(

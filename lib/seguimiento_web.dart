@@ -19,6 +19,7 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color bgDark = const Color(0xFF0A0A0A);
+  final Color inputFill = const Color(0xFF1E1E1E);
 
   // --- 1. FINALIZAR TRABAJO: ARCHIVA Y ELIMINA REGISTROS ACTIVOS ---
   Future<void> _finalizarTrabajo(String docId, Map<String, dynamic> data) async {
@@ -27,7 +28,7 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
       builder: (ctx) => AlertDialog(
         backgroundColor: cardBlack,
         title: const Text("¿FINALIZAR Y ARCHIVAR?", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        content: const Text("Se guardarán los diagnósticos y evidencias en el historial definitivo. El registro actual se eliminará para mantener limpia la base de datos."),
+        content: const Text("Se guardará el historial completo, incluyendo el presupuesto detallado, costos y margen de ganancia. El registro activo se cerrará."),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("CANCELAR")),
           ElevatedButton(
@@ -43,9 +44,18 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
       try {
         String urlVideoReparacion = _evidenciasYoutube[docId] ?? "";
 
-        // PASO A: CREAR EL REGISTRO EN EL HISTORIAL (COPIA ÍNTEGRA)
+        // PASO A: CREAR EL REGISTRO EN EL HISTORIAL
+        // Aseguramos que los datos financieros críticos se copien
         await FirebaseFirestore.instance.collection('historial_web').add({
-          ...data, // Copia automática de todos los campos del diagnóstico
+          ...data, // Copia placa, modelo, cliente, fallas, etc.
+          
+          // Datos financieros explícitos (aunque ...data los debería traer, esto lo asegura)
+          'presupuesto_items': data['presupuesto_items'] ?? [],
+          'total_reparacion': data['total_reparacion'] ?? 0.0,
+          'total_costo': data['total_costo'] ?? 0.0,
+          'ganancia_estimada': data['ganancia_estimada'] ?? 0.0,
+          
+          // Metadatos de cierre
           'fecha_finalizacion': FieldValue.serverTimestamp(),
           'estado_entrega': 'FINALIZADO',
           'url_evidencia_video': urlVideoReparacion,
@@ -59,7 +69,7 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("✅ TRABAJO ARCHIVADO Y BASE DE DATOS OPTIMIZADA"), 
+            content: Text("✅ TRABAJO ARCHIVADO CON PRESUPUESTO COMPLETO"), 
             backgroundColor: Colors.green
           ),
         );
@@ -127,7 +137,7 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
     } catch (e) { return "00-001"; }
   }
 
-  // --- 3. GENERACIÓN DE PDF ---
+  // --- 3. GENERACIÓN DE PDF (OT) ---
   Future<void> _generarOT(Map<String, dynamic> data, String funciones) async {
     final String numeroOT = await _obtenerSiguienteNumeroOT();
     final String fechaActual = DateTime.now().toString().split(' ')[0];
@@ -229,6 +239,11 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
     String faseActual = data['fase_reparacion'] ?? "EN ESPERA";
     bool tieneVideo = _evidenciasYoutube.containsKey(docId) && _evidenciasYoutube[docId]!.isNotEmpty;
 
+    // Métricas individuales por tarjeta
+    double totalCard = (data['total_reparacion'] ?? 0).toDouble();
+    double costoCard = (data['total_costo'] ?? 0).toDouble();
+    double gananciaCard = (data['ganancia_estimada'] ?? 0).toDouble();
+
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(20),
@@ -237,78 +252,96 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
-      child: Row(
+      child: Column(
         children: [
-          PopupMenuButton<String>(
-            onSelected: (val) => _cambiarEstatus(docId, val),
-            color: cardBlack,
-            itemBuilder: (ctx) => [
-              _buildMenuItem("EN ESPERA", Icons.timer),
-              _buildMenuItem("EN REPARACIÓN", Icons.build),
-              _buildMenuItem("EN PRUEBAS", Icons.speed),
-              _buildMenuItem("LISTO", Icons.check_circle),
-            ],
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: brandRed.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: brandRed.withValues(alpha: 0.5)),
+          Row(
+            children: [
+              PopupMenuButton<String>(
+                onSelected: (val) => _cambiarEstatus(docId, val),
+                color: cardBlack,
+                itemBuilder: (ctx) => [
+                  _buildMenuItem("EN ESPERA", Icons.timer),
+                  _buildMenuItem("EN REPARACIÓN", Icons.build),
+                  _buildMenuItem("EN PRUEBAS", Icons.speed),
+                  _buildMenuItem("LISTO", Icons.check_circle),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: brandRed.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: brandRed.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text("FASE / ESTATUS", style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text(faseActual, style: TextStyle(color: brandRed, fontSize: 10, fontWeight: FontWeight.w900)),
+                    ],
+                  ),
+                ),
               ),
-              child: Column(
+              const SizedBox(width: 25),
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(data['modelo_vehiculo'] ?? "S/D", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text("PLACA: ${data['placa_vehiculo'] ?? ''}", style: const TextStyle(color: Colors.white60, fontSize: 12)),
+                  ],
+                ),
+              ),
+              
+              _buildActionButton(Icons.assignment_rounded, "OT", () => _mostrarDialogoOT(data)),
+              const SizedBox(width: 15),
+              
+              Column(
                 children: [
-                  const Text("FASE / ESTATUS", style: TextStyle(color: Colors.white38, fontSize: 8, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 2),
-                  Text(faseActual, style: TextStyle(color: brandRed, fontSize: 10, fontWeight: FontWeight.w900)),
+                  IconButton(
+                    icon: Icon(
+                      Icons.play_circle_fill, 
+                      color: tieneVideo ? Colors.red : Colors.white24, 
+                      size: 26
+                    ), 
+                    onPressed: () => _mostrarDialogoVideo(docId)
+                  ),
+                  Text(
+                    tieneVideo ? "VIDEO OK" : "VINCULAR", 
+                    style: TextStyle(color: tieneVideo ? Colors.red : Colors.white24, fontSize: 8)
+                  ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(width: 25),
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data['modelo_vehiculo'] ?? "S/D", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                Text("PLACA: ${data['placa_vehiculo'] ?? ''}", style: const TextStyle(color: Colors.white60, fontSize: 12)),
-              ],
-            ),
-          ),
-          
-          _buildActionButton(Icons.assignment_rounded, "OT", () => _mostrarDialogoOT(data)),
-          const SizedBox(width: 15),
-          
-          Column(
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.play_circle_fill, 
-                  color: tieneVideo ? Colors.red : Colors.white24, 
-                  size: 26
-                ), 
-                onPressed: () => _mostrarDialogoVideo(docId)
-              ),
-              Text(
-                tieneVideo ? "VIDEO OK" : "VINCULAR", 
-                style: TextStyle(color: tieneVideo ? Colors.red : Colors.white24, fontSize: 8)
+              const SizedBox(width: 20),
+
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.withValues(alpha: 0.15),
+                  foregroundColor: Colors.green,
+                  side: const BorderSide(color: Colors.green),
+                  padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                ),
+                onPressed: () => _finalizarTrabajo(docId, data), 
+                icon: const Icon(Icons.verified, size: 18), 
+                label: const Text("FINALIZAR", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
-          const SizedBox(width: 20),
-
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.withValues(alpha: 0.15),
-              foregroundColor: Colors.green,
-              side: const BorderSide(color: Colors.green),
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 15),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+          // --- MINI RESUMEN FINANCIERO EN LA TARJETA ---
+          const SizedBox(height: 15),
+          const Divider(color: Colors.white10),
+          Padding(
+            padding: const EdgeInsets.only(top: 5),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                Text("FACTURA: \$${totalCard.toStringAsFixed(2)}  |  ", style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                Text("COSTO: \$${costoCard.toStringAsFixed(2)}  |  ", style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                Text("GANANCIA: \$${gananciaCard.toStringAsFixed(2)}", style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 11)),
+              ],
             ),
-            onPressed: () => _finalizarTrabajo(docId, data), 
-            icon: const Icon(Icons.verified, size: 18), 
-            label: const Text("FINALIZAR", style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
-          ),
+          )
         ],
       ),
     );
@@ -437,6 +470,50 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
     );
   }
 
+  // --- WIDGET DE RESUMEN FINANCIERO EN TIEMPO REAL ---
+  Widget _buildResumenFinanciero(List<DocumentSnapshot> docs) {
+    double totalFacturado = 0;
+    double totalCostos = 0;
+    double totalGanancia = 0;
+
+    for (var doc in docs) {
+      var data = doc.data() as Map<String, dynamic>;
+      totalFacturado += (data['total_reparacion'] ?? 0).toDouble();
+      totalCostos += (data['total_costo'] ?? 0).toDouble();
+      totalGanancia += (data['ganancia_estimada'] ?? 0).toDouble();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+      decoration: BoxDecoration(
+        color: inputFill,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildInfoCol("TOTAL FACTURADO", totalFacturado, Colors.white),
+          Container(width: 1, height: 30, color: Colors.white12),
+          _buildInfoCol("COSTO REPUESTOS", totalCostos, Colors.orange),
+          Container(width: 1, height: 30, color: Colors.white12),
+          _buildInfoCol("MANO DE OBRA / GANANCIA", totalGanancia, Colors.greenAccent),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCol(String label, double amount, Color color) {
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text("\$${amount.toStringAsFixed(2)}", style: TextStyle(color: color, fontSize: 16, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
   Widget _buildListaTrabajosAsignados() {
     return StreamBuilder<QuerySnapshot>(
       stream: FirebaseFirestore.instance
@@ -446,10 +523,20 @@ class _SeguimientoWebModuleState extends State<SeguimientoWebModule> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         var trabajos = snapshot.data!.docs;
+        
         if (trabajos.isEmpty) return _buildEmptyState("Sin trabajos activos");
-        return ListView.builder(
-          itemCount: trabajos.length,
-          itemBuilder: (context, index) => _buildTrabajoCard(trabajos[index].id, trabajos[index].data() as Map<String, dynamic>),
+
+        // Devolvemos una columna que incluye el resumen financiero + la lista
+        return Column(
+          children: [
+            _buildResumenFinanciero(trabajos),
+            Expanded(
+              child: ListView.builder(
+                itemCount: trabajos.length,
+                itemBuilder: (context, index) => _buildTrabajoCard(trabajos[index].id, trabajos[index].data() as Map<String, dynamic>),
+              ),
+            ),
+          ],
         );
       },
     );

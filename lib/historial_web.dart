@@ -38,6 +38,46 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
     }
   }
 
+  // --- NUEVA LÓGICA: ENVIAR A LA PESTAÑA DE RECIBOS ---
+  Future<void> _crearReciboEnSistema(Map<String, dynamic> data, String docId) async {
+    try {
+      // 1. Verificar si ya existe para evitar duplicados
+      var existe = await FirebaseFirestore.instance
+          .collection('recibos')
+          .where('origen_id', isEqualTo: docId)
+          .get();
+
+      if (existe.docs.isNotEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("⚠️ Este recibo ya está en la bandeja de Recibos"), backgroundColor: Colors.orange),
+        );
+        return;
+      }
+
+      // 2. Crear el documento en la colección 'recibos'
+      await FirebaseFirestore.instance.collection('recibos').add({
+        ...data, // Copiamos toda la info del vehículo, cliente y costos
+        'origen_id': docId, // Referencia al documento original del historial
+        'fecha_emision_recibo': FieldValue.serverTimestamp(),
+        'estado_pago': 'PENDIENTE',
+        'recibo_disponible_app': false, 
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("✅ ENVIADO A LA PESTAÑA DE RECIBOS"), 
+          backgroundColor: Colors.green
+        ),
+      );
+
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+    }
+  }
+
   String _calcularTiempoDesdeEntrega(DateTime fechaFin) {
     final diasPasados = DateTime.now().difference(fechaFin).inDays;
     if (diasPasados < 1) return "ENTREGADO HOY";
@@ -205,6 +245,7 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
   }
 
   Widget _buildListaHistorial() {
+    // Apuntamos a 'historial_web' donde se guardan los trabajos finalizados
     Query query = FirebaseFirestore.instance.collection('historial_web').orderBy('fecha_finalizacion', descending: true);
     
     if (_tecnicoSeleccionado != null) {
@@ -231,14 +272,14 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
 
           return ListView.builder(
             itemCount: docs.length,
-            itemBuilder: (context, index) => _buildReporteCard(docs[index].data() as Map<String, dynamic>),
+            itemBuilder: (context, index) => _buildReporteCard(docs[index].id, docs[index].data() as Map<String, dynamic>),
           );
         },
       ),
     );
   }
 
-  Widget _buildReporteCard(Map<String, dynamic> data) {
+  Widget _buildReporteCard(String docId, Map<String, dynamic> data) {
     DateTime fechaFin = (data['fecha_finalizacion'] as Timestamp).toDate();
     var infoGarantia = _calcularGarantia(fechaFin, data['garantia']);
     String placa = data['placa_vehiculo'] ?? "";
@@ -314,10 +355,8 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                       const SizedBox(height: 15),
                       _buildTextBlock("SISTEMA A REPARAR:", data['sistema_reparar'] ?? "Sin sistema asignado"),
                       const SizedBox(height: 15),
-                      // --- NUEVO CAMPO: TÉCNICO RESPONSABLE ---
                       _buildTextBlock("TÉCNICO RESPONSABLE:", data['mecanico_asignado'] ?? "No registrado"),
                       const SizedBox(height: 15),
-                      // ----------------------------------------
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -348,6 +387,19 @@ class _HistorialWebModuleState extends State<HistorialWebModule> {
                       onPressed: () => _mostrarPresupuestoDetalle(data),
                       icon: const Icon(Icons.receipt_long, size: 14, color: Colors.white),
                       label: const Text("VER PRESUPUESTO", style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 10),
+                    // --- BOTÓN ACTUALIZADO: ENVÍA A LA PESTAÑA RECIBOS ---
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent.withValues(alpha: 0.2),
+                        foregroundColor: Colors.blueAccent,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        side: const BorderSide(color: Colors.blueAccent)
+                      ),
+                      onPressed: () => _crearReciboEnSistema(data, docId),
+                      icon: const Icon(Icons.add_to_photos, size: 14),
+                      label: const Text("GENERAR RECIBO", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 20),
                     Container(
