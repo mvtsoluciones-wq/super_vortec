@@ -35,7 +35,7 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
     );
   }
 
-  // --- NUEVA FUNCIÓN: ELIMINAR RECIBO ---
+  // --- FUNCIÓN: ELIMINAR RECIBO ---
   Future<void> _eliminarRecibo(String docId) async {
     bool confirmar = await showDialog(
       context: context,
@@ -219,63 +219,66 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: bgDark,
-      padding: const EdgeInsets.all(30),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text("CONTROL DE CAJA Y RECIBOS", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1)),
-                  Text("Historial de pagos y emisión de documentos", style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
-                ],
-              ),
-              Container(
-                width: 350,
-                height: 45,
-                decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white10)),
-                child: TextField(
-                  onChanged: (val) => setState(() => _filtroBusqueda = val.toUpperCase()),
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    prefixIcon: Icon(Icons.search, color: Colors.white38),
-                    hintText: "Buscar recibo, placa o cliente...",
-                    hintStyle: TextStyle(color: Colors.white24),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.only(top: 8)
-                  ),
-                ),
-              )
-            ],
-          ),
-          const SizedBox(height: 30),
-          
-          // Encabezados
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(8)),
-            child: Row(
+    // CAMBIO CLAVE: Se usa Scaffold en lugar de Container para evitar el error "No Material widget found"
+    return Scaffold(
+      backgroundColor: bgDark,
+      body: Padding(
+        padding: const EdgeInsets.all(30),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _headerCell("CLIENTE / FECHA", flex: 3),
-                _headerCell("VEHÍCULO", flex: 2),
-                _headerCell("NRO RECIBO", flex: 2),
-                _headerCell("TOTAL", flex: 2, align: TextAlign.right),
-                _headerCell("ESTATUS", flex: 2, align: TextAlign.center),
-                _headerCell("ACCIONES", flex: 5, align: TextAlign.center),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("CONTROL DE CAJA Y RECIBOS", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                    Text("Historial de pagos y emisión de documentos", style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
+                  ],
+                ),
+                Container(
+                  width: 350,
+                  height: 45,
+                  decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white10)),
+                  child: TextField(
+                    onChanged: (val) => setState(() => _filtroBusqueda = val.toUpperCase()),
+                    style: const TextStyle(color: Colors.white),
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search, color: Colors.white38),
+                      hintText: "Buscar recibo, placa o cliente...",
+                      hintStyle: TextStyle(color: Colors.white24),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.only(top: 8)
+                    ),
+                  ),
+                )
               ],
             ),
-          ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 30),
+            
+            // Encabezados
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+              decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(8)),
+              child: Row(
+                children: [
+                  _headerCell("CLIENTE / FECHA", flex: 3),
+                  _headerCell("VEHÍCULO", flex: 2),
+                  _headerCell("NRO RECIBO", flex: 2),
+                  _headerCell("TOTAL", flex: 2, align: TextAlign.right),
+                  _headerCell("ESTATUS", flex: 2, align: TextAlign.center),
+                  _headerCell("ACCIONES", flex: 6, align: TextAlign.center),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
 
-          // Lista de Datos
-          Expanded(child: _buildListaRecibos()),
-        ],
+            // Lista de Datos
+            Expanded(child: _buildListaRecibos()),
+          ],
+        ),
       ),
     );
   }
@@ -325,7 +328,6 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
       ),
       child: Row(
         children: [
-          // Columna 1: Cliente
           Expanded(
             flex: 3,
             child: Column(
@@ -336,7 +338,6 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
               ],
             ),
           ),
-          // Columna 2: Vehículo
           Expanded(
             flex: 2,
             child: Column(
@@ -347,7 +348,6 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
               ],
             ),
           ),
-          // Columna 3: Número de Recibo
           Expanded(
             flex: 2,
             child: Text(
@@ -355,12 +355,10 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
               style: TextStyle(color: nroRecibo.isNotEmpty ? Colors.white70 : Colors.orange, fontSize: 12, fontWeight: FontWeight.bold)
             ),
           ),
-          // Columna 4: Total
           Expanded(
             flex: 2,
-            child: Text("\$${total.toStringAsFixed(2)}", textAlign: TextAlign.right, style: TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+            child: Text("\$${total.toStringAsFixed(2)}", textAlign: TextAlign.right, style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
           ),
-          // Columna 5: Estatus
           Expanded(
             flex: 2,
             child: Row(
@@ -372,9 +370,8 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
               ],
             ),
           ),
-          // Columna 6: Acciones
           Expanded(
-            flex: 5, // Aumenté un poco el espacio para el nuevo botón
+            flex: 6,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -388,7 +385,6 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
                 const SizedBox(width: 5),
                 _actionIcon(Icons.send_to_mobile, enviadoApp ? Colors.grey : Colors.orange, "App", () => _enviarAClienteApp(docId)),
                 const SizedBox(width: 5),
-                // --- BOTÓN DE BORRAR AGREGADO ---
                 _actionIcon(Icons.delete_outline, Colors.grey, "Borrar Recibo", () => _eliminarRecibo(docId)),
               ],
             ),
