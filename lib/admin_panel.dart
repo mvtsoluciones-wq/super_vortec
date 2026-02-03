@@ -303,11 +303,10 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                   _buildHeader(),
                   const SizedBox(height: 30),
                   Expanded(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 950),
-                        child: _buildCurrentModule(),
+                child: Align(
+                  alignment: Alignment.topLeft, // Cambiado a TopLeft para que empiece desde el borde
+                   child: SizedBox.expand(
+                    child: _buildCurrentModule(),
                       ),
                     ),
                   ),

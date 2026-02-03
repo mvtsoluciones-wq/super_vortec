@@ -214,68 +214,30 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
   }
 
   void _notificar(String msj, Color color) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msj), backgroundColor: color, behavior: SnackBarBehavior.floating));
   }
 
   @override
   Widget build(BuildContext context) {
-    // CAMBIO CLAVE: Se usa Scaffold en lugar de Container para evitar el error "No Material widget found"
+    // --- AQUÍ ESTÁ LA SOLUCIÓN AL ERROR ROJO: Scaffold ---
     return Scaffold(
       backgroundColor: bgDark,
-      body: Padding(
+      body: Container(
         padding: const EdgeInsets.all(30),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text("CONTROL DE CAJA Y RECIBOS", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 1)),
                     Text("Historial de pagos y emisión de documentos", style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12)),
-                  ],
-                ),
-                Container(
-                  width: 350,
-                  height: 45,
-                  decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white10)),
-                  child: TextField(
-                    onChanged: (val) => setState(() => _filtroBusqueda = val.toUpperCase()),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search, color: Colors.white38),
-                      hintText: "Buscar recibo, placa o cliente...",
-                      hintStyle: TextStyle(color: Colors.white24),
-                      border: InputBorder.none,
-                      contentPadding: EdgeInsets.only(top: 8)
-                    ),
-                  ),
-                )
-              ],
-            ),
+                ]),
+                Container(width: 350, height: 45, decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white10)), child: TextField(onChanged: (val) => setState(() => _filtroBusqueda = val.toUpperCase()), style: const TextStyle(color: Colors.white), decoration: const InputDecoration(prefixIcon: Icon(Icons.search, color: Colors.white38), hintText: "Buscar recibo, placa o cliente...", hintStyle: TextStyle(color: Colors.white24), border: InputBorder.none, contentPadding: EdgeInsets.only(top: 8)))),
+            ]),
             const SizedBox(height: 30),
-            
-            // Encabezados
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-              decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(8)),
-              child: Row(
-                children: [
-                  _headerCell("CLIENTE / FECHA", flex: 3),
-                  _headerCell("VEHÍCULO", flex: 2),
-                  _headerCell("NRO RECIBO", flex: 2),
-                  _headerCell("TOTAL", flex: 2, align: TextAlign.right),
-                  _headerCell("ESTATUS", flex: 2, align: TextAlign.center),
-                  _headerCell("ACCIONES", flex: 6, align: TextAlign.center),
-                ],
-              ),
-            ),
+            Container(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15), decoration: BoxDecoration(color: cardBlack, borderRadius: BorderRadius.circular(8)), child: Row(children: [_headerCell("CLIENTE / FECHA", flex: 3), _headerCell("VEHÍCULO", flex: 2), _headerCell("NRO RECIBO", flex: 2), _headerCell("TOTAL", flex: 2, align: TextAlign.right), _headerCell("ESTATUS", flex: 2, align: TextAlign.center), _headerCell("ACCIONES", flex: 5, align: TextAlign.center)])),
             const SizedBox(height: 10),
-
-            // Lista de Datos
             Expanded(child: _buildListaRecibos()),
           ],
         ),
@@ -283,12 +245,7 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
     );
   }
 
-  Widget _headerCell(String text, {int flex = 1, TextAlign align = TextAlign.left}) {
-    return Expanded(
-      flex: flex,
-      child: Text(text, textAlign: align, style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)),
-    );
-  }
+  Widget _headerCell(String text, {int flex = 1, TextAlign align = TextAlign.left}) => Expanded(flex: flex, child: Text(text, textAlign: align, style: const TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.bold)));
 
   Widget _buildListaRecibos() {
     return StreamBuilder<QuerySnapshot>(
@@ -300,14 +257,8 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
           String searchKey = "${data['placa_vehiculo']} ${data['modelo_vehiculo']} ${data['cliente_id']} ${data['numero_recibo'] ?? ''}".toUpperCase();
           return searchKey.contains(_filtroBusqueda);
         }).toList();
-
         if (docs.isEmpty) return const Center(child: Text("No se encontraron registros", style: TextStyle(color: Colors.white24)));
-
-        return ListView.separated(
-          itemCount: docs.length,
-          separatorBuilder: (c, i) => const SizedBox(height: 8),
-          itemBuilder: (context, index) => _buildReciboRow(docs[index].id, docs[index].data() as Map<String, dynamic>),
-        );
+        return ListView.separated(itemCount: docs.length, separatorBuilder: (c, i) => const SizedBox(height: 8), itemBuilder: (context, index) => _buildReciboRow(docs[index].id, docs[index].data() as Map<String, dynamic>));
       },
     );
   }
@@ -321,119 +272,31 @@ class _RecibosWebModuleState extends State<RecibosWebModule> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-      decoration: BoxDecoration(
-        color: inputFill,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05))
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _NombreClienteWidget(clienteId: data['cliente_id']),
-                Text(DateFormat('dd/MM HH:mm').format(fecha), style: const TextStyle(color: Colors.white38, fontSize: 10)),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data['modelo_vehiculo'] ?? "S/D", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)),
-                Text(data['placa_vehiculo'] ?? "", style: TextStyle(color: brandRed, fontSize: 10, fontWeight: FontWeight.bold)),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              nroRecibo.isNotEmpty ? nroRecibo : "PENDIENTE", 
-              style: TextStyle(color: nroRecibo.isNotEmpty ? Colors.white70 : Colors.orange, fontSize: 12, fontWeight: FontWeight.bold)
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text("\$${total.toStringAsFixed(2)}", textAlign: TextAlign.right, style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16)),
-          ),
-          Expanded(
-            flex: 2,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if(enviadoApp) const Padding(padding: EdgeInsets.only(right: 5), child: Icon(Icons.phone_android, size: 14, color: Colors.blue)),
-                if(estadoFactura == 'ENVIADO') const Icon(Icons.receipt, size: 14, color: Colors.orange),
-                if(!enviadoApp && estadoFactura != 'ENVIADO') const Text("-", style: TextStyle(color: Colors.white24)),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 6,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _actionIcon(Icons.picture_as_pdf, Colors.redAccent, "PDF", () => _generarPDFRecibo(data, docId)),
-                const SizedBox(width: 5),
-                _actionIcon(Icons.wechat, Colors.green, "WhatsApp", () => _enviarWhatsapp(data)),
-                const SizedBox(width: 5),
-                _actionIcon(Icons.monetization_on, Colors.purpleAccent, "Venta", () => _irAVentas(data, docId)),
-                const SizedBox(width: 5),
-                _actionIcon(Icons.cloud_upload, Colors.blue, "Facturar", () => _enviarAFacturacion(docId, data)),
-                const SizedBox(width: 5),
-                _actionIcon(Icons.send_to_mobile, enviadoApp ? Colors.grey : Colors.orange, "App", () => _enviarAClienteApp(docId)),
-                const SizedBox(width: 5),
-                _actionIcon(Icons.delete_outline, Colors.grey, "Borrar Recibo", () => _eliminarRecibo(docId)),
-              ],
-            ),
-          ),
-        ],
-      ),
+      decoration: BoxDecoration(color: inputFill, borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.white.withValues(alpha: 0.05))),
+      child: Row(children: [
+        Expanded(flex: 3, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_NombreClienteWidget(clienteId: data['cliente_id']), Text(DateFormat('dd/MM HH:mm').format(fecha), style: const TextStyle(color: Colors.white38, fontSize: 10))])),
+        Expanded(flex: 2, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(data['modelo_vehiculo'] ?? "S/D", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500)), Text(data['placa_vehiculo'] ?? "", style: TextStyle(color: brandRed, fontSize: 10, fontWeight: FontWeight.bold))])),
+        Expanded(flex: 2, child: Text(nroRecibo.isNotEmpty ? nroRecibo : "PENDIENTE", style: TextStyle(color: nroRecibo.isNotEmpty ? Colors.white70 : Colors.orange, fontSize: 12, fontWeight: FontWeight.bold))),
+        Expanded(flex: 2, child: Text("\$${total.toStringAsFixed(2)}", textAlign: TextAlign.right, style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 16))),
+        Expanded(flex: 2, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [if(enviadoApp) const Padding(padding: EdgeInsets.only(right: 5), child: Icon(Icons.phone_android, size: 14, color: Colors.blue)), if(estadoFactura == 'ENVIADO') const Icon(Icons.receipt, size: 14, color: Colors.orange), if(!enviadoApp && estadoFactura != 'ENVIADO') const Text("-", style: TextStyle(color: Colors.white24))])),
+        Expanded(flex: 5, child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [_actionIcon(Icons.picture_as_pdf, Colors.redAccent, "PDF", () => _generarPDFRecibo(data, docId)), const SizedBox(width: 5), _actionIcon(Icons.wechat, Colors.green, "WhatsApp", () => _enviarWhatsapp(data)), const SizedBox(width: 5), _actionIcon(Icons.monetization_on, Colors.purpleAccent, "Venta", () => _irAVentas(data, docId)), const SizedBox(width: 5), _actionIcon(Icons.cloud_upload, Colors.blue, "Facturar", () => _enviarAFacturacion(docId, data)), const SizedBox(width: 5), _actionIcon(Icons.send_to_mobile, enviadoApp ? Colors.grey : Colors.orange, "App", () => _enviarAClienteApp(docId)), const SizedBox(width: 5), _actionIcon(Icons.delete_outline, Colors.grey, "Borrar", () => _eliminarRecibo(docId))])),
+      ]),
     );
   }
 
-  Widget _actionIcon(IconData icon, Color color, String tooltip, VoidCallback onTap) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(5),
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(5),
-            border: Border.all(color: color.withValues(alpha: 0.3))
-          ),
-          child: Icon(icon, size: 16, color: color),
-        ),
-      ),
-    );
-  }
+  Widget _actionIcon(IconData icon, Color color, String tooltip, VoidCallback onTap) => Tooltip(message: tooltip, child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(5), child: Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(5), border: Border.all(color: color.withValues(alpha: 0.3))), child: Icon(icon, size: 16, color: color))));
 }
 
 class _NombreClienteWidget extends StatelessWidget {
   final String? clienteId;
   const _NombreClienteWidget({required this.clienteId});
-
   @override
   Widget build(BuildContext context) {
     if (clienteId == null) return const Text("S/N", style: TextStyle(color: Colors.white38));
-
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection('clientes').doc(clienteId).get(),
-      builder: (context, snapshot) {
+    return FutureBuilder<DocumentSnapshot>(future: FirebaseFirestore.instance.collection('clientes').doc(clienteId).get(), builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) return const SizedBox(width: 10, height: 10, child: CircularProgressIndicator(strokeWidth: 1));
-        
-        if (snapshot.hasData && snapshot.data!.exists) {
-          String nombre = snapshot.data!.get('nombre') ?? "Cliente";
-          return Text(nombre.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold));
-        } else {
-          return Text(clienteId!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold));
-        }
-      },
-    );
+        String nombre = snapshot.hasData && snapshot.data!.exists ? (snapshot.data!.get('nombre') ?? "Cliente") : clienteId!;
+        return Text(nombre.toUpperCase(), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold));
+    });
   }
 }
