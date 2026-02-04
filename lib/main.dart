@@ -31,7 +31,6 @@ void main() async {
   runApp(const SuperVortecApp());
 }
 
-// CONTROLADOR GLOBAL DEL TEMA
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.dark);
 
 class SuperVortecApp extends StatelessWidget {
@@ -65,7 +64,6 @@ class SuperVortecApp extends StatelessWidget {
   }
 }
 
-// --- GUARDIÁN DE INACTIVIDAD ---
 class SessionTimeoutGuard extends StatefulWidget {
   final Widget child;
   const SessionTimeoutGuard({super.key, required this.child});
@@ -101,7 +99,6 @@ class _SessionTimeoutGuardState extends State<SessionTimeoutGuard> {
           const SnackBar(
             content: Text("Sesión cerrada por inactividad."),
             backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
           ),
         );
       }
@@ -125,7 +122,6 @@ class _SessionTimeoutGuardState extends State<SessionTimeoutGuard> {
   }
 }
 
-// --- VIGILANTE DE SESIÓN ---
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -136,15 +132,11 @@ class AuthWrapper extends StatelessWidget {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(color: Color(0xFFD50000)),
-            ),
+            body: Center(child: CircularProgressIndicator(color: Color(0xFFD50000))),
           );
         }
         if (snapshot.hasData) {
-          return const SessionTimeoutGuard(
-            child: PlatformGuard(),
-          );
+          return const SessionTimeoutGuard(child: PlatformGuard());
         }
         return const LoginScreen();
       },
@@ -161,8 +153,9 @@ class PlatformGuard extends StatelessWidget {
     if (kIsWeb) {
       if (screenWidth > 1000) {
         return const AdminControlPanel();
+      } else {
+        return const WebBlockedScreen();
       }
-      return const WebBlockedScreen();
     }
     return const ClientHomeScreen();
   }
@@ -181,8 +174,14 @@ class WebBlockedScreen extends StatelessWidget {
           children: [
             const Icon(Icons.phonelink_lock, color: Color(0xFFD50000), size: 100),
             const SizedBox(height: 30),
-            const Text("APP NO DISPONIBLE EN WEB", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-            TextButton(onPressed: () => FirebaseAuth.instance.signOut(), child: const Text("Cerrar Sesión", style: TextStyle(color: Colors.white54))),
+            const Text(
+              "APP NO DISPONIBLE EN WEB",
+              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            TextButton(
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              child: const Text("Cerrar Sesión", style: TextStyle(color: Colors.white54)),
+            ),
           ],
         ),
       ),
@@ -190,7 +189,7 @@ class WebBlockedScreen extends StatelessWidget {
   }
 }
 
-// --- CLIENT HOME SCREEN ---
+// --- CLIENT HOME SCREEN (CABECERA FIJA) ---
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
 
@@ -199,16 +198,20 @@ class ClientHomeScreen extends StatefulWidget {
 }
 
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
-  final PageController _pageController = PageController(viewportFraction: 0.90);
+  late PageController _pageController;
   int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(viewportFraction: 0.88, initialPage: 0);
+  }
 
   @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
   }
-
-  // --- FUNCIONES AUXILIARES ---
 
   String _formatDate(dynamic date) {
     if (date == null) return "Pendiente";
@@ -221,17 +224,13 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   String _calculateRemainingWarranty(dynamic fechaFin, String? garantia) {
     if (fechaFin == null || fechaFin is! Timestamp || garantia == null || garantia.isEmpty) return "-";
-    
     DateTime fecha = fechaFin.toDate();
     DateTime now = DateTime.now();
-    
     final numberMatch = RegExp(r'(\d+)').firstMatch(garantia);
     if (numberMatch == null) return "-"; 
-    
     int amount = int.parse(numberMatch.group(1)!);
     DateTime expiryDate = fecha;
     String g = garantia.toUpperCase();
-    
     if (g.contains("MES")) {
       expiryDate = DateTime(fecha.year, fecha.month + amount, fecha.day);
     } else if (g.contains("DIA") || g.contains("DÍA")) {
@@ -239,22 +238,19 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     } else if (g.contains("ANO") || g.contains("AÑO")) {
       expiryDate = DateTime(fecha.year + amount, fecha.month, fecha.day);
     } else {
-      return "-"; 
+      return "-";
     }
-    
     int daysLeft = expiryDate.difference(now).inDays;
-    if (daysLeft < 0) return "Vencida";
-    return "$daysLeft Días";
+    return daysLeft < 0 ? "Vencida" : "$daysLeft Días";
   }
 
   String _calculateElapsed(dynamic fechaFin) {
-    if (fechaFin == null || fechaFin is! Timestamp) return "En curso";
+    if (fechaFin == null || fechaFin is! Timestamp) return "En taller";
     DateTime fecha = fechaFin.toDate();
     DateTime now = DateTime.now();
     Duration diff = now.difference(fecha);
-    
-    if (diff.inDays > 365) return "${(diff.inDays / 365).floor()} Año(s)";
-    if (diff.inDays > 30) return "${(diff.inDays / 30).floor()} Mes(es)";
+    if (diff.inDays > 365) return "${(diff.inDays / 365).floor()} Años";
+    if (diff.inDays > 30) return "${(diff.inDays / 30).floor()} Meses";
     if (diff.inDays > 0) return "${diff.inDays} Días";
     return "Hoy";
   }
@@ -265,7 +261,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     const Color brandRed = Color(0xFFD50000);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : Colors.black;
-    final subTextColor = isDark ? Colors.grey : Colors.grey[700];
 
     if (user == null) return const Scaffold(body: Center(child: Text("Error de sesión")));
 
@@ -276,25 +271,18 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
-        iconTheme: IconThemeData(color: textColor),
-        title: Text(
-          'MI GARAJE',
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 3.0, fontSize: 18, color: textColor),
-        ),
+        title: Text('MI GARAJE', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 3.0, fontSize: 18, color: textColor)),
         actions: [
           IconButton(
             icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, color: isDark ? Colors.amber : Colors.indigo),
-            onPressed: () {
-              themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
-            },
+            onPressed: () => themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark,
           ),
         ],
       ),
       body: Stack(
         children: [
           Container(
-            height: double.infinity,
-            width: double.infinity,
+            height: double.infinity, width: double.infinity,
             decoration: BoxDecoration(
               gradient: isDark
                   ? const RadialGradient(center: Alignment(0, -0.3), radius: 1.2, colors: [Color(0xFF252525), Colors.black])
@@ -305,176 +293,133 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('clientes').where('email', isEqualTo: user.email).limit(1).snapshots(),
             builder: (context, clientSnap) {
-              if (clientSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: brandRed));
-              if (!clientSnap.hasData || clientSnap.data!.docs.isEmpty) return _buildEmptyState("Sin Perfil", "Correo no registrado.", textColor);
-
-              var clientData = clientSnap.data!.docs.first.data() as Map<String, dynamic>;
-              String cedulaCliente = clientData['cedula'] ?? "";
+              if (!clientSnap.hasData || clientSnap.data!.docs.isEmpty) return const Center(child: CircularProgressIndicator());
+              String cedula = (clientSnap.data!.docs.first.data() as Map<String, dynamic>)['cedula'] ?? "";
 
               return StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: cedulaCliente).snapshots(),
+                stream: FirebaseFirestore.instance.collection('vehiculos').where('propietario_id', isEqualTo: cedula).snapshots(),
                 builder: (context, vehicleSnap) {
-                  if (vehicleSnap.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: brandRed));
-                  if (!vehicleSnap.hasData || vehicleSnap.data!.docs.isEmpty) return _buildEmptyState("Sin Vehículos", "No hay autos asociados.", textColor);
+                  if (!vehicleSnap.hasData) return const Center(child: CircularProgressIndicator());
 
-                  final vehicles = vehicleSnap.data!.docs.map((doc) {
+                  final Map<String, Map<String, dynamic>> uniqueVehicles = {};
+                  for (var doc in vehicleSnap.data!.docs) {
                     var data = doc.data() as Map<String, dynamic>;
-                    return {
-                      "brand": data['marca'] ?? "MARCA",
-                      "model": data['modelo'] ?? "MODELO",
-                      "year": data['anio']?.toString() ?? "----",
-                      "plate": data['placa'] ?? "S/P",
-                      "color": data['color'] ?? "N/A",
-                      "km": data['km']?.toString() ?? "0",
-                      "isInWorkshop": data['en_taller'] ?? false,
-                    };
-                  }).toList();
+                    String plate = (data['placa'] ?? "").toString().trim().toUpperCase();
+                    if (plate.isNotEmpty && !uniqueVehicles.containsKey(plate)) {
+                      uniqueVehicles[plate] = {
+                        "brand": data['marca'] ?? "MARCA",
+                        "model": data['modelo'] ?? "MODELO",
+                        "year": data['anio']?.toString() ?? "----",
+                        "plate": plate,
+                        "color": data['color'] ?? "N/A",
+                        "km": data['km']?.toString() ?? "0",
+                        "isInWorkshop": data['en_taller'] ?? false,
+                      };
+                    }
+                  }
 
+                  final List<Map<String, dynamic>> vehicles = uniqueVehicles.values.toList();
+                  vehicles.sort((a, b) => a['plate'].compareTo(b['plate']));
+
+                  if (vehicles.isEmpty) return _buildEmptyState("Sin Vehículos", "No hay autos registrados.", textColor);
                   if (_currentPage >= vehicles.length) _currentPage = 0;
-                  
                   String placaActual = vehicles[_currentPage]['plate'];
 
-                  return SingleChildScrollView(
-                    padding: const EdgeInsets.only(top: 100),
+                  return SafeArea(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        SizedBox(
-                          height: 110,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            children: [
-                              _buildSliderItem(context, Icons.calendar_month, "CITAS", brandRed, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))),
-                              _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const NotificationScreen()))),
-                              _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DiagnosticScreen()))),
-                              _buildSliderItem(context, Icons.storefront, "TIENDA", const Color(0xFFD50000), isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))),
-                              _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))),
-                              _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))),
-                            ],
-                          ),
-                        ),
+                        const SizedBox(height: 10),
+                        _buildMenuSlider(context, brandRed, isDark),
                         const SizedBox(height: 20),
+                        
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text("VEHÍCULO ACTIVO", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 2.5, fontWeight: FontWeight.bold)),
-                              Text("${_currentPage + 1}/${vehicles.length}", style: TextStyle(color: subTextColor, fontSize: 10)),
+                              Text("${_currentPage + 1}/${vehicles.length}", style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 10)),
                             ],
                           ),
                         ),
 
+                        // CABECERA FIJA
                         SizedBox(
-                          height: 220,
+                          height: 180,
                           child: PageView.builder(
+                            key: const PageStorageKey('stable_carousel'),
                             controller: _pageController,
                             itemCount: vehicles.length,
-                            physics: const BouncingScrollPhysics(),
-                            onPageChanged: (int index) {
-                              if (_currentPage != index) {
-                                setState(() {
-                                  _currentPage = index;
-                                });
-                              }
-                            },
+                            physics: const PageScrollPhysics(),
+                            onPageChanged: (int index) => setState(() => _currentPage = index),
                             itemBuilder: (context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 10), 
-                                child: _buildVehicleCard(vehicles[index], isDark)
+                              return AnimatedScale(
+                                duration: const Duration(milliseconds: 400),
+                                scale: _currentPage == index ? 1.0 : 0.9,
+                                child: _buildVehicleCard(vehicles[index], isDark),
                               );
                             },
                           ),
                         ),
                         const SizedBox(height: 10),
-                        
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(vehicles.length, (index) {
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              height: 5, width: _currentPage == index ? 20 : 5,
-                              decoration: BoxDecoration(color: _currentPage == index ? brandRed : Colors.grey[800], borderRadius: BorderRadius.circular(3)),
-                            );
-                          }),
+                          children: List.generate(vehicles.length, (index) => AnimatedContainer(duration: const Duration(milliseconds: 300), margin: const EdgeInsets.symmetric(horizontal: 4), height: 5, width: _currentPage == index ? 20 : 5, decoration: BoxDecoration(color: _currentPage == index ? brandRed : Colors.grey[800], borderRadius: BorderRadius.circular(3)))),
                         ),
-                        const SizedBox(height: 30),
                         
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-                          child: Text("HISTORIAL DE SERVICIOS", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 2.5, fontWeight: FontWeight.bold)),
-                        ),
+                        const SizedBox(height: 15),
+                        const Divider(color: Colors.white10, thickness: 1, indent: 25, endIndent: 25),
 
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 600), 
-                          switchInCurve: Curves.easeOut,
-                          switchOutCurve: Curves.easeIn,
-                          transitionBuilder: (Widget child, Animation<double> animation) {
-                            return FadeTransition(
-                              opacity: animation,
-                              child: SlideTransition(
-                                position: Tween<Offset>(begin: const Offset(0.0, 0.05), end: Offset.zero).animate(animation),
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: Container(
-                            key: ValueKey<String>(placaActual),
-                            child: StreamBuilder<QuerySnapshot>(
-                              stream: FirebaseFirestore.instance
-                                  .collection('historial_web')
-                                  .where('placa_vehiculo', isEqualTo: placaActual)
-                                  .snapshots(),
-                              builder: (context, historySnap) {
-                                if (historySnap.connectionState == ConnectionState.waiting) {
-                                  return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
-                                }
-                                
-                                if (!historySnap.hasData || historySnap.data!.docs.isEmpty) {
-                                  return Padding(
-                                    padding: const EdgeInsets.all(30.0),
-                                    child: Center(child: Text("Sin historial para $placaActual", style: TextStyle(color: Colors.grey[600]))),
-                                  );
-                                }
+                        // CUERPO SCROLLABLE (HISTORIAL)
+                        Expanded(
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(bottom: 30),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+                                  child: Text("HISTORIAL DE SERVICIOS", style: TextStyle(color: Colors.grey, fontSize: 10, letterSpacing: 2.5, fontWeight: FontWeight.bold)),
+                                ),
+                                AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 500),
+                                  child: Container(
+                                    key: ValueKey<String>(placaActual),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                                    child: StreamBuilder<QuerySnapshot>(
+                                      stream: FirebaseFirestore.instance.collection('historial_web').where('placa_vehiculo', isEqualTo: placaActual).snapshots(),
+                                      builder: (context, historySnap) {
+                                        if (!historySnap.hasData) return const Center(child: CircularProgressIndicator());
+                                        if (historySnap.data!.docs.isEmpty) return Center(child: Padding(padding: const EdgeInsets.all(50), child: Text("Sin servicios registrados.", style: TextStyle(color: Colors.grey[600], fontSize: 12))));
 
-                                return Column(
-                                  children: historySnap.data!.docs.map((doc) {
-                                    var data = doc.data() as Map<String, dynamic>;
-                                    List items = data['presupuesto_items'] ?? [];
-                                    String titulo = data['sistema_reparar'] ?? "Servicio Taller";
-                                    var fechaFin = data['fecha_finalizacion'];
-                                    String garantiaTxt = data['garantia'] ?? "N/A";
-                                    String estado = "Finalizado"; 
-                                    bool isCompleted = true;
-
-                                    Map<String, dynamic> historyItem = {
-                                      'title': titulo, 
-                                      'date': _formatDate(fechaFin),
-                                      'status': estado,
-                                      'isCompleted': isCompleted,
-                                      'warranty': garantiaTxt,
-                                      'daysLeft': _calculateRemainingWarranty(fechaFin, garantiaTxt), 
-                                      'elapsed': _calculateElapsed(fechaFin),
-                                      'complaint': "Servicio realizado a ${data['modelo_vehiculo'] ?? 'vehículo'}",
-                                      'diagnosis': "Trabajo realizado en ${data['sistema_reparar'] ?? 'sistema general'}.",
-                                      'videoReception': data['link_video'] ?? "",
-                                      'videoRepair': "",
-                                      'budget': items.map((i) => {
-                                        'item': i['item'] ?? i['descripcion'] ?? "Item",
-                                        'price': (i['precio_unitario'] ?? i['total'] ?? 0).toDouble()
-                                      }).toList(),
-                                    };
-
-                                    return _buildHistoryCard(context, historyItem, isDark);
-                                  }).toList(),
-                                );
-                              }
+                                        return Column(
+                                          children: historySnap.data!.docs.map((doc) {
+                                            var data = doc.data() as Map<String, dynamic>;
+                                            return _buildHistoryCard(context, {
+                                              'budget_id': data['numero_presupuesto'] ?? "N/A",
+                                              'title': data['sistema_reparar'] ?? "Servicio Técnico",
+                                              'date': _formatDate(data['fecha_finalizacion']),
+                                              'status': "Finalizado",
+                                              'isCompleted': true,
+                                              'warranty': data['garantia'] ?? "N/A",
+                                              'daysLeft': _calculateRemainingWarranty(data['fecha_finalizacion'], data['garantia']),
+                                              'elapsed': _calculateElapsed(data['fecha_finalizacion']),
+                                              'complaint': "Reparación General",
+                                              'diagnosis': data['sistema_reparar'] ?? "Sin descripción de falla.", 
+                                              'budget': (data['presupuesto_items'] as List? ?? []).map((i) => {'item': i['item'] ?? "Repuesto", 'price': (i['precio_unitario'] ?? 0).toDouble()}).toList(),
+                                              'videoUrl': data['url_evidencia_video'] ?? "", // CAMPO ACTUALIZADO
+                                            }, isDark);
+                                          }).toList(),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        const SizedBox(height: 50),
                       ],
                     ),
                   );
@@ -487,424 +432,178 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  // --- WIDGETS AUXILIARES ---
-
-  Widget _buildEmptyState(String title, String subtitle, Color textColor) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.no_accounts, size: 80, color: Colors.grey.withValues(alpha: 0.3)),
-          const SizedBox(height: 20),
-          Text(title, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18)),
-          const SizedBox(height: 10),
-          Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDrawer(bool isDark, String userEmail) {
-    return Drawer(
-      backgroundColor: isDark ? Colors.black : Colors.white,
+  Widget _buildMenuSlider(BuildContext context, Color red, bool isDark) {
+    return SizedBox(
+      height: 110,
       child: ListView(
-        padding: EdgeInsets.zero,
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        physics: const BouncingScrollPhysics(),
         children: [
-          Container(
-            padding: const EdgeInsets.only(top: 60, bottom: 30, left: 20),
-            decoration: BoxDecoration(color: isDark ? const Color(0xFF111111) : Colors.grey[200]),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const CircleAvatar(backgroundColor: Color(0xFFD50000), radius: 30, child: Icon(Icons.person, color: Colors.white, size: 30)),
-                const SizedBox(height: 15),
-                Text(userEmail.split('@')[0].toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 16, letterSpacing: 1)),
-                Text("Cliente Verificado", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          ),
-          _buildDrawerItem(Icons.logout, "CERRAR SESIÓN", isDark, onTap: () async {
-            await FirebaseAuth.instance.signOut();
-          }),
+          _buildSliderItem(context, Icons.calendar_month, "CITAS", red, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))),
+          _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const NotificationScreen()))),
+          _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DiagnosticScreen()))),
+          _buildSliderItem(context, Icons.storefront, "TIENDA", red, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))),
+          _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))),
+          _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))),
         ],
       ),
     );
   }
 
-  Widget _buildDrawerItem(IconData icon, String title, bool isDark, {VoidCallback? onTap}) {
-    Color color = isDark ? Colors.white : Colors.black87;
-    return ListTile(
-      leading: Icon(icon, color: color),
-      title: Text(title, style: TextStyle(color: color, letterSpacing: 1)),
-      onTap: onTap,
-    );
-  }
+  Widget _buildEmptyState(String t, String s, Color c) => Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.no_accounts, size: 80, color: Colors.grey.withValues(alpha: 0.3)), const SizedBox(height: 20), Text(t, style: TextStyle(color: c, fontWeight: FontWeight.bold, fontSize: 18)), Text(s, style: const TextStyle(color: Colors.grey))]));
 
-  Widget _buildVehicleCard(Map<String, dynamic> vehicleData, bool isDark) {
-    bool isInWorkshop = vehicleData['isInWorkshop'] ?? false;
-    Color cardBg = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white;
+  Widget _buildDrawer(bool isDark, String email) => Drawer(backgroundColor: isDark ? Colors.black : Colors.white, child: ListView(padding: EdgeInsets.zero, children: [UserAccountsDrawerHeader(decoration: BoxDecoration(color: isDark ? const Color(0xFF111111) : Colors.grey[200]), accountName: const Text("JMendez Performance", style: TextStyle(fontWeight: FontWeight.bold)), accountEmail: Text(email), currentAccountPicture: const CircleAvatar(backgroundColor: Color(0xFFD50000), child: Icon(Icons.person, color: Colors.white))), ListTile(leading: const Icon(Icons.logout, color: Colors.red), title: const Text("CERRAR SESIÓN", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)), onTap: () => FirebaseAuth.instance.signOut())]));
+
+  Widget _buildVehicleCard(Map<String, dynamic> v, bool isDark) {
     Color textColor = isDark ? Colors.white : Colors.black;
-    Color borderColor = isDark ? Colors.white.withValues(alpha: 0.1) : Colors.grey[300]!;
-
     return Container(
-      width: double.infinity,
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0 : 0.05), blurRadius: 10)],
-        border: Border.all(color: borderColor, width: 1),
-      ),
+      decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: isDark ? Colors.white10 : Colors.grey[300]!)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFD50000).withValues(alpha: 0.1), shape: BoxShape.circle), child: const Icon(Icons.directions_car, color: Color(0xFFD50000), size: 22)),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(vehicleData['brand'].toString().toUpperCase(), style: TextStyle(color: textColor, fontSize: 14, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    Text(vehicleData['model'].toString().toUpperCase(), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: textColor, letterSpacing: 0.5)),
-                    Text(vehicleData['year'].toString(), style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-                  ],
-                ),
-              ),
-              if (isInWorkshop)
-                Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(30), border: Border.all(color: const Color(0xFFD50000))), child: const Text("EN TALLER", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 8, letterSpacing: 0.5))),
-            ],
-          ),
+          Row(children: [
+            const CircleAvatar(backgroundColor: Color(0xFFD50000), radius: 18, child: Icon(Icons.directions_car, color: Colors.white, size: 18)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(v['brand'], style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 12)), Text(v['model'], style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 18))])),
+            if (v['isInWorkshop'] == true) Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFD50000))), child: const Text("EN TALLER", style: TextStyle(color: Color(0xFFD50000), fontSize: 8, fontWeight: FontWeight.bold))),
+          ]),
           const Spacer(),
-          Divider(color: borderColor, height: 1),
-          const Spacer(),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildTechInfo("PLACA", vehicleData['plate'] ?? "S/P", isDark),
-              Container(width: 1, height: 25, color: borderColor),
-              _buildTechInfo("COLOR", vehicleData['color'] ?? "N/A", isDark),
-              Container(width: 1, height: 25, color: borderColor),
-              _buildTechInfo("KM", vehicleData['km'] ?? "0", isDark),
-            ],
-          ),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            _buildTechItem("PLACA", v['plate'], isDark),
+            _buildTechItem("COLOR", v['color'], isDark),
+            _buildTechItem("KM", v['km'], isDark),
+          ]),
         ],
       ),
     );
   }
 
-  Widget _buildTechInfo(String label, String value, bool isDark) {
-    return Column(
-      children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 8, letterSpacing: 1.0)),
-        const SizedBox(height: 3),
-        Text(value.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 0.5)),
-      ],
-    );
-  }
+  Widget _buildTechItem(String l, String v, bool isDark) => Column(children: [Text(l, style: const TextStyle(color: Colors.grey, fontSize: 8)), Text(v.toUpperCase(), style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 12))]);
 
-  Widget _buildHistoryCard(BuildContext context, Map<String, dynamic> historyItem, bool isDark) {
-    bool isCompleted = historyItem['isCompleted'] ?? true;
-    Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
-    Color cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
-    Color titleColor = isDark ? Colors.white : Colors.black;
-    Color borderColor = isDark ? Colors.white10 : Colors.grey[300]!;
-
+  Widget _buildHistoryCard(BuildContext ctx, Map<String, dynamic> h, bool isDark) {
+    Color statusColor = Colors.green;
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => RepairDetailScreen(historyItem: historyItem, isDark: isDark))),
+      onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (c) => RepairDetailScreen(historyItem: h, isDark: isDark))),
       child: Container(
         margin: const EdgeInsets.only(bottom: 15),
         padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: cardBg, borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: borderColor),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05), blurRadius: 10, offset: const Offset(0, 5))],
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(isCompleted ? Icons.check_circle : Icons.timelapse, color: statusColor, size: 20)),
-                const SizedBox(width: 15),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(historyItem['title'] ?? "Servicio", style: TextStyle(color: titleColor, fontWeight: FontWeight.bold, fontSize: 13)), const SizedBox(height: 4), Text(historyItem['date'] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 11))])),
-                const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 12),
-              ],
-            ),
-            if (isCompleted) ...[
-              const SizedBox(height: 15), Divider(color: borderColor, height: 1), const SizedBox(height: 15),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                _buildHistoryStat(Icons.verified_user_outlined, "Garantía", historyItem['warranty'] ?? "N/A", isDark),
-                _buildHistoryStat(Icons.hourglass_bottom, "Restan", historyItem['daysLeft'] ?? "-", isDark, isHighlighted: true),
-                _buildHistoryStat(Icons.history, "Tiempo", historyItem['elapsed'] ?? "-", isDark),
-              ]),
-            ],
-          ],
-        ),
+        decoration: BoxDecoration(color: isDark ? const Color(0xFF1E1E1E) : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: isDark ? Colors.white10 : Colors.grey[300]!)),
+        child: Column(children: [
+          Row(children: [
+            Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)), child: Icon(Icons.check_circle, color: statusColor, size: 20)),
+            const SizedBox(width: 15),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(h['title'], style: TextStyle(color: isDark ? Colors.white : Colors.black, fontWeight: FontWeight.bold, fontSize: 13)), Text(h['date'], style: const TextStyle(color: Colors.grey, fontSize: 11))])),
+            const Icon(Icons.arrow_forward_ios, color: Colors.grey, size: 12),
+          ]),
+          const SizedBox(height: 15),
+          const Divider(color: Colors.white10),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            _buildStat(Icons.verified_user, "Garantía", h['warranty']),
+            _buildStat(Icons.hourglass_bottom, "Restan", h['daysLeft']),
+            _buildStat(Icons.history, "Tiempo", h['elapsed']),
+          ]),
+        ]),
       ),
     );
   }
 
-  Widget _buildHistoryStat(IconData icon, String label, String value, bool isDark, {bool isHighlighted = false}) {
-    Color valColor = isHighlighted ? (isDark ? Colors.greenAccent : Colors.green[700]!) : (isDark ? Colors.white : Colors.black87);
-    return Column(children: [Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 12, color: Colors.grey), const SizedBox(width: 4), Text(label, style: const TextStyle(color: Colors.grey, fontSize: 9))]), const SizedBox(height: 4), Text(value, style: TextStyle(color: valColor, fontSize: 11, fontWeight: FontWeight.bold))]);
-  }
+  Widget _buildStat(IconData i, String l, String v) => Column(children: [Row(mainAxisSize: MainAxisSize.min, children: [Icon(i, size: 10, color: Colors.grey), const SizedBox(width: 4), Text(l, style: const TextStyle(color: Colors.grey, fontSize: 8))]), const SizedBox(height: 4), Text(v, style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 11))]);
 
   Widget _buildSliderItem(BuildContext context, IconData icon, String label, Color iconColor, bool isDark, {VoidCallback? onTap}) {
-    return GestureDetector(onTap: onTap, child: Container(width: 90, margin: const EdgeInsets.symmetric(horizontal: 5), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [Container(height: 60, width: 60, decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: isDark ? [const Color(0xFF2C2C2C), Colors.black.withValues(alpha: 0.8)] : [Colors.white, Colors.grey[200]!]), shape: BoxShape.circle, border: Border.all(color: isDark ? Colors.white12 : Colors.grey[300]!), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.1), blurRadius: 10, offset: const Offset(0, 5))]), child: Icon(icon, color: iconColor, size: 24)), const SizedBox(height: 10), Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: isDark ? Colors.white70 : Colors.black54, fontWeight: FontWeight.bold, letterSpacing: 1.0))])));
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(width: 90, margin: const EdgeInsets.symmetric(horizontal: 5), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(height: 60, width: 60, decoration: BoxDecoration(gradient: LinearGradient(colors: isDark ? [const Color(0xFF2C2C2C), Colors.black] : [Colors.white, Colors.grey[200]!]), shape: BoxShape.circle, border: Border.all(color: isDark ? Colors.white12 : Colors.grey[300]!)), child: Icon(icon, color: iconColor, size: 24)),
+        const SizedBox(height: 10),
+        Text(label, textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: isDark ? Colors.white70 : Colors.black54, fontWeight: FontWeight.bold)),
+      ])),
+    );
   }
 }
 
 class RepairDetailScreen extends StatelessWidget {
   final Map<String, dynamic> historyItem;
   final bool isDark;
-
   const RepairDetailScreen({super.key, required this.historyItem, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    bool isCompleted = historyItem['isCompleted'] ?? true;
-    Color statusColor = isCompleted ? Colors.green : const Color(0xFFD50000);
-    List budgetList = historyItem['budget'] ?? [];
-    double totalBudget = budgetList.fold(0, (total, item) => total + ((item['price'] ?? 0.0) as double));
-
     Color textColor = isDark ? Colors.white : Colors.black;
-    Color cardColor = isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white;
-    Color borderColor = isDark ? Colors.white10 : Colors.grey[300]!;
-
+    double total = (historyItem['budget'] as List).fold(0, (acc, item) => acc + (item['price'] ?? 0));
+    
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, title: Text("INFORME DE SERVICIO", style: TextStyle(fontSize: 14, letterSpacing: 2, fontWeight: FontWeight.bold, color: textColor)), centerTitle: true, iconTheme: IconThemeData(color: textColor)),
-      body: Stack(
-        children: [
-          Container(
-            height: double.infinity, width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: isDark ? const RadialGradient(center: Alignment(0, -0.3), radius: 1.2, colors: [Color(0xFF252525), Colors.black]) : const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.white, Color(0xFFEEEEEE)]),
-            ),
-          ),
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(25, 120, 25, 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: statusColor)),
-                  child: Text(historyItem['status'].toString().toUpperCase(), style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 1.5)),
-                ),
-                const SizedBox(height: 20),
-                Text(historyItem['title'] ?? "", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textColor, height: 1.2)),
-                const SizedBox(height: 10),
-                Text(historyItem['date'] ?? "", style: const TextStyle(color: Colors.grey, fontSize: 14)),
-
-                const SizedBox(height: 40),
-
-                _buildSectionTitle("REPORTE TÉCNICO"),
-                const SizedBox(height: 15),
-                _buildInfoBlock("Falla Reportada", historyItem['complaint'], textColor, cardColor, borderColor),
-                const SizedBox(height: 10),
-                _buildInfoBlock("Diagnóstico Técnico", historyItem['diagnosis'], textColor, cardColor, borderColor),
-
-                const SizedBox(height: 30),
-
-                _buildSectionTitle("EVIDENCIA MULTIMEDIA"),
-                const SizedBox(height: 15),
-                Row(
-                  children: [
-                    Expanded(child: _buildVideoCard(context, "Recepción", historyItem['videoReception'], title: "Recepción del vehículo.", desc: "Video del estado inicial.", isDark: isDark)),
-                    const SizedBox(width: 15),
-                    Expanded(child: _buildVideoCard(context, "Reparación", historyItem['videoRepair'], title: "Reparación: ${historyItem['title']}", desc: historyItem['diagnosis'], isDark: isDark)),
-                  ],
-                ),
-
-                const SizedBox(height: 30),
-
-                _buildSectionTitle("PRESUPUESTO APROBADO"),
-                const SizedBox(height: 15),
-                Container(
-                  width: double.infinity, padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(color: cardColor, borderRadius: BorderRadius.circular(15), border: Border.all(color: borderColor)),
-                  child: Column(
-                    children: [
-                      ...budgetList.map(
-                        (item) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(child: Text(item['item'], style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 13))),
-                              Text("\$${(item['price'] ?? 0.0).toStringAsFixed(2)}", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Divider(color: borderColor),
-                      const SizedBox(height: 5),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("TOTAL", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text("\$${totalBudget.toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 50),
-              ],
-            ),
-          ),
-        ],
-      ),
+      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0, centerTitle: true, title: Text("ORDEN #${historyItem['budget_id']}", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textColor, letterSpacing: 2)), iconTheme: IconThemeData(color: textColor)),
+      body: Stack(children: [
+        Container(height: double.infinity, width: double.infinity, decoration: BoxDecoration(gradient: isDark ? const RadialGradient(center: Alignment(0, -0.3), radius: 1.2, colors: [Color(0xFF252525), Colors.black]) : const LinearGradient(colors: [Colors.white, Color(0xFFEEEEEE)]))),
+        SingleChildScrollView(padding: const EdgeInsets.fromLTRB(25, 120, 25, 40), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: Colors.green.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.green)), child: const Text("FINALIZADO", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 10))),
+          const SizedBox(height: 20),
+          Text(historyItem['title'], style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textColor)),
+          Text(historyItem['date'], style: const TextStyle(color: Colors.grey)),
+          const SizedBox(height: 40),
+          _buildInfoBlock("DIAGNÓSTICO TÉCNICO", historyItem['diagnosis'], textColor, isDark),
+          const SizedBox(height: 30),
+          _buildVideoSection(context, historyItem, isDark),
+          const SizedBox(height: 30),
+          _buildBudgetSection(historyItem['budget'], total, isDark, textColor),
+        ])),
+      ]),
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(title, style: const TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2));
-  }
+  Widget _buildInfoBlock(String l, String c, Color t, bool d) => Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: d ? Colors.white.withValues(alpha: 0.05) : Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white10)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l, style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(height: 5), Text(c, style: TextStyle(color: t.withValues(alpha: 0.7), fontSize: 13, height: 1.4))]));
 
-  Widget _buildInfoBlock(String label, String? content, Color textColor, Color bgColor, Color borderColor) {
-    return Container(
-      width: double.infinity, padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(10), border: Border.all(color: borderColor)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFD50000))),
-          const SizedBox(height: 5),
-          Text(content ?? "Pendiente...", style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 13, height: 1.4)),
-        ],
+  Widget _buildVideoSection(BuildContext ctx, Map h, bool d) {
+    String url = h['videoUrl'] ?? ""; // USO DE URL_EVIDENCIA_VIDEO
+    String? id = YoutubePlayer.convertUrlToId(url);
+    String thumb = id != null ? "https://img.youtube.com/vi/$id/mqdefault.jpg" : "";
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text("EVIDENCIA MULTIMEDIA", style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 2)),
+      const SizedBox(height: 15),
+      GestureDetector(
+        onTap: () { if (url.isNotEmpty) Navigator.push(ctx, MaterialPageRoute(builder: (c) => InAppVideoPlayerScreen(videoUrl: url, videoTitle: h['title'], videoDescription: h['diagnosis']))); },
+        child: Container(height: 150, width: double.infinity, decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10), image: thumb.isNotEmpty ? DecorationImage(image: NetworkImage(thumb), fit: BoxFit.cover, opacity: 0.6) : null), child: const Center(child: Icon(Icons.play_circle_fill, color: Color(0xFFD50000), size: 50))),
       ),
-    );
+    ]);
   }
 
-  Widget _buildVideoCard(BuildContext context, String label, String? videoUrl, {required String title, required String? desc, required bool isDark}) {
-    bool hasVideo = videoUrl != null && videoUrl.isNotEmpty;
-    String? thumbnailUrl;
-
-    if (hasVideo) {
-      String? videoId = YoutubePlayer.convertUrlToId(videoUrl);
-      if (videoId != null) thumbnailUrl = "https://img.youtube.com/vi/$videoId/mqdefault.jpg";
-    }
-
-    return GestureDetector(
-      onTap: () {
-        if (hasVideo) {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => InAppVideoPlayerScreen(videoUrl: videoUrl!, videoTitle: title, videoDescription: desc ?? "Sin detalles.")));
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No hay video disponible")));
-        }
-      },
-      child: Container(
-        height: 100,
-        decoration: BoxDecoration(
-          color: Colors.black, borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: isDark ? Colors.white24 : Colors.grey[400]!),
-          image: thumbnailUrl != null ? DecorationImage(image: NetworkImage(thumbnailUrl!), fit: BoxFit.cover, colorFilter: ColorFilter.mode(Colors.black.withValues(alpha: 0.4), BlendMode.darken)) : null,
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Icon(Icons.play_circle_fill, color: hasVideo ? const Color(0xFFD50000) : Colors.grey.withValues(alpha: 0.3), size: 40),
-            Positioned(bottom: 10, child: Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)]))),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildBudgetSection(List items, double total, bool d, Color t) => Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: d ? Colors.white.withValues(alpha: 0.05) : Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white10)), child: Column(children: [
+    ...items.map((i) => Padding(padding: const EdgeInsets.only(bottom: 10), child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [Expanded(child: Text(i['item'], style: const TextStyle(color: Colors.grey, fontSize: 13))), Text("\$${(i['price'] ?? 0).toStringAsFixed(2)}", style: TextStyle(color: t, fontWeight: FontWeight.bold))]))),
+    const Divider(color: Colors.white10),
+    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text("TOTAL", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold)), Text("\$${total.toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18))]),
+  ]));
 }
 
 class InAppVideoPlayerScreen extends StatefulWidget {
   final String videoUrl;
   final String videoTitle;
   final String videoDescription;
-
   const InAppVideoPlayerScreen({super.key, required this.videoUrl, required this.videoTitle, required this.videoDescription});
-
   @override
   State<InAppVideoPlayerScreen> createState() => _InAppVideoPlayerScreenState();
 }
 
 class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
   late YoutubePlayerController _controller;
-
   @override
   void initState() {
     super.initState();
-    final videoId = YoutubePlayer.convertUrlToId(widget.videoUrl);
-    _controller = YoutubePlayerController(initialVideoId: videoId ?? "", flags: const YoutubePlayerFlags(autoPlay: true, mute: false, enableCaption: false, forceHD: true));
+    _controller = YoutubePlayerController(initialVideoId: YoutubePlayer.convertUrlToId(widget.videoUrl) ?? "", flags: const YoutubePlayerFlags(autoPlay: true, mute: false));
   }
-
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
+  void dispose() { _controller.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     return YoutubePlayerBuilder(
-      player: YoutubePlayer(controller: _controller, showVideoProgressIndicator: true, progressIndicatorColor: const Color(0xFFD50000), progressColors: const ProgressBarColors(playedColor: Color(0xFFD50000), handleColor: Color(0xFFD50000))),
-      builder: (context, player) {
-        return Scaffold(
-          extendBodyBehindAppBar: true,
-          body: Container(
-            decoration: const BoxDecoration(color: Colors.black),
-            child: Column(
-              children: [
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                    child: Row(
-                      children: [
-                        CircleAvatar(backgroundColor: Colors.black.withValues(alpha: 0.5), child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white), onPressed: () => Navigator.pop(context))),
-                        const Spacer(),
-                        const Text("EVIDENCIA DIGITAL", style: TextStyle(color: Colors.white70, fontSize: 12, letterSpacing: 2)),
-                        const Spacer(),
-                        const SizedBox(width: 40),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 20),
-                  decoration: BoxDecoration(boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.8), blurRadius: 20, offset: const Offset(0, 10))], borderRadius: BorderRadius.circular(10)),
-                  child: player,
-                ),
-                const SizedBox(height: 30),
-                Expanded(
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(25),
-                    decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: const BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)), border: const Border(top: BorderSide(color: Colors.white10))),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5), decoration: BoxDecoration(color: const Color(0xFFD50000), borderRadius: BorderRadius.circular(5)), child: const Text("VIDEO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10))),
-                          const SizedBox(height: 15),
-                          Text(widget.videoTitle, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 15),
-                          const Divider(color: Colors.white10),
-                          const SizedBox(height: 15),
-                          const Text("DETALLES", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 10),
-                          Text(widget.videoDescription, style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5)),
-                          const SizedBox(height: 40),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      player: YoutubePlayer(controller: _controller),
+      builder: (context, player) => Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
+        body: Column(children: [player, Padding(padding: const EdgeInsets.all(20), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(widget.videoTitle, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)), const SizedBox(height: 10), Text(widget.videoDescription, style: const TextStyle(color: Colors.white70))]))]),
+      ),
     );
   }
 }
