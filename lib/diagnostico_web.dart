@@ -20,17 +20,18 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   // Variables de control
   String _semaforoSeleccionado = 'Verde'; 
   String? _clienteSeleccionado; 
-  String? _vehiculoSeleccionado; // Guarda la Placa
-  String? _modeloSeleccionado;   // Guarda el nombre del Modelo (Ej: RENAULT)
+  String? _vehiculoSeleccionado; 
+  String? _modeloSeleccionado;   
 
-  // --- LÓGICA DE PRESUPUESTO DINÁMICO ---
-  // Se agregó el controlador 'costo' para calcular ganancias
+  // Variable para mostrar el próximo número en pantalla (Opcional, pero útil)
+  int _contadorSecuencia = 0; 
+
   List<Map<String, dynamic>> _itemsPresupuesto = [
     {
       'item': TextEditingController(),
       'desc': TextEditingController(),
       'cant': TextEditingController(text: "1"),
-      'costo': TextEditingController(), // NUEVO CAMPO
+      'costo': TextEditingController(), 
       'precio': TextEditingController(),
     }
   ];
@@ -38,6 +39,29 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
   final Color brandRed = const Color(0xFFD50000);
   final Color cardBlack = const Color(0xFF101010);
   final Color inputFill = const Color(0xFF1E1E1E);
+
+  @override
+  void initState() {
+    super.initState();
+    _cargarSecuencia(); // Cargar el contador al iniciar
+  }
+
+  // --- NUEVA LÓGICA: Cargar el número actual de la nube ---
+  Future<void> _cargarSecuencia() async {
+    try {
+      var doc = await FirebaseFirestore.instance.collection('configuracion').doc('secuencias').get();
+      if (doc.exists) {
+        setState(() {
+          _contadorSecuencia = (doc.data()?['ultimo_presupuesto'] ?? 0);
+        });
+      } else {
+        // Si no existe, lo creamos en 0
+        await FirebaseFirestore.instance.collection('configuracion').doc('secuencias').set({'ultimo_presupuesto': 0});
+      }
+    } catch (e) {
+      debugPrint("Error cargando secuencia: $e");
+    }
+  }
 
   // Calcula el precio de venta total al cliente
   double _calcularTotalFalla() {
@@ -72,12 +96,13 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
         'item': TextEditingController(),
         'desc': TextEditingController(),
         'cant': TextEditingController(text: "1"),
-        'costo': TextEditingController(), // NUEVO CAMPO
+        'costo': TextEditingController(), 
         'precio': TextEditingController(),
       });
     });
   }
 
+  // --- FUNCIÓN MODIFICADA: GUARDAR CON SECUENCIA AUTOMÁTICA ---
   Future<void> _guardarDiagnostico() async {
     if (_vehiculoSeleccionado == null || _modeloSeleccionado == null) {
       _showSnack("⚠️ SELECCIONE UN VEHÍCULO", Colors.orange);
@@ -93,50 +118,79 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
     );
 
     try {
-      List<Map<String, dynamic>> presupuestoFinal = _itemsPresupuesto.map((e) {
-        double c = double.tryParse(e['cant'].text) ?? 0;
-        double p = double.tryParse(e['precio_unitario']?.text ?? e['precio'].text) ?? 0;
-        double costo = double.tryParse(e['costo'].text) ?? 0;
-        
-        return {
-          'item': e['item'].text.toUpperCase(),
-          'descripcion': e['desc'].text.toUpperCase(),
-          'cantidad': c,
-          'costo_unitario': costo, // Se guarda el costo interno
-          'precio_unitario': p,
-          'subtotal': c * p,
-        };
-      }).toList();
+      // Referencias a colecciones
+      final DocumentReference secuenciaRef = FirebaseFirestore.instance.collection('configuracion').doc('secuencias');
+      final CollectionReference diagnosticosRef = FirebaseFirestore.instance.collection('diagnosticos');
 
-      await FirebaseFirestore.instance.collection('diagnosticos').add({
-        'placa_vehiculo': _vehiculoSeleccionado,
-        'modelo_vehiculo': _modeloSeleccionado, 
-        'cliente_id': _clienteSeleccionado,
-        'sistema_reparar': _tituloFallaController.text.trim().toUpperCase(),
-        'total_reparacion': _calcularTotalFalla(),
-        'total_costo': _calcularTotalCosto(), // Guardamos métricas internas
-        'ganancia_estimada': _calcularGanancia(), // Guardamos métricas internas
-        'garantia': _garantiaController.text.trim().toUpperCase(),
-        'link_escanner': _scannerController.text.trim(),
-        'link_video': _videoController.text.trim(),
-        'descripcion_falla': _descController.text.trim().toUpperCase(),
-        'urgencia': _semaforoSeleccionado,
-        'presupuesto_items': presupuestoFinal, 
-        'aprobado': false,
-        'finalizado': false, 
-        'fecha': FieldValue.serverTimestamp(),
+      // USAMOS TRANSACCIÓN PARA EVITAR NÚMEROS REPETIDOS
+      await FirebaseFirestore.instance.runTransaction((transaction) async {
+        // 1. Leer el último número
+        DocumentSnapshot secuenciaSnapshot = await transaction.get(secuenciaRef);
+        int ultimoNumero = 0;
+        
+        if (secuenciaSnapshot.exists) {
+          ultimoNumero = secuenciaSnapshot.get('ultimo_presupuesto') ?? 0;
+        }
+
+        // 2. Incrementar
+        int nuevoNumero = ultimoNumero + 1;
+
+        // 3. Formatear: P: 00-001 (Rellena con ceros a la izquierda)
+        String numeroFormateado = "P: 00-${nuevoNumero.toString().padLeft(3, '0')}";
+
+        // 4. Preparar items
+        List<Map<String, dynamic>> presupuestoFinal = _itemsPresupuesto.map((e) {
+          double c = double.tryParse(e['cant'].text) ?? 0;
+          double p = double.tryParse(e['precio'].text) ?? 0;
+          double costo = double.tryParse(e['costo'].text) ?? 0;
+          
+          return {
+            'item': e['item'].text.toUpperCase(),
+            'descripcion': e['desc'].text.toUpperCase(),
+            'cantidad': c,
+            'costo_unitario': costo,
+            'precio_unitario': p,
+            'subtotal': c * p,
+          };
+        }).toList();
+
+        // 5. Guardar el Diagnóstico con el nuevo número
+        transaction.set(diagnosticosRef.doc(), {
+          'numero_presupuesto': numeroFormateado, // Aquí va el formato P: 00-001
+          'secuencia_int': nuevoNumero, // Guardamos el entero por si acaso para ordenar
+          'placa_vehiculo': _vehiculoSeleccionado,
+          'modelo_vehiculo': _modeloSeleccionado, 
+          'cliente_id': _clienteSeleccionado,
+          'sistema_reparar': _tituloFallaController.text.trim().toUpperCase(),
+          'total_reparacion': _calcularTotalFalla(),
+          'total_costo': _calcularTotalCosto(), 
+          'ganancia_estimada': _calcularGanancia(), 
+          'garantia': _garantiaController.text.trim().toUpperCase(),
+          'link_escanner': _scannerController.text.trim(),
+          'link_video': _videoController.text.trim(),
+          'descripcion_falla': _descController.text.trim().toUpperCase(),
+          'urgencia': _semaforoSeleccionado,
+          'presupuesto_items': presupuestoFinal, 
+          'aprobado': false,
+          'finalizado': false, 
+          'fecha': FieldValue.serverTimestamp(),
+        });
+
+        // 6. Actualizar el contador global
+        transaction.set(secuenciaRef, {'ultimo_presupuesto': nuevoNumero}, SetOptions(merge: true));
       });
 
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context); // Cerrar loading
 
-      _showSnack("✅ ENVIADO A PRESUPUESTOS APP", Colors.green);
+      _showSnack("✅ PRESUPUESTO GUARDADO CORRECTAMENTE", Colors.green);
       _limpiarFormulario();
+      _cargarSecuencia(); // Actualizar contador en vista
       
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
-      _showSnack("Error: $e", Colors.red);
+      _showSnack("Error al guardar: $e", Colors.red);
     }
   }
 
@@ -165,6 +219,9 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
 
   @override
   Widget build(BuildContext context) {
+    // Calculamos el siguiente número solo para mostrarlo visualmente
+    String siguienteNumVisual = "P: 00-${(_contadorSecuencia + 1).toString().padLeft(3, '0')}";
+
     return SingleChildScrollView(
       child: Form(
         key: _formKey,
@@ -178,8 +235,27 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text("GENERADOR DE DIAGNÓSTICO Y PRESUPUESTO", 
-                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text("GENERADOR DE DIAGNÓSTICO Y PRESUPUESTO", 
+                    style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+                  
+                  // INDICADOR DE SECUENCIA
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: brandRed.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: brandRed.withValues(alpha: 0.3))
+                    ),
+                    child: Text(
+                      "PRÓXIMO: $siguienteNumVisual",
+                      style: TextStyle(color: brandRed, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 35),
               
               _buildSelectorVehiculo(),
@@ -242,7 +318,7 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                 height: 60,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(backgroundColor: brandRed, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  onPressed: _guardarDiagnostico,
+                  onPressed: _guardarDiagnostico, // LLAMA A LA NUEVA FUNCIÓN
                   icon: const Icon(Icons.cloud_upload, color: Colors.white),
                   label: const Text("GUARDAR DIAGNÓSTICO EN PRESUPUESTOS", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
                 ),
@@ -320,14 +396,14 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
               children: [
                 Expanded(flex: 2, child: _headerText("ITEM")),
                 const SizedBox(width: 10),
-                Expanded(flex: 3, child: _headerText("DESCRIPCIÓN")), // Reducido para dar espacio
+                Expanded(flex: 3, child: _headerText("DESCRIPCIÓN")), 
                 const SizedBox(width: 10),
                 Expanded(flex: 1, child: _headerText("CANT")),
                 const SizedBox(width: 10),
-                Expanded(flex: 2, child: _headerText("COSTO UNIT.")), // Nueva Columna
+                Expanded(flex: 2, child: _headerText("COSTO UNIT.")),
                 const SizedBox(width: 10),
                 Expanded(flex: 2, child: _headerText("PRECIO VENTA")),
-                const SizedBox(width: 40), // Espacio para botón borrar
+                const SizedBox(width: 40), 
               ],
             ),
           ),
@@ -345,7 +421,6 @@ class _DiagnosticoWebModuleState extends State<DiagnosticoWebModule> {
                   const SizedBox(width: 10),
                   Expanded(flex: 1, child: _tableInput(row['cant'], "1", isNumber: true)),
                   const SizedBox(width: 10),
-                  // Input de Costo
                   Expanded(flex: 2, child: _tableInput(row['costo'], "0.00", isNumber: true)),
                   const SizedBox(width: 10),
                   Expanded(flex: 2, child: _tableInput(row['precio'], "0.00", isNumber: true)),

@@ -189,7 +189,7 @@ class WebBlockedScreen extends StatelessWidget {
   }
 }
 
-// --- CLIENT HOME SCREEN (CABECERA FIJA) ---
+// --- CLIENT HOME SCREEN ---
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
 
@@ -323,13 +323,16 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
                   if (vehicles.isEmpty) return _buildEmptyState("Sin Vehículos", "No hay autos registrados.", textColor);
                   if (_currentPage >= vehicles.length) _currentPage = 0;
+                  
+                  // OBTENEMOS LA PLACA ACTUAL
                   String placaActual = vehicles[_currentPage]['plate'];
 
                   return SafeArea(
                     child: Column(
                       children: [
                         const SizedBox(height: 10),
-                        _buildMenuSlider(context, brandRed, isDark),
+                        // PASAMOS LA PLACA AL MENÚ SLIDER
+                        _buildMenuSlider(context, brandRed, isDark, placaActual),
                         const SizedBox(height: 20),
                         
                         Padding(
@@ -343,7 +346,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                           ),
                         ),
 
-                        // CABECERA FIJA
                         SizedBox(
                           height: 180,
                           child: PageView.builder(
@@ -370,7 +372,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         const SizedBox(height: 15),
                         const Divider(color: Colors.white10, thickness: 1, indent: 25, endIndent: 25),
 
-                        // CUERPO SCROLLABLE (HISTORIAL)
                         Expanded(
                           child: SingleChildScrollView(
                             physics: const AlwaysScrollableScrollPhysics(),
@@ -408,7 +409,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                                               'complaint': "Reparación General",
                                               'diagnosis': data['sistema_reparar'] ?? "Sin descripción de falla.", 
                                               'budget': (data['presupuesto_items'] as List? ?? []).map((i) => {'item': i['item'] ?? "Repuesto", 'price': (i['precio_unitario'] ?? 0).toDouble()}).toList(),
-                                              'videoUrl': data['url_evidencia_video'] ?? "", // CAMPO ACTUALIZADO
+                                              'videoUrl': data['url_evidencia_video'] ?? "", 
                                             }, isDark);
                                           }).toList(),
                                         );
@@ -432,7 +433,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     );
   }
 
-  Widget _buildMenuSlider(BuildContext context, Color red, bool isDark) {
+  // --- MENU SLIDER CORREGIDO ---
+  // Acepta el parámetro 'String placa'
+  Widget _buildMenuSlider(BuildContext context, Color red, bool isDark, String placa) {
     return SizedBox(
       height: 110,
       child: ListView(
@@ -442,7 +445,10 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         children: [
           _buildSliderItem(context, Icons.calendar_month, "CITAS", red, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))),
           _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const NotificationScreen()))),
-          _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const DiagnosticScreen()))),
+          
+          // --- AQUÍ ESTÁ LA CORRECCIÓN: Pasamos 'plate: placa' ---
+          _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => DiagnosticScreen(plate: placa)))),
+          
           _buildSliderItem(context, Icons.storefront, "TIENDA", red, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))),
           _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))),
           _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))),

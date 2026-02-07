@@ -1,121 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DiagnosticScreen extends StatefulWidget {
-  const DiagnosticScreen({super.key});
+  final String plate; 
+  const DiagnosticScreen({super.key, required this.plate});
 
   @override
   State<DiagnosticScreen> createState() => _DiagnosticScreenState();
 }
 
 class _DiagnosticScreenState extends State<DiagnosticScreen> {
-  // Estado del Total
-  double _totalPrice = 0.0;
-
-  // DATOS DE DIAGNÓSTICO
-  final List<Map<String, dynamic>> _diagnosticItems = [
-    {
-      "system": "Motor (ECM)",
-      "code": "P0303",
-      "title": "Fallo de Encendido Cilindro 3",
-      "diagnosis": "Bobina de encendido quemada y bujía carbonizada. Se detectó resistencia infinita en el componente.",
-      "priority": "CRÍTICA",
-      "color": Colors.red, 
-      "price": 85.00,
-      "isSelected": true, 
-      "isFixable": true,
-      "warranty": "3 Meses",
-      "videoUrl": "https://www.youtube.com/watch?v=wblL1YIDu-A", 
-      "breakdown": [
-        {"item": "Bobina Original AC Delco", "cost": 55.00},
-        {"item": "Bujía Iridium", "cost": 10.00},
-        {"item": "Mano de Obra", "cost": 20.00},
-      ]
-    },
-    {
-      "system": "Admisión",
-      "code": "P0171",
-      "title": "Mezcla Pobre (Banco 1)",
-      "diagnosis": "Sensor MAF sucio provocando lectura errónea de aire. Se recomienda limpieza y calibración.",
-      "priority": "ALERTA",
-      "color": Colors.orange, 
-      "price": 35.00,
-      "isSelected": false, 
-      "isFixable": true,
-      "warranty": "15 Días",
-      "videoUrl": "https://www.youtube.com/watch?v=YuUtjWC2y0s",
-      "breakdown": [
-        {"item": "Limpiador Electrónico", "cost": 10.00},
-        {"item": "Mano de Obra / Calibración", "cost": 25.00},
-      ]
-    },
-    {
-      "system": "Suspensión",
-      "code": "N/A",
-      "title": "Bieletas Delanteras",
-      "diagnosis": "Juego excesivo detectado en inspección visual. Generará ruido pronto.",
-      "priority": "ALERTA",
-      "color": Colors.orange, 
-      "price": 60.00,
-      "isSelected": false, 
-      "isFixable": true,
-      "warranty": "3 Meses",
-      "videoUrl": "https://www.youtube.com/watch?v=3XoBQPC-1vM",
-      "breakdown": [
-        {"item": "Par de Bieletas (Genéricas)", "cost": 30.00},
-        {"item": "Instalación", "cost": 30.00},
-      ]
-    },
-    {
-      "system": "Frenos (ABS)",
-      "code": "OK",
-      "title": "Sistema de Frenado",
-      "diagnosis": "Módulos y sensores operando correctamente. Vida útil pastillas 60%.",
-      "priority": "ESTABLE",
-      "color": Colors.green, 
-      "price": 0.00,
-      "isSelected": false,
-      "isFixable": false, 
-      "warranty": "N/A",
-      "videoUrl": "",
-      "breakdown": [] 
-    },
-  ];
+  final Map<String, bool> _selectedItems = {};
+  
+  // VARIABLE PARA GUARDAR LA CONEXIÓN (ESTO EVITA EL PARPADEO)
+  late Stream<QuerySnapshot> _diagnosticosStream;
 
   @override
   void initState() {
     super.initState();
-    _calculateTotal();
+    // CREAMOS LA CONEXIÓN UNA SOLA VEZ AL INICIAR
+    _diagnosticosStream = FirebaseFirestore.instance
+        .collection('diagnosticos')
+        .where('placa_vehiculo', isEqualTo: widget.plate)
+        .snapshots();
   }
 
-  void _calculateTotal() {
-    double tempTotal = 0;
-    for (var item in _diagnosticItems) {
-      if (item['isSelected'] == true) {
-        tempTotal += item['price'];
-      }
-    }
-    setState(() {
-      _totalPrice = tempTotal;
-    });
-  }
-
-  Future<void> _launchScannerReport() async {
-    const url = 'https://usait.x431.com/Home/Report/reportDetail/diagnose_record_id/592733fbge3bOM54nRKw54Dh2Y/report_type/X2/l/es'; 
+  Future<void> _launchScannerReport(String? dynamicUrl) async {
+    final String url = (dynamicUrl != null && dynamicUrl.isNotEmpty) 
+        ? dynamicUrl 
+        : 'https://usait.x431.com/Home/Report/reportDetail/diagnose_record_id/592733fbge3bOM54nRKw54Dh2Y/report_type/X2/l/es'; 
+    
     final Uri uri = Uri.parse(url);
     try {
-      await launchUrl(
-        uri, 
-        mode: LaunchMode.inAppWebView,
-        webViewConfiguration: const WebViewConfiguration(enableJavaScript: true),
-      );
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
-      // CORRECCIÓN DE SEGURIDAD PARA ASYNC GAPS
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No se pudo cargar el reporte"))
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo cargar el reporte")));
     }
   }
 
@@ -133,157 +55,192 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text("Resultados del Escáner", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: Text("Diagnóstico: ${widget.plate}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         centerTitle: true,
       ),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: cardColor,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                side: const BorderSide(color: Colors.white24),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: _diagnosticosStream, // USAMOS LA VARIABLE ESTABLE
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator(color: Colors.red));
+          }
+          
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+             return const Center(child: Text("Sin diagnósticos pendientes.", style: TextStyle(color: Colors.grey)));
+          }
+
+          final docs = snapshot.data!.docs;
+
+          // CÁLCULO AL VUELO
+          double calculatedTotal = 0.0;
+          for (var doc in docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final String docId = doc.id;
+            
+            if (_selectedItems[docId] == true) {
+              calculatedTotal += (data['total_reparacion'] ?? 0.0).toDouble();
+            }
+          }
+
+          // Link del Escáner
+          String? linkScanner;
+          try {
+            linkScanner = docs.firstWhere((d) {
+              final data = d.data() as Map<String, dynamic>;
+              return data.containsKey('link_escanner') && data['link_escanner'] != null;
+            }).get('link_escanner');
+          } catch (_) {
+            linkScanner = null;
+          }
+
+          return Column(
+            children: [
+              // BOTÓN ESCÁNER
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: cardColor,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    side: const BorderSide(color: Colors.white24),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () => _launchScannerReport(linkScanner),
+                  icon: const Icon(Icons.description, color: Colors.blueAccent),
+                  label: const Text("Ver reporte del escaner", style: TextStyle(color: Colors.white, letterSpacing: 1)),
+                ),
               ),
-              onPressed: _launchScannerReport,
-              icon: const Icon(Icons.description, color: Colors.blueAccent),
-              label: const Text("Ver reporte del escaner", style: TextStyle(color: Colors.white, letterSpacing: 1)),
-            ),
-          ),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildLegendItem(Colors.red, "Crítica"),
-                _buildLegendItem(Colors.orange, "Media"),
-                _buildLegendItem(Colors.green, "OK"),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              itemCount: _diagnosticItems.length,
-              itemBuilder: (context, index) {
-                final item = _diagnosticItems[index];
-                final bool isFixable = item['isFixable'];
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 15),
-                  padding: const EdgeInsets.all(15),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border(left: BorderSide(color: item['color'], width: 5)),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      const SizedBox(height: 8),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: "Diagnóstico: ", style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.bold)),
-                            TextSpan(text: item['diagnosis'], style: TextStyle(color: Colors.grey[500])),
-                          ],
-                          style: const TextStyle(fontSize: 13, height: 1.4),
-                        ),
-                      ),
-                      const SizedBox(height: 15),
-                      const Divider(color: Colors.white10),
-                      const SizedBox(height: 10),
-                      if (isFixable)
-                        Row(
-                          children: [
-                            Transform.scale(
-                              scale: 1.2,
-                              child: Checkbox(
-                                activeColor: const Color(0xFFD50000),
-                                checkColor: Colors.white,
-                                value: item['isSelected'],
-                                onChanged: (val) {
-                                  setState(() {
-                                    item['isSelected'] = val;
-                                    _calculateTotal();
-                                  });
-                                },
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text("Reparación", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                                Text("\$${item['price'].toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                              ],
-                            ),
-                            const Spacer(),
-                            TextButton.icon(
-                              onPressed: () {
-                                Navigator.push(
-                                  context, 
-                                  MaterialPageRoute(builder: (context) => BudgetDetailScreen(item: item))
-                                );
-                              },
-                              icon: const Icon(Icons.play_circle_fill, size: 20, color: Colors.red), 
-                              label: const Text("Ver Detalle", style: TextStyle(color: Colors.white, fontSize: 12)),
-                            )
-                          ],
-                        )
-                      else
-                        const Row(
-                          children: [
-                            Icon(Icons.check_circle, color: Colors.green, size: 20),
-                            SizedBox(width: 8),
-                            Text("Sistema Operativo", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                          ],
-                        )
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-
-          Container(
-            padding: const EdgeInsets.all(25),
-            decoration: const BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
-              boxShadow: [BoxShadow(color: Colors.black, blurRadius: 20, offset: Offset(0, -5))]
-            ),
-            child: Column(
-              children: [
-                Row(
+              // LEYENDA
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text("TOTAL A PAGAR", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
-                    Text("\$${_totalPrice.toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
+                    _buildLegendItem(Colors.red, "Crítica"),
+                    _buildLegendItem(Colors.orange, "Media"),
+                    _buildLegendItem(Colors.green, "OK"),
                   ],
                 ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _totalPrice > 0 ? const Color(0xFFD50000) : Colors.grey[800],
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                    ),
-                    onPressed: _totalPrice > 0 ? () => _showApprovalDialog(context) : null,
-                    child: const Text("APROBAR REPARACIÓN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                  ),
+              ),
+
+              // LISTA DE ITEMS
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    final String docId = docs[index].id;
+
+                    _selectedItems.putIfAbsent(docId, () => false);
+
+                    String urgencia = data['urgencia'] ?? "Verde";
+                    Color statusColor = urgencia == "Rojo" ? Colors.red : (urgencia == "Amarillo" ? Colors.orange : Colors.green);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 15),
+                      padding: const EdgeInsets.all(15),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border(left: BorderSide(color: statusColor, width: 5)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(data['sistema_reparar'] ?? "Sistema", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 8),
+                          Text.rich(
+                            TextSpan(
+                              children: [
+                                TextSpan(text: "Diagnóstico: ", style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.bold)),
+                                TextSpan(text: data['sistema_reparar'] ?? "", style: TextStyle(color: Colors.grey[500])),
+                              ],
+                              style: const TextStyle(fontSize: 13, height: 1.4),
+                            ),
+                          ),
+                          const SizedBox(height: 15),
+                          const Divider(color: Colors.white10),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Transform.scale(
+                                scale: 1.2,
+                                child: Checkbox(
+                                  activeColor: const Color(0xFFD50000),
+                                  checkColor: Colors.white,
+                                  value: _selectedItems[docId] ?? false,
+                                  onChanged: (val) {
+                                    // Al ser el Stream estable, esto ya no causa parpadeo
+                                    setState(() => _selectedItems[docId] = val!);
+                                  },
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text("Reparación", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                                  Text("\$${(data['total_reparacion'] ?? 0).toStringAsFixed(0)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                ],
+                              ),
+                              const Spacer(),
+                              TextButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context, 
+                                    MaterialPageRoute(builder: (context) => BudgetDetailScreen(item: data))
+                                  );
+                                },
+                                icon: const Icon(Icons.play_circle_fill, size: 20, color: Colors.red), 
+                                label: const Text("Ver Detalle", style: TextStyle(color: Colors.white, fontSize: 12)),
+                              )
+                            ],
+                          )
+                        ],
+                      ),
+                    );
+                  },
                 ),
-              ],
-            ),
-          )
-        ],
+              ),
+
+              // PANEL INFERIOR
+              Container(
+                padding: const EdgeInsets.all(25),
+                decoration: const BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+                  boxShadow: [BoxShadow(color: Colors.black, blurRadius: 20, offset: Offset(0, -5))]
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("TOTAL A PAGAR", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1)),
+                        Text("\$${calculatedTotal.toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 24)),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 55,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: calculatedTotal > 0 ? const Color(0xFFD50000) : Colors.grey[800],
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        ),
+                        onPressed: calculatedTotal > 0 ? () => _showApprovalDialog(context, calculatedTotal) : null,
+                        child: const Text("APROBAR REPARACIÓN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            ],
+          );
+        },
       ),
     );
   }
@@ -292,7 +249,9 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     return Row(children: [Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)), const SizedBox(width: 6), Text(text, style: const TextStyle(color: Colors.white70, fontSize: 10))]);
   }
 
-  void _showApprovalDialog(BuildContext context) {
+// ... resto del código anterior ...
+
+  void _showApprovalDialog(BuildContext context, double total) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -305,11 +264,52 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             children: [
               const Icon(Icons.verified, color: Colors.green, size: 50),
               const SizedBox(height: 20),
-              const Text("¡Servicio Aprobado!", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text("¿Confirmar Aprobación?", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 10),
-              Text("Total autorizado: \$${_totalPrice.toStringAsFixed(2)}", style: const TextStyle(color: Colors.white70)),
+              Text("Se autorizará un total de: \$${total.toStringAsFixed(2)}", style: const TextStyle(color: Colors.white70)),
               const SizedBox(height: 25),
-              SizedBox(width: double.infinity, child: ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD50000)), onPressed: () { Navigator.pop(ctx); Navigator.pop(context); }, child: const Text("VOLVER AL GARAJE", style: TextStyle(color: Colors.white))))
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD50000)),
+                  onPressed: () async {
+                    // 1. CERRAMOS EL DIÁLOGO PRIMERO
+                    Navigator.pop(ctx);
+
+                    try {
+                      // 2. ENVIAMOS LA NOTIFICACIÓN A FIREBASE (Para la Web)
+                      await FirebaseFirestore.instance.collection('notificaciones').add({
+                        'titulo': 'PRESUPUESTO APROBADO',
+                        'mensaje': 'El cliente del vehículo ${widget.plate} ha aprobado reparaciones.',
+                        'monto': total,
+                        'placa': widget.plate,
+                        'fecha': FieldValue.serverTimestamp(), // Hora exacta del servidor
+                        'leido': false, // Para que salga como nueva en la web
+                        'tipo': 'aprobacion' // Para ponerle un icono de dinero en la web
+                      });
+
+                      // 3. CONFIRMACIÓN VISUAL AL USUARIO
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text("¡Aprobación enviada al taller con éxito!"),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        // Opcional: Volver atrás
+                        Navigator.pop(context);
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Error al enviar. Verifica tu internet.")),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text("CONFIRMAR Y ENVIAR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              )
             ],
           ),
         ),
@@ -317,6 +317,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     );
   }
 }
+
+
 
 class BudgetDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -332,7 +334,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
   @override
   void initState() {
     super.initState();
-    String? videoId = YoutubePlayer.convertUrlToId(widget.item['videoUrl'] ?? "");
+    String? videoId = YoutubePlayer.convertUrlToId(widget.item['url_evidencia_video'] ?? "");
     _controller = YoutubePlayerController(
       initialVideoId: videoId ?? "", 
       flags: const YoutubePlayerFlags(
@@ -352,7 +354,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final List breakdown = widget.item['breakdown'] ?? [];
+    final List breakdown = widget.item['presupuesto_items'] ?? [];
     const Color bgDark = Color(0xFF121212);
 
     return YoutubePlayerBuilder(
@@ -383,18 +385,18 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(widget.item['title'], style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(widget.item['sistema_reparar'] ?? "Detalle", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
                   child: Text(
-                    widget.item['diagnosis'],
+                    widget.item['sistema_reparar'] ?? "", 
                     style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
                   ),
                 ),
                 const SizedBox(height: 25),
-                if (widget.item['videoUrl'] != null && widget.item['videoUrl'].isNotEmpty) ...[
+                if (widget.item['url_evidencia_video'] != null && widget.item['url_evidencia_video'].toString().isNotEmpty) ...[
                   const Text("EVIDENCIA EN VIDEO", style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                   const SizedBox(height: 10),
                   Container(
@@ -423,8 +425,8 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(detail['item'], style: const TextStyle(color: Colors.white70)),
-                            Text("\$${detail['cost'].toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            Text(detail['descripcion'] ?? "Item", style: const TextStyle(color: Colors.white70)),
+                            Text("\$${(detail['precio_unitario'] ?? 0).toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       )),
@@ -434,11 +436,12 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text("TOTAL ITEM", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold)),
-                          Text("\$${widget.item['price'].toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text("\$${(widget.item['total_reparacion'] ?? 0).toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
                         ],
                       ),
                       const SizedBox(height: 20),
-                      // SECCIÓN DE GARANTÍA (DISEÑO VERDE)
+                      
+                      // GARANTÍA 
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
@@ -455,7 +458,7 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const Text("GARANTÍA INCLUIDA", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
-                                Text(widget.item['warranty'] ?? "N/A", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text(widget.item['garantia'] ?? "N/A", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
                               ],
                             ),
                           ],
