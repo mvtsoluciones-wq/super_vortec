@@ -7,13 +7,16 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async'; 
 
+// --- 1. IMPORTACIÓN NECESARIA PARA CORREGIR EL ERROR DE FECHA ---
+import 'package:intl/date_symbol_data_local.dart';
+
 import 'firebase_options.dart';
 
 // --- IMPORTACIONES DE TUS PANTALLAS ---
 import 'admin_panel.dart';
 import 'citas.dart';
 import 'diagnostico.dart';
-import 'notificaciones.dart'; // Asegúrate de que este archivo exista
+import 'notificaciones.dart'; 
 import 'tienda.dart';
 import 'ofertas.dart';
 import 'market.dart';
@@ -22,6 +25,9 @@ import 'login_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // --- 2. LÍNEA AGREGADA PARA INICIALIZAR EL FORMATO DE FECHA EN ESPAÑOL ---
+  await initializeDateFormatting('es_ES', null);
 
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

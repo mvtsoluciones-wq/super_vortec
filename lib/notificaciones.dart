@@ -99,9 +99,7 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
 
           final docs = snapshot.data!.docs;
 
-          // FILTRO LOCAL ADICIONAL:
-          // Ocultamos las notificaciones de tipo 'aprobacion' porque esas son 
-          // las que el CLIENTE envió al taller. El cliente solo quiere ver lo que el taller le escribe a él.
+          // FILTRO LOCAL: Ocultamos 'aprobacion' (mensajes enviados por el cliente)
           final misMensajes = docs.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
             String tipo = data['tipo'] ?? '';
@@ -122,19 +120,41 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
               bool leido = data['leido'] ?? false;
               String titulo = data['titulo'] ?? "Mensaje del Taller";
               String tipo = data['tipo'] ?? 'general';
+              String mensaje = data['mensaje'] ?? "";
               
-              // Formateo de fecha amigable
+              // Formateo de fecha
               Timestamp? timestamp = data['fecha'];
               String fechaStr = timestamp != null 
                   ? DateFormat('dd MMM, hh:mm a').format(timestamp.toDate()) 
                   : "Reciente";
 
-              // Estilo especial si es un mensaje directo del admin (Chat)
-              bool esMensajeDirecto = tipo == 'mensaje_admin';
+              // --- LÓGICA DE ESTILOS SEGÚN EL TIPO DE MENSAJE ---
+              IconData iconMsg = Icons.info_outline;
+              Color colorAccent = Colors.white70;
+              Color bgIcon = Colors.white10;
+
+              if (tipo == 'mensaje_admin') {
+                iconMsg = Icons.support_agent;
+                colorAccent = Colors.blueAccent;
+                bgIcon = Colors.blue.withValues(alpha: 0.1);
+              } 
+              // NUEVA LÓGICA PARA CITAS
+              else if (tipo == 'cita') {
+                iconMsg = Icons.calendar_month;
+                if (titulo.toLowerCase().contains("confirmada")) {
+                  colorAccent = Colors.greenAccent;
+                  bgIcon = Colors.green.withValues(alpha: 0.1);
+                } else if (titulo.toLowerCase().contains("cancelada")) {
+                  colorAccent = Colors.redAccent;
+                  bgIcon = Colors.red.withValues(alpha: 0.1);
+                } else {
+                  colorAccent = Colors.orangeAccent; // Recordatorios
+                  bgIcon = Colors.orange.withValues(alpha: 0.1);
+                }
+              }
 
               return GestureDetector(
                 onTap: () {
-                  // Al tocar, marcamos como leído en la base de datos
                   if (!leido) {
                     FirebaseFirestore.instance.collection('notificaciones').doc(docId).update({'leido': true});
                   }
@@ -144,20 +164,15 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                   margin: const EdgeInsets.only(bottom: 15),
                   padding: const EdgeInsets.all(15),
                   decoration: BoxDecoration(
-                    // Si es mensaje directo y no está leído, se ve azul oscuro. Si no, negro tarjeta.
-                    color: esMensajeDirecto 
-                        ? (leido ? const Color(0xFF1E1E1E) : const Color(0xFF1A237E).withValues(alpha: 0.2)) 
-                        : const Color(0xFF1E1E1E),
+                    color: const Color(0xFF1E1E1E),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      // Borde brillante si no está leído
-                      color: !leido 
-                          ? (esMensajeDirecto ? Colors.blueAccent : const Color(0xFFD50000)) 
-                          : Colors.white10,
+                      // Borde de color si no está leído, gris si ya se leyó
+                      color: !leido ? colorAccent : Colors.white10,
                       width: !leido ? 1.5 : 1
                     ),
                     boxShadow: !leido ? [
-                       BoxShadow(color: esMensajeDirecto ? Colors.blue.withValues(alpha: 0.1) : Colors.red.withValues(alpha: 0.1), blurRadius: 10)
+                       BoxShadow(color: colorAccent.withValues(alpha: 0.1), blurRadius: 10)
                     ] : [],
                   ),
                   child: Column(
@@ -165,16 +180,16 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // ÍCONO SEGÚN TIPO DE MENSAJE
+                          // ÍCONO DINÁMICO
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: esMensajeDirecto ? Colors.blue.withValues(alpha: 0.1) : Colors.white10,
+                              color: bgIcon,
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
-                              esMensajeDirecto ? Icons.support_agent : Icons.info_outline,
-                              color: esMensajeDirecto ? Colors.blue : Colors.white70,
+                              iconMsg,
+                              color: colorAccent,
                               size: 24,
                             ),
                           ),
@@ -186,25 +201,29 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      titulo,
-                                      style: TextStyle(
-                                        color: leido ? Colors.white70 : Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15
+                                    Expanded(
+                                      child: Text(
+                                        titulo,
+                                        style: TextStyle(
+                                          color: leido ? Colors.white70 : Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
                                     if (!leido)
                                       Container(
+                                        margin: const EdgeInsets.only(left: 8),
                                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(color: const Color(0xFFD50000), borderRadius: BorderRadius.circular(4)),
-                                        child: const Text("NUEVO", style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                                        decoration: BoxDecoration(color: colorAccent, borderRadius: BorderRadius.circular(4)),
+                                        child: const Text("NUEVO", style: TextStyle(color: Colors.black, fontSize: 8, fontWeight: FontWeight.bold)),
                                       )
                                   ],
                                 ),
                                 const SizedBox(height: 5),
                                 Text(
-                                  data['mensaje'] ?? "",
+                                  mensaje,
                                   style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
                                 ),
                                 const SizedBox(height: 10),

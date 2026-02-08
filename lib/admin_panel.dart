@@ -23,6 +23,7 @@ import 'tecnicos_web.dart';
 import 'recibos_web.dart';
 import 'ventas_web.dart';
 import 'cajachica_web.dart';
+import 'citas_web.dart';
 
 // --- 1. FORMATEADOR PARA MAYÚSCULAS ---
 class UpperCaseTextFormatter extends TextInputFormatter {
@@ -370,6 +371,11 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
                     Icons.notifications_active_outlined,
                     "NOTIFICACIÓN",
                   ),
+                  _sidebarItem(
+                    18,
+                    Icons.notifications_active_outlined,
+                    "CITAS",
+                  ),
                   _sidebarItem(5, Icons.storefront_rounded, "TIENDA"),
                   _sidebarItem(
                     6,
@@ -549,6 +555,8 @@ class _AdminControlPanelState extends State<AdminControlPanel> {
         return const VentasWebModule();
        case 17:
         return const CajaChicaWebModule(); 
+        case 18:
+        return const CitasWebModule();
 
       default:
         return const Center(
