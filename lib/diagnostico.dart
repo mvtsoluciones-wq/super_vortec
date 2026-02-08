@@ -14,18 +14,38 @@ class DiagnosticScreen extends StatefulWidget {
 class _DiagnosticScreenState extends State<DiagnosticScreen> {
   final Map<String, bool> _selectedItems = {};
   late Stream<QuerySnapshot> _diagnosticosStream;
+  
+  // VARIABLES PARA CARGAR DESDE LA COLECCIÓN 'VEHICULOS'
+  String _marcaVehiculo = "";
+  String _modeloVehiculo = "";
 
   @override
   void initState() {
     super.initState();
-    // Consulta a Firebase filtrando por la placa del vehículo
+    _fetchVehicleData(); // BUSCAMOS MARCA Y MODELO AL ENTRAR
     _diagnosticosStream = FirebaseFirestore.instance
         .collection('diagnosticos')
         .where('placa_vehiculo', isEqualTo: widget.plate)
+        // IMPORTANTE: Si quisieras mostrar solo los NO aprobados, descomenta la siguiente linea:
+        // .where('estado', isNotEqualTo: 'aprobado') 
         .snapshots();
   }
 
-  // Función para abrir el reporte PDF del escáner
+  // --- FUNCIÓN PARA BUSCAR MARCA Y MODELO EN LA COLECCIÓN VEHÍCULOS ---
+  Future<void> _fetchVehicleData() async {
+    try {
+      var doc = await FirebaseFirestore.instance.collection('vehiculos').doc(widget.plate).get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _marcaVehiculo = doc.data()?['marca'] ?? "";
+          _modeloVehiculo = doc.data()?['modelo'] ?? "";
+        });
+      }
+    } catch (e) {
+      debugPrint("Error obteniendo datos del vehículo: $e");
+    }
+  }
+
   Future<void> _launchScannerReport(String? dynamicUrl) async {
     final String url = (dynamicUrl != null && dynamicUrl.isNotEmpty) 
         ? dynamicUrl 
@@ -54,7 +74,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text("Diagnóstico: ${widget.plate}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text("DIAGNÓSTICO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
         centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -64,9 +84,72 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             return const Center(child: CircularProgressIndicator(color: Colors.red));
           }
           
+          // ==================================================================
+          // NUEVA PANTALLA DE "SIN PENDIENTES" (VISUALMENTE MEJORADA)
+          // ==================================================================
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-             return const Center(child: Text("Sin diagnósticos pendientes.", style: TextStyle(color: Colors.grey)));
+             return Center(
+               child: Column(
+                 mainAxisAlignment: MainAxisAlignment.center,
+                 children: [
+                   // Círculo de fondo con ícono
+                   Container(
+                     padding: const EdgeInsets.all(30),
+                     decoration: BoxDecoration(
+                       color: Colors.green.withValues(alpha: 0.1), // Fondo verde muy sutil
+                       shape: BoxShape.circle,
+                     ),
+                     child: Icon(
+                       Icons.check_circle_outline_rounded, // Ícono de "Check" redondeado
+                       size: 100,
+                       color: Colors.greenAccent[400],
+                     ),
+                   ),
+                   const SizedBox(height: 30),
+                   // Título principal
+                   const Text(
+                     "¡Todo al día!",
+                     style: TextStyle(
+                       color: Colors.white,
+                       fontSize: 24,
+                       fontWeight: FontWeight.bold,
+                       letterSpacing: 1.2
+                     ),
+                   ),
+                   const SizedBox(height: 15),
+                   // Subtítulo explicativo
+                   Padding(
+                     padding: const EdgeInsets.symmetric(horizontal: 40),
+                     child: Text(
+                       "No hay diagnósticos ni presupuestos pendientes por aprobar para este vehículo.",
+                       textAlign: TextAlign.center,
+                       style: TextStyle(
+                         color: Colors.white.withValues(alpha: 0.7), // Blanco más suave
+                         fontSize: 16,
+                         height: 1.5,
+                       ),
+                     ),
+                   ),
+                   // Opcional: Botón para volver
+                   const SizedBox(height: 40),
+                   ElevatedButton.icon(
+                     onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: cardColor,
+                        padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        side: BorderSide(color: Colors.white.withValues(alpha: 0.2))
+                      ),
+                     icon: const Icon(Icons.arrow_back, color: Colors.white),
+                     label: const Text("Volver al Inicio", style: TextStyle(color: Colors.white)),
+                   )
+                 ],
+               ),
+             );
           }
+          // ==================================================================
+          // FIN DE NUEVA PANTALLA
+          // ==================================================================
 
           final docs = snapshot.data!.docs;
 
@@ -138,6 +221,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                     String urgencia = data['urgencia'] ?? "Verde";
                     Color statusColor = urgencia == "Rojo" ? Colors.red : (urgencia == "Amarillo" ? Colors.orange : Colors.green);
 
+                    String sistema = data['sistema_reparar'] ?? "";
+
                     return Container(
                       margin: const EdgeInsets.only(bottom: 15),
                       padding: const EdgeInsets.all(15),
@@ -152,7 +237,8 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(data['sistema_reparar'] ?? "Sistema", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                              Text("$_marcaVehiculo $_modeloVehiculo".trim().toUpperCase(), 
+                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                               if (isApproved)
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -163,7 +249,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            "Presupuesto: ${data['numero_presupuesto'] ?? 'N/A'}",
+                            sistema.toUpperCase(),
                             style: TextStyle(color: Colors.blue[200], fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 15),
@@ -407,8 +493,6 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                     fontSize: 22,
                     fontWeight: FontWeight.bold)),
             
-            // ELIMINADO EL BLOQUE DE TEXTO GRIS DE "PINTURA GENERAL" (falla_detectada)
-            
             const SizedBox(height: 25),
 
             if (_hasVideo) ...[
@@ -434,15 +518,6 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
                   controller: _controller,
                   showVideoProgressIndicator: true,
                   progressIndicatorColor: Colors.red,
-                  bottomActions: [
-                    CurrentPosition(),
-                    ProgressBar(isExpanded: true, colors: const ProgressBarColors(
-                      playedColor: Colors.red,
-                      handleColor: Colors.redAccent
-                    )),
-                    RemainingDuration(),
-                    FullScreenButton(),
-                  ],
                 ),
               ),
             ] else ...[
