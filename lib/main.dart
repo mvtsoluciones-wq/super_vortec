@@ -13,7 +13,7 @@ import 'firebase_options.dart';
 import 'admin_panel.dart';
 import 'citas.dart';
 import 'diagnostico.dart';
-import 'notificaciones.dart';
+import 'notificaciones.dart'; // Asegúrate de que este archivo exista
 import 'tienda.dart';
 import 'ofertas.dart';
 import 'market.dart';
@@ -434,7 +434,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
   }
 
   // --- MENU SLIDER CORREGIDO ---
-  // Acepta el parámetro 'String placa'
   Widget _buildMenuSlider(BuildContext context, Color red, bool isDark, String placa) {
     return SizedBox(
       height: 110,
@@ -444,9 +443,22 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         physics: const BouncingScrollPhysics(),
         children: [
           _buildSliderItem(context, Icons.calendar_month, "CITAS", red, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))),
-          _buildSliderItem(context, Icons.notifications, "NOTIFIC.", Colors.amber, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const NotificationScreen()))),
           
-          // --- AQUÍ ESTÁ LA CORRECCIÓN: Pasamos 'plate: placa' ---
+          // --- AQUÍ ESTÁ LA CORRECCIÓN: NotificacionesScreen con parámetro currentPlaca ---
+          _buildSliderItem(
+            context, 
+            Icons.notifications, 
+            "NOTIFIC.", 
+            Colors.amber, 
+            isDark, 
+            onTap: () => Navigator.push(
+              context, 
+              MaterialPageRoute(
+                builder: (c) => NotificacionesScreen(currentPlaca: placa)
+              )
+            )
+          ),
+          
           _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => DiagnosticScreen(plate: placa)))),
           
           _buildSliderItem(context, Icons.storefront, "TIENDA", red, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))),

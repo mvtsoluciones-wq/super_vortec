@@ -13,20 +13,19 @@ class DiagnosticScreen extends StatefulWidget {
 
 class _DiagnosticScreenState extends State<DiagnosticScreen> {
   final Map<String, bool> _selectedItems = {};
-  
-  // VARIABLE PARA GUARDAR LA CONEXIÓN (ESTO EVITA EL PARPADEO)
   late Stream<QuerySnapshot> _diagnosticosStream;
 
   @override
   void initState() {
     super.initState();
-    // CREAMOS LA CONEXIÓN UNA SOLA VEZ AL INICIAR
+    // Consulta a Firebase filtrando por la placa del vehículo
     _diagnosticosStream = FirebaseFirestore.instance
         .collection('diagnosticos')
         .where('placa_vehiculo', isEqualTo: widget.plate)
         .snapshots();
   }
 
+  // Función para abrir el reporte PDF del escáner
   Future<void> _launchScannerReport(String? dynamicUrl) async {
     final String url = (dynamicUrl != null && dynamicUrl.isNotEmpty) 
         ? dynamicUrl 
@@ -36,7 +35,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (e) {
-      if (!mounted) return;
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("No se pudo cargar el reporte")));
     }
   }
@@ -59,7 +58,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
         centerTitle: true,
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: _diagnosticosStream, // USAMOS LA VARIABLE ESTABLE
+        stream: _diagnosticosStream, 
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator(color: Colors.red));
@@ -71,18 +70,17 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
 
           final docs = snapshot.data!.docs;
 
-          // CÁLCULO AL VUELO
           double calculatedTotal = 0.0;
           for (var doc in docs) {
             final data = doc.data() as Map<String, dynamic>;
             final String docId = doc.id;
+            bool isApproved = data['estado'] == 'aprobado';
             
-            if (_selectedItems[docId] == true) {
+            if (!isApproved && _selectedItems[docId] == true) {
               calculatedTotal += (data['total_reparacion'] ?? 0.0).toDouble();
             }
           }
 
-          // Link del Escáner
           String? linkScanner;
           try {
             linkScanner = docs.firstWhere((d) {
@@ -95,7 +93,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
 
           return Column(
             children: [
-              // BOTÓN ESCÁNER
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.fromLTRB(20, 20, 20, 10),
@@ -112,7 +109,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                 ),
               ),
 
-              // LEYENDA
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 5),
                 child: Row(
@@ -125,7 +121,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                 ),
               ),
 
-              // LISTA DE ITEMS
               Expanded(
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -133,8 +128,12 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                   itemBuilder: (context, index) {
                     final data = docs[index].data() as Map<String, dynamic>;
                     final String docId = docs[index].id;
+                    
+                    bool isApproved = data['estado'] == 'aprobado';
 
-                    _selectedItems.putIfAbsent(docId, () => false);
+                    if (!isApproved) {
+                      _selectedItems.putIfAbsent(docId, () => false);
+                    }
 
                     String urgencia = data['urgencia'] ?? "Verde";
                     Color statusColor = urgencia == "Rojo" ? Colors.red : (urgencia == "Amarillo" ? Colors.orange : Colors.green);
@@ -150,34 +149,40 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(data['sistema_reparar'] ?? "Sistema", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          const SizedBox(height: 8),
-                          Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(text: "Diagnóstico: ", style: TextStyle(color: Colors.grey[400], fontWeight: FontWeight.bold)),
-                                TextSpan(text: data['sistema_reparar'] ?? "", style: TextStyle(color: Colors.grey[500])),
-                              ],
-                              style: const TextStyle(fontSize: 13, height: 1.4),
-                            ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(data['sistema_reparar'] ?? "Sistema", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                              if (isApproved)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(5)),
+                                  child: const Text("APROBADO", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                )
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            "Presupuesto: ${data['numero_presupuesto'] ?? 'N/A'}",
+                            style: TextStyle(color: Colors.blue[200], fontSize: 12, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 15),
                           const Divider(color: Colors.white10),
                           const SizedBox(height: 10),
                           Row(
                             children: [
-                              Transform.scale(
-                                scale: 1.2,
-                                child: Checkbox(
-                                  activeColor: const Color(0xFFD50000),
-                                  checkColor: Colors.white,
-                                  value: _selectedItems[docId] ?? false,
-                                  onChanged: (val) {
-                                    // Al ser el Stream estable, esto ya no causa parpadeo
-                                    setState(() => _selectedItems[docId] = val!);
-                                  },
+                              if (!isApproved)
+                                Transform.scale(
+                                  scale: 1.2,
+                                  child: Checkbox(
+                                    activeColor: const Color(0xFFD50000),
+                                    checkColor: Colors.white,
+                                    value: _selectedItems[docId] ?? false,
+                                    onChanged: (val) {
+                                      setState(() => _selectedItems[docId] = val!);
+                                    },
+                                  ),
                                 ),
-                              ),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -205,7 +210,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                 ),
               ),
 
-              // PANEL INFERIOR
               Container(
                 padding: const EdgeInsets.all(25),
                 decoration: const BoxDecoration(
@@ -231,7 +235,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                           backgroundColor: calculatedTotal > 0 ? const Color(0xFFD50000) : Colors.grey[800],
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                         ),
-                        onPressed: calculatedTotal > 0 ? () => _showApprovalDialog(context, calculatedTotal) : null,
+                        onPressed: calculatedTotal > 0 ? () => _showApprovalDialog(context, calculatedTotal, docs) : null,
                         child: const Text("APROBAR REPARACIÓN", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                     ),
@@ -249,9 +253,7 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
     return Row(children: [Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)), const SizedBox(width: 6), Text(text, style: const TextStyle(color: Colors.white70, fontSize: 10))]);
   }
 
-// ... resto del código anterior ...
-
-  void _showApprovalDialog(BuildContext context, double total) {
+  void _showApprovalDialog(BuildContext context, double total, List<QueryDocumentSnapshot> allDocs) {
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
@@ -273,38 +275,60 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD50000)),
                   onPressed: () async {
-                    // 1. CERRAMOS EL DIÁLOGO PRIMERO
-                    Navigator.pop(ctx);
+                    Navigator.pop(ctx); 
+
+                    final batch = FirebaseFirestore.instance.batch();
+                    Set<String> numerosPresupuestos = {};
+                    List<String> itemsAprobados = [];
+
+                    for (var doc in allDocs) {
+                      if (_selectedItems[doc.id] == true) {
+                        batch.update(doc.reference, {
+                          'estado': 'aprobado',
+                          'fecha_aprobacion': FieldValue.serverTimestamp()
+                        });
+                        var data = doc.data() as Map<String, dynamic>;
+                        if (data['numero_presupuesto'] != null) {
+                          numerosPresupuestos.add(data['numero_presupuesto']);
+                        }
+                        itemsAprobados.add(data['sistema_reparar'] ?? "Item");
+                      }
+                    }
 
                     try {
-                      // 2. ENVIAMOS LA NOTIFICACIÓN A FIREBASE (Para la Web)
+                      await batch.commit();
+                      
+                      if (!context.mounted) return;
+
+                      String presupuestosString = numerosPresupuestos.join(", ");
+                      if (presupuestosString.isEmpty) presupuestosString = "Varios";
+
                       await FirebaseFirestore.instance.collection('notificaciones').add({
-                        'titulo': 'PRESUPUESTO APROBADO',
-                        'mensaje': 'El cliente del vehículo ${widget.plate} ha aprobado reparaciones.',
+                        'titulo': 'REPARACIÓN APROBADA',
+                        'mensaje': 'Cliente aprobó: ${itemsAprobados.length} ítems.',
                         'monto': total,
                         'placa': widget.plate,
-                        'fecha': FieldValue.serverTimestamp(), // Hora exacta del servidor
-                        'leido': false, // Para que salga como nueva en la web
-                        'tipo': 'aprobacion' // Para ponerle un icono de dinero en la web
+                        'numero_presupuesto': presupuestosString,
+                        'fecha': FieldValue.serverTimestamp(),
+                        'leido': false,
+                        'tipo': 'aprobacion'
                       });
 
-                      // 3. CONFIRMACIÓN VISUAL AL USUARIO
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text("¡Aprobación enviada al taller con éxito!"),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                        // Opcional: Volver atrás
-                        Navigator.pop(context);
-                      }
+                      if (!context.mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("¡Aprobación enviada al taller con éxito!"),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                      Navigator.pop(context);
+                      
                     } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("Error al enviar. Verifica tu internet.")),
-                        );
-                      }
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Error al enviar. Verifica tu internet.")),
+                      );
                     }
                   },
                   child: const Text("CONFIRMAR Y ENVIAR", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -318,8 +342,6 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
   }
 }
 
-
-
 class BudgetDetailScreen extends StatefulWidget {
   final Map<String, dynamic> item;
   const BudgetDetailScreen({super.key, required this.item});
@@ -330,19 +352,23 @@ class BudgetDetailScreen extends StatefulWidget {
 
 class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
   late YoutubePlayerController _controller;
+  bool _hasVideo = false;
 
   @override
   void initState() {
     super.initState();
-    String? videoId = YoutubePlayer.convertUrlToId(widget.item['url_evidencia_video'] ?? "");
+    String videoUrl = widget.item['link_video'] ?? "";
+    
+    if (videoUrl.isEmpty) {
+      videoUrl = widget.item['url_evidencia_video'] ?? "";
+    }
+
+    String? videoId = YoutubePlayer.convertUrlToId(videoUrl);
+    _hasVideo = videoId != null;
+
     _controller = YoutubePlayerController(
       initialVideoId: videoId ?? "", 
-      flags: const YoutubePlayerFlags(
-        autoPlay: false, 
-        mute: false, 
-        forceHD: true,
-        enableCaption: false,
-      ),
+      flags: const YoutubePlayerFlags(autoPlay: false, mute: false, forceHD: true),
     );
   }
 
@@ -356,122 +382,218 @@ class _BudgetDetailScreenState extends State<BudgetDetailScreen> {
   Widget build(BuildContext context) {
     final List breakdown = widget.item['presupuesto_items'] ?? [];
     const Color bgDark = Color(0xFF121212);
+    const Color cardColor = Color(0xFF1E1E1E);
 
-    return YoutubePlayerBuilder(
-      player: YoutubePlayer(
-        controller: _controller,
-        showVideoProgressIndicator: true,
-        progressIndicatorColor: Colors.red,
-        bottomActions: [
-          CurrentPosition(),
-          ProgressBar(isExpanded: true, colors: const ProgressBarColors(playedColor: Colors.red, handleColor: Colors.redAccent)),
-          const SizedBox(width: 10),
-          RemainingDuration(),
-          const FullScreenButton(),
-        ],
+    Widget content = Scaffold(
+      backgroundColor: bgDark,
+      appBar: AppBar(
+        backgroundColor: bgDark,
+        elevation: 0,
+        leading: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white),
+            onPressed: () => Navigator.pop(context)),
+        title: const Text("Detalles",
+            style: TextStyle(color: Colors.white, fontSize: 16)),
+        centerTitle: true,
       ),
-      builder: (context, player) {
-        return Scaffold(
-          backgroundColor: bgDark,
-          appBar: AppBar(
-            backgroundColor: bgDark,
-            elevation: 0,
-            leading: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(context)),
-            title: const Text("Evidencia y Costos", style: TextStyle(color: Colors.white, fontSize: 16)),
-            centerTitle: true,
-          ),
-          body: SingleChildScrollView( 
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(widget.item['sistema_reparar'] ?? "Detalle", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(10)),
-                  child: Text(
-                    widget.item['sistema_reparar'] ?? "", 
-                    style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
-                  ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.item['sistema_reparar'] ?? "Detalle",
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold)),
+            
+            // ELIMINADO EL BLOQUE DE TEXTO GRIS DE "PINTURA GENERAL" (falla_detectada)
+            
+            const SizedBox(height: 25),
+
+            if (_hasVideo) ...[
+              const Text("VIDEO DEL DIAGNÓSTICO",
+                  style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5)),
+              const SizedBox(height: 10),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        blurRadius: 15,
+                        offset: const Offset(0, 5))
+                  ],
                 ),
-                const SizedBox(height: 25),
-                if (widget.item['url_evidencia_video'] != null && widget.item['url_evidencia_video'].toString().isNotEmpty) ...[
-                  const Text("EVIDENCIA EN VIDEO", style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                  const SizedBox(height: 10),
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 15, offset: const Offset(0, 5))],
+                clipBehavior: Clip.antiAlias,
+                child: YoutubePlayer(
+                  controller: _controller,
+                  showVideoProgressIndicator: true,
+                  progressIndicatorColor: Colors.red,
+                  bottomActions: [
+                    CurrentPosition(),
+                    ProgressBar(isExpanded: true, colors: const ProgressBarColors(
+                      playedColor: Colors.red,
+                      handleColor: Colors.redAccent
+                    )),
+                    RemainingDuration(),
+                    FullScreenButton(),
+                  ],
+                ),
+              ),
+            ] else ...[
+               Container(
+                 width: double.infinity,
+                 padding: const EdgeInsets.all(20),
+                 decoration: BoxDecoration(
+                   border: Border.all(color: Colors.white12),
+                   borderRadius: BorderRadius.circular(10)
+                 ),
+                 child: const Column(
+                   children: [
+                     Icon(Icons.videocam_off, color: Colors.grey, size: 40),
+                     SizedBox(height: 10),
+                     Text("Sin video adjunto para este ítem", style: TextStyle(color: Colors.grey))
+                   ],
+                 ),
+               )
+            ],
+
+            const SizedBox(height: 30),
+            
+            const Text("PRESUPUESTO DETALLADO",
+                style: TextStyle(
+                    color: Colors.grey,
+                    fontSize: 12,
+                    letterSpacing: 1.5,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 15),
+
+            Container(
+              decoration: BoxDecoration(
+                  color: cardColor, 
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.white10)),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                    child: Row(
+                      children: const [
+                        Expanded(flex: 2, child: Text("DESCRIPCIÓN", style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
+                        Expanded(child: Text("CANT.", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
+                        Expanded(child: Text("PRECIO", textAlign: TextAlign.right, style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold))),
+                      ],
                     ),
-                    clipBehavior: Clip.antiAlias,
-                    child: player,
                   ),
-                ],
-                const SizedBox(height: 30),
-                const Text("PRESUPUESTO DETALLADO", style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.5, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 15),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: Colors.white10),
-                  ),
-                  child: Column(
-                    children: [
-                      ...breakdown.map((detail) => Padding(
-                        padding: const EdgeInsets.only(bottom: 15),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(detail['descripcion'] ?? "Item", style: const TextStyle(color: Colors.white70)),
-                            Text("\$${(detail['precio_unitario'] ?? 0).toStringAsFixed(2)}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      )),
-                      const Divider(color: Colors.white24),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  const Divider(color: Colors.white10, height: 1),
+
+                  ...breakdown.map((detail) {
+                    var cant = detail['cantidad'];
+                    var precio = detail['precio_venta'] ?? detail['precio_unitario'];
+                    
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("TOTAL ITEM", style: TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold)),
-                          Text("\$${(widget.item['total_reparacion'] ?? 0).toStringAsFixed(2)}", style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 18)),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              detail['descripcion'] ?? "Repuesto/Servicio",
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              cant.toString(),
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white70),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              "\$${(precio ?? 0).toString()}",
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      
-                      // GARANTÍA 
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: Colors.green.withValues(alpha: 0.5)),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.verified, color: Colors.green, size: 24),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text("GARANTÍA INCLUIDA", style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
-                                Text(widget.item['garantia'] ?? "N/A", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                              ],
-                            ),
-                          ],
-                        ),
-                      )
+                    );
+                  }),
+                  
+                  const Divider(color: Colors.white24),
+                  
+                  Padding(
+                    padding: const EdgeInsets.all(15),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("TOTAL ITEM",
+                            style: TextStyle(
+                                color: Color(0xFFD50000),
+                                fontWeight: FontWeight.bold)),
+                        Text(
+                            "\$${(widget.item['total_reparacion'] ?? 0).toStringAsFixed(2)}",
+                            style: const TextStyle(
+                                color: Color(0xFFD50000),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
+              decoration: BoxDecoration(
+                  color: Colors.green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.green.withValues(alpha: 0.5))),
+              child: Row(
+                children: [
+                  const Icon(Icons.verified, color: Colors.green, size: 24),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("GARANTÍA INCLUIDA",
+                          style: TextStyle(
+                              color: Colors.green,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold)),
+                      Text(widget.item['garantia'] ?? "N/A",
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14)),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+                ],
+              ),
+            )
+          ],
+        ),
+      ),
     );
+
+    if (_hasVideo) {
+      return YoutubePlayerBuilder(
+        player: YoutubePlayer(controller: _controller),
+        builder: (context, player) => content,
+      );
+    } else {
+      return content;
+    }
   }
 }
