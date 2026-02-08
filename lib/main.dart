@@ -17,9 +17,6 @@ import 'admin_panel.dart';
 import 'citas.dart';
 import 'diagnostico.dart';
 import 'notificaciones.dart'; 
-import 'tienda.dart';
-import 'ofertas.dart';
-import 'market.dart';
 import 'login_screen.dart';
 
 void main() async {
@@ -467,10 +464,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           
           _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => DiagnosticScreen(plate: placa)))),
           
-          _buildSliderItem(context, Icons.storefront, "TIENDA", red, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))),
-          _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))),
-          _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))),
-        ],
+      
+          
+         ],
       ),
     );
   }

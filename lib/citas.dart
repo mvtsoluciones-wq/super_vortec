@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+// LIBRERÍAS DE VIDEO Y ALMACENAMIENTO
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class AppointmentsScreen extends StatefulWidget {
   const AppointmentsScreen({super.key});
@@ -12,15 +16,18 @@ class AppointmentsScreen extends StatefulWidget {
 class _AppointmentsScreenState extends State<AppointmentsScreen> {
   // VARIABLES DE ESTADO
   int _selectedDayIndex = 0;
-  int _selectedTimeIndex = -1; // -1: Ninguno, 0: Mañana, 1: Tarde
+  int _selectedTimeIndex = -1; 
   String? _selectedService; 
-  
-  // NUEVA VARIABLE: Vehículo seleccionado
-  String? _selectedVehicleId; // Guardaremos el ID o Placa del vehículo seleccionado
-  List<Map<String, String>> _userVehicles = []; // Lista de vehículos del usuario
+  String? _selectedVehicleId; 
+  List<Map<String, String>> _userVehicles = []; 
 
   final TextEditingController _descriptionController = TextEditingController();
   bool _isLoading = false;
+
+  // --- VARIABLES PARA VIDEO ---
+  File? _videoFile;
+  bool _isUploadingVideo = false;
+  final ImagePicker _picker = ImagePicker();
 
   // DATOS
   final List<DateTime> _days = List.generate(7, (index) => DateTime.now().add(Duration(days: index)));
@@ -41,16 +48,41 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserVehicles(); // Cargar vehículos al iniciar
+    _loadUserVehicles(); 
   }
 
-  // --- FUNCIÓN PARA CARGAR VEHÍCULOS DEL USUARIO ---
+  // --- FUNCIÓN GRABAR VIDEO (MAX 20 SEG) ---
+  Future<void> _recordVideo() async {
+    try {
+      final XFile? video = await _picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(seconds: 20),
+        preferredCameraDevice: CameraDevice.rear,
+      );
+
+      if (video != null) {
+        setState(() {
+          _videoFile = File(video.path);
+        });
+        
+        // Validación de seguridad antes de usar el contexto
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("✅ Video grabado correctamente"), backgroundColor: Colors.green)
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("Error al grabar video: $e");
+    }
+  }
+
+  // --- CARGAR VEHÍCULOS ---
   Future<void> _loadUserVehicles() async {
     setState(() => _isLoading = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
-        // 1. Buscar la cédula del cliente usando su email
         var clienteQuery = await FirebaseFirestore.instance
             .collection('clientes')
             .where('email', isEqualTo: user.email)
@@ -60,7 +92,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         if (clienteQuery.docs.isNotEmpty) {
           String cedula = clienteQuery.docs.first['cedula'] ?? "";
           
-          // 2. Buscar vehículos asociados a esa cédula
           if (cedula.isNotEmpty) {
             var vehiculosQuery = await FirebaseFirestore.instance
                 .collection('vehiculos')
@@ -72,10 +103,10 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               var data = doc.data();
               String marca = data['marca'] ?? "Marca";
               String modelo = data['modelo'] ?? "Modelo";
-              String placa = data['placa'] ?? doc.id; // Usamos ID si no hay placa
+              String placa = data['placa'] ?? doc.id; 
               
               loadedVehicles.add({
-                'id': placa, // Usaremos la placa como identificador
+                'id': placa, 
                 'display': "$marca $modelo ($placa)".toUpperCase()
               });
             }
@@ -83,7 +114,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
             if (mounted) {
               setState(() {
                 _userVehicles = loadedVehicles;
-                // Si solo tiene un vehículo, lo seleccionamos automáticamente
                 if (_userVehicles.length == 1) {
                   _selectedVehicleId = _userVehicles[0]['id'];
                 }
@@ -120,11 +150,20 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)
         ),
       ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator(color: brandRed))
+      body: (_isLoading || _isUploadingVideo) 
+        ? Center(child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(color: brandRed),
+              if (_isUploadingVideo) ...[
+                const SizedBox(height: 20),
+                const Text("Subiendo video de evidencia...", style: TextStyle(color: Colors.white70))
+              ]
+            ],
+          ))
         : Column(
           children: [
-            // 1. CALENDARIO (Horizontal)
+            // CALENDARIO
             Container(
               padding: const EdgeInsets.symmetric(vertical: 20),
               child: SizedBox(
@@ -179,7 +218,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               ),
             ),
 
-            // 2. FORMULARIO EN TARJETA INFERIOR
+            // FORMULARIO
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -195,8 +234,6 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      
-                      // --- NUEVO: SELECTOR DE VEHÍCULO ---
                       const Text("Seleccionar Vehículo", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
                       Container(
@@ -233,12 +270,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                             ),
                           ),
                       ),
-                      if (_userVehicles.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 5, left: 5),
-                          child: Text("Contacta al taller para registrar tu vehículo.", style: TextStyle(color: Colors.red[300], fontSize: 11)),
-                        ),
-
+                      
                       const SizedBox(height: 25),
 
                       const Text("Tipo de Servicio", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
@@ -310,6 +342,51 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
 
                       const SizedBox(height: 25),
 
+                      // BOTÓN DE VIDEO
+                      const Text("Video de la Falla (Opcional - Máx 20s)", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: _recordVideo,
+                        child: Container(
+                          width: double.infinity,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2C2C2C),
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(
+                              color: _videoFile != null ? Colors.green : brandRed.withValues(alpha: 0.5),
+                              width: 1.5,
+                              style: BorderStyle.solid
+                            ),
+                          ),
+                          child: _videoFile == null 
+                            ? const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.videocam, color: brandRed, size: 30),
+                                  SizedBox(height: 5),
+                                  Text("GRABAR VIDEO AHORA", style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
+                                ],
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.check_circle, color: Colors.green, size: 24),
+                                  const SizedBox(width: 10),
+                                  const Text("VIDEO LISTO", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 10),
+                                  IconButton(
+                                    icon: const Icon(Icons.refresh, color: Colors.white54, size: 20),
+                                    onPressed: _recordVideo,
+                                    tooltip: "Grabar de nuevo",
+                                  )
+                                ],
+                              ),
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 25),
+
                       const Text("Descripción de la Falla", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
                       TextField(
@@ -353,9 +430,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
     );
   }
 
-  // --- FUNCIÓN PRINCIPAL PARA GUARDAR EN FIREBASE ---
+  // --- ENVIAR SOLICITUD Y SUBIR VIDEO ---
   Future<void> _enviarSolicitud() async {
-    // 1. Validaciones
     if (_selectedVehicleId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("⚠️ Selecciona un vehículo"), backgroundColor: Colors.orange));
       return;
@@ -369,13 +445,23 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() => _isUploadingVideo = true);
 
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception("Usuario no autenticado");
 
-      // Buscar nombre del cliente nuevamente para asegurar datos frescos
+      String? videoUrl;
+
+      // SUBIDA A STORAGE
+      if (_videoFile != null) {
+        String fileName = "video_${_selectedVehicleId}_${DateTime.now().millisecondsSinceEpoch}.mp4";
+        Reference ref = FirebaseStorage.instance.ref().child("videos_citas/$fileName");
+        UploadTask uploadTask = ref.putFile(_videoFile!);
+        TaskSnapshot snapshot = await uploadTask;
+        videoUrl = await snapshot.ref.getDownloadURL();
+      }
+
       String nombreCliente = "Usuario App";
       String telefonoCliente = "";
       
@@ -391,10 +477,8 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         telefonoCliente = data['telefono'] ?? "";
       }
 
-      // Obtener el string del vehículo seleccionado para guardarlo
       String vehiculoString = _userVehicles.firstWhere((v) => v['id'] == _selectedVehicleId)['display']!;
 
-      // Preparar fecha
       DateTime fechaSeleccionada = _days[_selectedDayIndex];
       DateTime fechaFinal = DateTime(
         fechaSeleccionada.year, 
@@ -404,15 +488,16 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         0
       );
 
-      // Guardar en Firestore
+      // GUARDAR EN FIRESTORE
       await FirebaseFirestore.instance.collection('citas').add({
         'cliente_id': user.uid,
         'nombre_cliente': nombreCliente,
         'telefono': telefonoCliente,
-        'vehiculo': vehiculoString, // Guardamos "MARCA MODELO (PLACA)"
-        'vehiculo_placa': _selectedVehicleId, // Guardamos la placa pura también por si acaso
+        'vehiculo': vehiculoString, 
+        'vehiculo_placa': _selectedVehicleId, 
         'motivo': _selectedService,
         'descripcion': _descriptionController.text.trim(),
+        'url_video': videoUrl, 
         'fecha_hora': Timestamp.fromDate(fechaFinal),
         'turno': _timeSlots[_selectedTimeIndex],
         'estado': 'pendiente',
@@ -428,7 +513,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
         SnackBar(content: Text("Error al agendar: $e"), backgroundColor: Colors.red)
       );
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) setState(() => _isUploadingVideo = false);
     }
   }
 
