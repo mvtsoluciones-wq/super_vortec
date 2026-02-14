@@ -7,9 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async'; 
 
-// --- 1. IMPORTACIÓN NECESARIA PARA CORREGIR EL ERROR DE FECHA ---
 import 'package:intl/date_symbol_data_local.dart';
-
 import 'firebase_options.dart';
 
 // --- IMPORTACIONES DE TUS PANTALLAS ---
@@ -19,11 +17,12 @@ import 'diagnostico.dart';
 import 'notificaciones.dart'; 
 import 'login_screen.dart';
 
+// NOTA: He eliminado los imports de tienda, ofertas y market para corregir el error.
+// Las clases de esas pantallas están definidas al final de este archivo.
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // --- 2. LÍNEA AGREGADA PARA INICIALIZAR EL FORMATO DE FECHA EN ESPAÑOL ---
   await initializeDateFormatting('es_ES', null);
 
   SystemChrome.setPreferredOrientations([
@@ -70,7 +69,6 @@ class SuperVortecApp extends StatelessWidget {
 class SessionTimeoutGuard extends StatefulWidget {
   final Widget child;
   const SessionTimeoutGuard({super.key, required this.child});
-
   @override
   State<SessionTimeoutGuard> createState() => _SessionTimeoutGuardState();
 }
@@ -98,12 +96,7 @@ class _SessionTimeoutGuardState extends State<SessionTimeoutGuard> {
     if (FirebaseAuth.instance.currentUser != null) {
       await FirebaseAuth.instance.signOut();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Sesión cerrada por inactividad."),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Sesión cerrada por inactividad."), backgroundColor: Colors.orange));
       }
     }
   }
@@ -127,20 +120,13 @@ class _SessionTimeoutGuardState extends State<SessionTimeoutGuard> {
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
-
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator(color: Color(0xFFD50000))),
-          );
-        }
-        if (snapshot.hasData) {
-          return const SessionTimeoutGuard(child: PlatformGuard());
-        }
+        if (snapshot.connectionState == ConnectionState.waiting) return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFD50000))));
+        if (snapshot.hasData) return const SessionTimeoutGuard(child: PlatformGuard());
         return const LoginScreen();
       },
     );
@@ -149,16 +135,12 @@ class AuthWrapper extends StatelessWidget {
 
 class PlatformGuard extends StatelessWidget {
   const PlatformGuard({super.key});
-
   @override
   Widget build(BuildContext context) {
     double screenWidth = MediaQuery.of(context).size.width;
     if (kIsWeb) {
-      if (screenWidth > 1000) {
-        return const AdminControlPanel();
-      } else {
-        return const WebBlockedScreen();
-      }
+      if (screenWidth > 1000) return const AdminControlPanel();
+      return const WebBlockedScreen();
     }
     return const ClientHomeScreen();
   }
@@ -166,7 +148,6 @@ class PlatformGuard extends StatelessWidget {
 
 class WebBlockedScreen extends StatelessWidget {
   const WebBlockedScreen({super.key});
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -177,13 +158,126 @@ class WebBlockedScreen extends StatelessWidget {
           children: [
             const Icon(Icons.phonelink_lock, color: Color(0xFFD50000), size: 100),
             const SizedBox(height: 30),
-            const Text(
-              "APP NO DISPONIBLE EN WEB",
-              style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            const Text("APP NO DISPONIBLE EN WEB", style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+            TextButton(onPressed: () => FirebaseAuth.instance.signOut(), child: const Text("Cerrar Sesión", style: TextStyle(color: Colors.white54))),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --- WIDGET CORREGIDO: ICONO CON DOBLE PERSONALIDAD (NORMAL O ALERTA) ---
+class GlowingNotificationIcon extends StatefulWidget {
+  final VoidCallback onTap;
+  final bool hasMessages;
+  final Color activeColor; // Rojo cuando hay mensajes
+  final Color defaultColor; // Amarillo/Dorado cuando no hay mensajes
+  final bool isDark; // Para saber qué diseño base usar
+
+  const GlowingNotificationIcon({
+    super.key, 
+    required this.onTap, 
+    required this.hasMessages, 
+    required this.activeColor,
+    required this.defaultColor,
+    required this.isDark,
+  });
+
+  @override
+  State<GlowingNotificationIcon> createState() => _GlowingNotificationIconState();
+}
+
+class _GlowingNotificationIconState extends State<GlowingNotificationIcon> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(duration: const Duration(milliseconds: 800), vsync: this);
+    _animation = Tween<double>(begin: 0.0, end: 15.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+    if (widget.hasMessages) _controller.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(GlowingNotificationIcon oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.hasMessages != oldWidget.hasMessages) {
+      if (widget.hasMessages) {
+        _controller.repeat(reverse: true);
+      } else {
+        _controller.stop();
+        _controller.reset();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        width: 90,
+        margin: const EdgeInsets.symmetric(horizontal: 5),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                // DISEÑO BASE IDÉNTICO AL _buildSliderItem ORIGINAL
+                final baseDecoration = BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft, 
+                    end: Alignment.bottomRight, 
+                    colors: widget.isDark 
+                      ? [const Color(0xFF2C2C2C), Colors.black.withValues(alpha: 0.8)] 
+                      : [Colors.white, Colors.grey[200]!]
+                  ),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: widget.isDark ? Colors.white12 : Colors.grey[300]!),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withValues(alpha: widget.isDark ? 0.5 : 0.1), blurRadius: 10, offset: const Offset(0, 5))
+                  ]
+                );
+
+                // DISEÑO DE ALERTA (SOBRESCRIBE SI HAY MENSAJES)
+                final alertDecoration = BoxDecoration(
+                  color: widget.activeColor,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: widget.activeColor, blurRadius: _animation.value, spreadRadius: _animation.value / 2)],
+                );
+
+                return Container(
+                  height: 60, width: 60,
+                  decoration: widget.hasMessages ? alertDecoration : baseDecoration,
+                  child: Icon(
+                    widget.hasMessages ? Icons.notifications_active : Icons.notifications,
+                    color: widget.hasMessages ? Colors.white : widget.defaultColor, // Amarillo si no hay mensajes
+                    size: 24
+                  ),
+                );
+              },
             ),
-            TextButton(
-              onPressed: () => FirebaseAuth.instance.signOut(),
-              child: const Text("Cerrar Sesión", style: TextStyle(color: Colors.white54)),
+            const SizedBox(height: 10),
+            Text(
+              "NOTIFIC.", 
+              textAlign: TextAlign.center, 
+              style: TextStyle(
+                fontSize: 10, 
+                // Color de texto: Rojo si hay alerta, gris/blanco si es normal
+                color: widget.hasMessages 
+                  ? widget.activeColor 
+                  : (widget.isDark ? Colors.white70 : Colors.black54), 
+                fontWeight: FontWeight.bold
+              )
             ),
           ],
         ),
@@ -192,10 +286,8 @@ class WebBlockedScreen extends StatelessWidget {
   }
 }
 
-// --- CLIENT HOME SCREEN ---
 class ClientHomeScreen extends StatefulWidget {
   const ClientHomeScreen({super.key});
-
   @override
   State<ClientHomeScreen> createState() => _ClientHomeScreenState();
 }
@@ -203,6 +295,7 @@ class ClientHomeScreen extends StatefulWidget {
 class _ClientHomeScreenState extends State<ClientHomeScreen> {
   late PageController _pageController;
   int _currentPage = 0;
+  int _previousMessageCount = 0;
 
   @override
   void initState() {
@@ -256,6 +349,27 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
     if (diff.inDays > 30) return "${(diff.inDays / 30).floor()} Meses";
     if (diff.inDays > 0) return "${diff.inDays} Días";
     return "Hoy";
+  }
+
+  void _triggerAlert() {
+    HapticFeedback.heavyImpact();
+    SystemSound.play(SystemSoundType.click);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: const Color(0xFFD50000),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(top: 50, left: 20, right: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        content: const Row(
+          children: [
+            Icon(Icons.notifications_active, color: Colors.white),
+            SizedBox(width: 15),
+            Expanded(child: Text("¡TIENES UN MENSAJE DEL TALLER!", style: TextStyle(fontWeight: FontWeight.bold))),
+          ],
+        ),
+        duration: const Duration(seconds: 4),
+      )
+    );
   }
 
   @override
@@ -317,6 +431,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                         "color": data['color'] ?? "N/A",
                         "km": data['km']?.toString() ?? "0",
                         "isInWorkshop": data['en_taller'] ?? false,
+                        "statusText": data['estado_taller'] ?? "EN TALLER",
                       };
                     }
                   }
@@ -327,7 +442,6 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                   if (vehicles.isEmpty) return _buildEmptyState("Sin Vehículos", "No hay autos registrados.", textColor);
                   if (_currentPage >= vehicles.length) _currentPage = 0;
                   
-                  // OBTENEMOS LA PLACA ACTUAL
                   String placaActual = vehicles[_currentPage]['plate'];
 
                   return SafeArea(
@@ -447,25 +561,38 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         children: [
           _buildSliderItem(context, Icons.calendar_month, "CITAS", red, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const AppointmentsScreen()))),
           
-          // --- AQUÍ ESTÁ LA CORRECCIÓN: NotificacionesScreen con parámetro currentPlaca ---
-          _buildSliderItem(
-            context, 
-            Icons.notifications, 
-            "NOTIFIC.", 
-            Colors.amber, 
-            isDark, 
-            onTap: () => Navigator.push(
-              context, 
-              MaterialPageRoute(
-                builder: (c) => NotificacionesScreen(currentPlaca: placa)
-              )
-            )
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('notificaciones').where('placa', isEqualTo: placa).where('leido', isEqualTo: false).snapshots(),
+            builder: (context, snapshot) {
+              int currentCount = 0;
+              if (snapshot.hasData) currentCount = snapshot.data!.docs.length;
+
+              if (currentCount > _previousMessageCount && currentCount > 0) {
+                 WidgetsBinding.instance.addPostFrameCallback((_) { _triggerAlert(); });
+              }
+              if (snapshot.hasData) {
+                Future.delayed(Duration.zero, () {
+                  if (mounted && _previousMessageCount != currentCount) setState(() => _previousMessageCount = currentCount);
+                });
+              }
+
+              bool hayMensajes = currentCount > 0;
+
+              return GlowingNotificationIcon(
+                hasMessages: hayMensajes,
+                activeColor: red,
+                defaultColor: Colors.amber, // COLOR AMARILLO ORIGINAL
+                isDark: isDark,
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => NotificacionesScreen(currentPlaca: placa))),
+              );
+            }
           ),
           
           _buildSliderItem(context, Icons.monitor_heart, "DIAGNÓSTICO", isDark ? Colors.white : Colors.black, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => DiagnosticScreen(plate: placa)))),
           
-      
-          
+          _buildSliderItem(context, Icons.storefront, "TIENDA", const Color(0xFFD50000), isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const StoreScreen()))),
+          _buildSliderItem(context, Icons.local_offer, "OFERTAS", Colors.orange, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const OfferScreen()))),
+          _buildSliderItem(context, Icons.directions_car, "MARKET", Colors.blueAccent, isDark, onTap: () => Navigator.push(context, MaterialPageRoute(builder: (c) => const MarketplaceScreen()))),
          ],
       ),
     );
@@ -477,6 +604,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
 
   Widget _buildVehicleCard(Map<String, dynamic> v, bool isDark) {
     Color textColor = isDark ? Colors.white : Colors.black;
+    Color statusColor = const Color(0xFFD50000); 
+    String statusText = v['statusText'] ?? "EN TALLER";
+    if (statusText == "LISTO") statusColor = Colors.green;
+    if (statusText == "EN REPARACIÓN") statusColor = Colors.orange;
+
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(color: isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: isDark ? Colors.white10 : Colors.grey[300]!)),
@@ -487,14 +619,11 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
             const CircleAvatar(backgroundColor: Color(0xFFD50000), radius: 18, child: Icon(Icons.directions_car, color: Colors.white, size: 18)),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(v['brand'], style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 12)), Text(v['model'], style: TextStyle(color: textColor, fontWeight: FontWeight.w900, fontSize: 18))])),
-            if (v['isInWorkshop'] == true) Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFD50000))), child: const Text("EN TALLER", style: TextStyle(color: Color(0xFFD50000), fontSize: 8, fontWeight: FontWeight.bold))),
+            if (v['isInWorkshop'] == true) 
+              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4), decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), border: Border.all(color: statusColor)), child: Text(statusText.toUpperCase(), style: TextStyle(color: statusColor, fontSize: 8, fontWeight: FontWeight.bold))),
           ]),
           const Spacer(),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            _buildTechItem("PLACA", v['plate'], isDark),
-            _buildTechItem("COLOR", v['color'], isDark),
-            _buildTechItem("KM", v['km'], isDark),
-          ]),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_buildTechItem("PLACA", v['plate'], isDark), _buildTechItem("COLOR", v['color'], isDark), _buildTechItem("KM", v['km'], isDark)]),
         ],
       ),
     );
@@ -519,11 +648,7 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
           ]),
           const SizedBox(height: 15),
           const Divider(color: Colors.white10),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            _buildStat(Icons.verified_user, "Garantía", h['warranty']),
-            _buildStat(Icons.hourglass_bottom, "Restan", h['daysLeft']),
-            _buildStat(Icons.history, "Tiempo", h['elapsed']),
-          ]),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_buildStat(Icons.verified_user, "Garantía", h['warranty']), _buildStat(Icons.hourglass_bottom, "Restan", h['daysLeft']), _buildStat(Icons.history, "Tiempo", h['elapsed'])]),
         ]),
       ),
     );
@@ -577,7 +702,7 @@ class RepairDetailScreen extends StatelessWidget {
   Widget _buildInfoBlock(String l, String c, Color t, bool d) => Container(width: double.infinity, padding: const EdgeInsets.all(15), decoration: BoxDecoration(color: d ? Colors.white.withValues(alpha: 0.05) : Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.white10)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(l, style: const TextStyle(color: Color(0xFFD50000), fontWeight: FontWeight.bold, fontSize: 14)), const SizedBox(height: 5), Text(c, style: TextStyle(color: t.withValues(alpha: 0.7), fontSize: 13, height: 1.4))]));
 
   Widget _buildVideoSection(BuildContext ctx, Map h, bool d) {
-    String url = h['videoUrl'] ?? ""; // USO DE URL_EVIDENCIA_VIDEO
+    String url = h['videoUrl'] ?? "";
     String? id = YoutubePlayer.convertUrlToId(url);
     String thumb = id != null ? "https://img.youtube.com/vi/$id/mqdefault.jpg" : "";
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -627,3 +752,8 @@ class _InAppVideoPlayerScreenState extends State<InAppVideoPlayerScreen> {
     );
   }
 }
+
+// --- CLASES PLACEHOLDER (Para que compile sin tienda/ofertas.dart) ---
+class StoreScreen extends StatelessWidget { const StoreScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)), body: const Center(child: Text("Tienda Próximamente", style: TextStyle(color: Colors.white)))); }
+class OfferScreen extends StatelessWidget { const OfferScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)), body: const Center(child: Text("Ofertas Próximamente", style: TextStyle(color: Colors.white)))); }
+class MarketplaceScreen extends StatelessWidget { const MarketplaceScreen({super.key}); @override Widget build(BuildContext context) => Scaffold(backgroundColor: Colors.black, appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)), body: const Center(child: Text("Marketplace Próximamente", style: TextStyle(color: Colors.white)))); }
